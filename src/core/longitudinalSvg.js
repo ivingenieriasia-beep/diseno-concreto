@@ -75,7 +75,7 @@ export function elevationSvg(t, r, opts = {}) {
       if (b.ancla?.includes('I')) P(`<line x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x0.toFixed(1)}" y2="${(y + dir * hook).toFixed(1)}" stroke="${color}" stroke-width="2.5"/>`)
       if (b.ancla?.includes('J')) P(`<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + dir * hook).toFixed(1)}" stroke="${color}" stroke-width="2.5"/>`)
       // etiqueta
-      const lbl = `${b.k}#${cal} L=${f2(b.len)} m${b.ancla ? ` (anclar en ${b.ancla})` : ''}`
+      const lbl = `bastón ${b.k}#${cal} L=${f2(b.len)} m${b.ancla ? ` (anclar en ${b.ancla})` : ''}`
       const ty = dir > 0 ? y + fs + 3 : y - 5
       P(`<text x="${((x0 + x1) / 2).toFixed(1)}" y="${ty.toFixed(1)}" font-size="${fs}" font-weight="700" fill="${color}" text-anchor="middle">${esc(lbl)}</text>`)
       // cotas del bastón (debajo de la trabe, escalonadas)

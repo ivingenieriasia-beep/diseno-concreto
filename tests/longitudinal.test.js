@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseRamStations, looksLikeStations, memberProfile, profileAt, exceedZones, developmentLength, sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign, capacityAt, capacityProfile, capacityViolations, mrForAs, bastonesDe, bastonesDeVarios } from '../src/core/longitudinal.js'
+import { parseRamStations, looksLikeStations, memberProfile, profileAt, exceedZones, developmentLength, sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign, capacityAt, capacityProfile, capacityViolations, mrForAs, bastonesDe, bastonesDeVarios, extraDe } from '../src/core/longitudinal.js'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../src/core/longitudinalSvg.js'
 import { calcFlexion } from '../src/core/sectionCalculator.js'
 
@@ -345,6 +345,19 @@ describe('bajar el bastoneo a la sección', () => {
     expect(sobran).toHaveLength(0)
     // y es estrictamente más que el armado corrido solo
     expect(MRN).toBeGreaterThan(caps.MRN)
+  })
+  it('extraDe separa lo que ya cubre el diseño de lo que es bastón puntual extra', () => {
+    const r = { inf: { bars: [{ k: 1 }] }, sup: { bars: [{ k: 3 }] }, status: 'baston' }
+    // el corte ya lleva 1/1 bastones: abajo queda cubierto, arriba faltan 2
+    expect(extraDe(r, 1, 1)).toMatchObject({ kInf: 1, kSup: 3, extraInf: 0, extraSup: 2, extra: true })
+    // con 1/3 dibujados no pide nada más
+    expect(extraDe(r, 1, 3)).toMatchObject({ extraInf: 0, extraSup: 0, extra: false, cubiertoPorDiseno: true })
+    // sin bastones en el diseño, todo es extra
+    expect(extraDe(r, 0, 0)).toMatchObject({ extraInf: 1, extraSup: 3, extra: true })
+    // el que no alcanza ni con un bastón por varilla siempre pide más
+    expect(extraDe({ inf: { bars: [] }, sup: { bars: [{ k: 2 }] }, status: 'insuficiente' }, 9, 9).extra).toBe(true)
+    // y el que pasa sólo con corridas no pide nada
+    expect(extraDe({ inf: { bars: [] }, sup: { bars: [] }, status: 'ok' }, 0, 0)).toMatchObject({ extra: false, cubiertoPorDiseno: false })
   })
   it('el bastoneo de un elemento suelto puede quedar por debajo del que pide el grupo', () => {
     const P = parseRamStations(T4)

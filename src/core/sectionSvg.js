@@ -78,9 +78,11 @@ export function sectionSvgString(t, opts = {}) {
 
   // ── Callouts ──
   // Top steel (upper-left)
-  const topLbl = cantBSup > 0 && t.calBastonSup !== t.calSup
-    ? `${t.cantSup}Ø#${t.calSup} + ${cantBSup}Ø#${t.calBastonSup}`
-    : `${(Number(t.cantSup) || 0) + cantBSup}Ø#${t.calSup}`
+  // corridas y bastones SIEMPRE por separado: en el corte se distinguen por el
+  // círculo relleno (corrida) y el hueco (bastón), y el rótulo debe decir lo mismo
+  const topLbl = cantBSup > 0
+    ? `${t.cantSup}Ø#${t.calSup} corridas + ${cantBSup}Ø#${t.calBastonSup} bastón`
+    : `${t.cantSup}Ø#${t.calSup} corridas`
   if (supBars.length) {
     const b0 = supBars[0]
     const lx = ox - 6, ly = oy - 8
@@ -88,9 +90,9 @@ export function sectionSvgString(t, opts = {}) {
     P(`<text x="${ox - 30}" y="${oy - 6}" font-size="12.5" font-weight="600" fill="${C.topStroke}" text-anchor="end">Lecho sup. ${esc(topLbl)}</text>`)
   }
   // Bottom steel (lower-right)
-  const botLbl = cantBInf > 0 && t.calBastonInf !== t.calInf
-    ? `${t.cantInf}Ø#${t.calInf} + ${cantBInf}Ø#${t.calBastonInf}`
-    : `${(Number(t.cantInf) || 0) + cantBInf}Ø#${t.calInf}`
+  const botLbl = cantBInf > 0
+    ? `${t.cantInf}Ø#${t.calInf} corridas + ${cantBInf}Ø#${t.calBastonInf} bastón`
+    : `${t.cantInf}Ø#${t.calInf} corridas`
   if (infBars.length) {
     const bl = infBars[infBars.length - 1]
     const lx = ox + bpx + 14, ly = oy + hpx + 6

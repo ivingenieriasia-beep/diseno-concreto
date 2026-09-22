@@ -728,6 +728,20 @@ export function bastonesDe(r) {
   }
 }
 
+/**
+ * Lo que una unidad pide MÁS ALLÁ del armado del diseño: el diseño ya lleva
+ * kBaseInf/kBaseSup bastones dibujados en el corte, así que sólo son "bastón
+ * puntual extra" los que pasan de ahí.
+ * @returns { extraInf, extraSup, extra:bool, cubiertoPorDiseno:bool }
+ */
+export function extraDe(r, kBaseInf = 0, kBaseSup = 0) {
+  const { kInf, kSup } = bastonesDe(r)
+  const extraInf = Math.max(0, kInf - Math.max(0, kBaseInf))
+  const extraSup = Math.max(0, kSup - Math.max(0, kBaseSup))
+  const extra = extraInf > 0 || extraSup > 0 || r?.status === 'insuficiente' || !!r?.shearFail
+  return { kInf, kSup, extraInf, extraSup, extra, cubiertoPorDiseno: !extra && (kInf > 0 || kSup > 0) }
+}
+
 /** Bastones que cubren a todas las unidades de una lista */
 export function bastonesDeVarios(rs) {
   const k = (rs || []).map(bastonesDe)

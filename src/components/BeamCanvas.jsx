@@ -16,7 +16,7 @@ const COLS = 4
 function SectionGroup({ t, ox, oy }) {
   const g = computeGeometry(t, SCALE)
   const { bpx, hpx, rcPx, eiPx, ew, eh, er, fs, supBars, infBars, hook1, hook2,
-    bastonsSup, bastonsInf, cantBSup, cantBInf, totalSup, totalInf } = g
+    bastonsSup, bastonsInf, cantBSup, cantBInf } = g
 
   // Dimension annotation: cover (left, between height and section)
   const crx = -fs * 1.6
@@ -114,15 +114,15 @@ function SectionGroup({ t, ox, oy }) {
       </text>
       {/* Top steel label */}
       <text x={bpx / 2} y={-fs * 0.3} fontSize={Math.round(fs * 0.88)} fill="#c94f2a" textAnchor="middle">
-        {cantBSup > 0 && t.calBastonSup !== t.calSup
-          ? `${t.cantSup}\u00D8#${t.calSup} + ${cantBSup}\u00D8#${t.calBastonSup}`
-          : `${totalSup}\u00D8#${t.calSup}`}
+        {cantBSup > 0
+          ? `${t.cantSup}\u00D8#${t.calSup} corridas + ${cantBSup}\u00D8#${t.calBastonSup} bastón`
+          : `${t.cantSup}\u00D8#${t.calSup} corridas`}
       </text>
       {/* Bottom steel label */}
       <text x={bpx / 2} y={hpx + fs * 1.2} fontSize={Math.round(fs * 0.88)} fill="#2563a8" textAnchor="middle">
-        {cantBInf > 0 && t.calBastonInf !== t.calInf
-          ? `${t.cantInf}\u00D8#${t.calInf} + ${cantBInf}\u00D8#${t.calBastonInf}`
-          : `${totalInf}\u00D8#${t.calInf}`}
+        {cantBInf > 0
+          ? `${t.cantInf}\u00D8#${t.calInf} corridas + ${cantBInf}\u00D8#${t.calBastonInf} bastón`
+          : `${t.cantInf}\u00D8#${t.calInf} corridas`}
       </text>
 
       {/* Name + dims */}
