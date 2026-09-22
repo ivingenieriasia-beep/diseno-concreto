@@ -100,39 +100,27 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     return group.results.find((r) => r.id === sel) || group.results.find((r) => r.status !== 'ok') || group.results[0]
   }, [group, sel])
 
-  // El DISEÑO de la trabe es lo que lleva dibujado el corte: corridas + sus
-  // bastones. Este módulo sólo añade BASTONES PUNTUALES donde el momento pide
-  // más que eso, así que «extra» es lo que pasa de los bastones del diseño.
-  const MRk = useMemo(() => {
-    if (!group) return null
-    const kI = Math.min(+form.cantBastonInf || 0, group.caps.inf.kMax)
-    const kS = Math.min(+form.cantBastonSup || 0, group.caps.sup.kMax)
-    return {
-      kI, kS,
-      MRP: (kI ? group.caps.inf.withK(kI)?.MRT : group.caps.MRP) || group.caps.MRP,
-      MRN: (kS ? group.caps.sup.withK(kS)?.MRT : group.caps.MRN) || group.caps.MRN,
-    }
-  }, [group, form.cantBastonInf, form.cantBastonSup])
-  const extraDeR = (r) => extraDe(r, MRk?.kI || 0, MRk?.kS || 0)
-  const criticos = useMemo(() => (group ? group.results.filter((r) => extraDeR(r).extra) : []), [group, MRk]) // eslint-disable-line
-  const conBaston = useMemo(() => (group ? group.results.filter((r) => r.status !== 'ok') : []), [group])
+  // El DISEÑO de la trabe (corridas + bastones CORRIDOS del corte) es la base
+  // del análisis; lo que este módulo reparte encima son bastones PUNTUALES.
+  const kCorr = group ? { inf: group.caps.kCorrInf, sup: group.caps.kCorrSup } : { inf: 0, sup: 0 }
+  const criticos = useMemo(() => (group ? group.results.filter((r) => extraDe(r).pidePuntual) : []), [group])
+  const insuficientes = useMemo(() => (group ? group.results.filter((r) => r.status === 'insuficiente' || r.shearFail) : []), [group])
   const filas = useMemo(() => {
     if (!group) return []
     if (filtro === 'criticos') return criticos
-    if (filtro === 'baston') return conBaston
+    if (filtro === 'baston') return insuficientes
     return group.results
-  }, [group, filtro, criticos, conBaston])
+  }, [group, filtro, criticos, insuficientes])
 
-  // Estado de cada unidad frente al DISEÑO, no sólo frente a las corridas
+  // Estado de cada unidad frente al diseño de la trabe
   const pillDe = (r) => {
     if (r.status === 'insuficiente') return <Pill tone="bad">✗ insuficiente</Pill>
     if (r.shearFail) return <Pill tone="bad">✗ cortante</Pill>
-    const e = extraDeR(r)
-    if (e.extraInf || e.extraSup) {
-      return <Pill tone="info">+{[e.extraInf && `${e.extraInf} abajo`, e.extraSup && `${e.extraSup} arriba`].filter(Boolean).join(' / ')} puntual</Pill>
+    const { kInf, kSup } = extraDe(r)
+    if (kInf || kSup) {
+      return <Pill tone="info">+{[kInf && `${kInf} abajo`, kSup && `${kSup} arriba`].filter(Boolean).join(' / ')} puntual</Pill>
     }
-    if (e.kInf || e.kSup) return <Pill tone="ok">✓ con el diseño</Pill>
-    return <Pill tone="ok">✓ corridas</Pill>
+    return <Pill tone="ok">✓ con el diseño</Pill>
   }
 
   const mismatch = useMemo(() => {
@@ -255,11 +243,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     setMsg(`DXF de alzados generado: ${n} patrón(es) de ${list.length} trabe(s), a escala real (1 unidad = 1 cm${dxfScale !== 1 ? `, factor ${dxfScale}` : ''}).`)
   }
 
-  // Baja a la sección los bastones que pide el análisis (los dibuja el corte)
+  // Anota en la trabe los bastones PUNTUALES que reparte el análisis. No van al
+  // corte (no existen en toda la longitud): se dibujan en el alzado.
   const aplicarBastones = (unidades, nota) => {
     const { kInf, kSup } = bastonesDeVarios(unidades)
-    setForm({ cantBastonInf: kInf, cantBastonSup: kSup })
-    setMsg(`${nota}: la sección queda con ${kInf}/${kSup} bastón(es) #${form.calBastonInf}/#${form.calBastonSup}.`)
+    setForm({ cantBastonPuntInf: kInf, cantBastonPuntSup: kSup })
+    setMsg(`${nota}: ${kInf}/${kSup} bastón(es) puntual(es) #${form.calBastonInf}/#${form.calBastonSup}, que salen en el alzado (el corte no cambia).`)
   }
 
   const nombreLibre = (base) => {
@@ -282,6 +271,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     const nueva = {
       ...form,
       nombre: nombreLibre(form.nombre),
+      cantBastonPuntInf: kInf, cantBastonPuntSup: kSup,
       perfil: { ...perfil, members: perfil.members.filter((m) => idSet.has(String(m.id))), excluir: [] },
       envelope: env?.points ? { ...env, points: env.points.filter((p) => idSet.has(String(p.member))) } : env,
     }
@@ -317,10 +307,9 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const capsOk = group?.caps.okBase
   const L = perfil?.L || 0
   const needL = group && group.results.some((r) => !(r.L > 0))
-  const kInfMismatch = group && group.kMaxInf !== (+form.cantBastonInf || 0)
-  const kSupMismatch = group && group.kMaxSup !== (+form.cantBastonSup || 0)
-  // ¿la sección lleva menos bastones de los que pide el grupo (faltan) o más (sobran)?
-  const faltan = group && (group.kMaxInf > (+form.cantBastonInf || 0) || group.kMaxSup > (+form.cantBastonSup || 0))
+  const kInfMismatch = group && group.kMaxInf !== (+form.cantBastonPuntInf || 0)
+  const kSupMismatch = group && group.kMaxSup !== (+form.cantBastonPuntSup || 0)
+  const puedeCorrer = group && (group.kMaxInf > 0 || group.kMaxSup > 0)
   const hayEsfuerzos = perfil?.members?.length > 0
   const hayModelo = model?.rows?.length > 0 && nodes.size > 0
   const vista = view === 'modelo' && !hayModelo ? 'tabla' : view
@@ -409,7 +398,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                   <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid="foco-todos"
                     onClick={() => setFiltro('criticos')}
                     title="En la envolvente no pasan varios miembros; aquí se agrupan por elemento contra la sección tal como está detallada">
-                    ¿Trasladar también los demás? — ver sólo los que piden extra ({criticos.length})
+                    ¿Trasladar también los demás? — ver sólo los que piden puntual ({criticos.length})
                   </button>
                 )}
               </>
@@ -446,43 +435,51 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               border: `1px solid ${group.allOk && capsOk ? '#a5d6a7' : group.nInsuf || group.nShear || !capsOk ? '#ef9a9a' : '#fcd34d'}`,
             }}>
               <b>{group.n} {group.results.some((r) => r.isElement) ? 'elementos' : 'miembros'}:</b>
-              <span style={{ color: '#15803d' }}>{group.nOk} pasan con corridas</span>
-              <span style={{ color: '#1d4ed8' }} title="Piden bastón en algún tramo, partiendo del armado corrido">{group.nBast} piden bastón</span>
+              <span style={{ color: '#15803d' }} title="Les basta lo que la trabe lleva en toda su longitud (corridas + bastón corrido)">{group.nOk} cubiertos con el diseño</span>
+              <span style={{ color: '#1d4ed8' }} title="Piden bastón puntual en algún tramo, además del armado del corte">{group.nBast} piden bastón puntual</span>
               {group.nInsuf > 0 && <span style={{ color: '#c62828' }}>{group.nInsuf} insuficientes</span>}
               {group.nShear > 0 && <span style={{ color: '#c62828' }}>{group.nShear} fallan por cortante</span>}
               {group.results.some(smaxWarn) && <span style={{ color: '#92400e' }} title="La separación de estribos supera d/2 (o d/4 con cortante alto) en alguna zona; la NTC la limita cuando se requieren estribos">⚠ {group.results.filter(smaxWarn).length} con s &gt; s máx</span>}
-              <span style={{ color: 'var(--color-tx3)' }} title="El análisis a lo largo parte del armado corrido solo: «con bastón» es dónde hace falta añadirlo, no que la trabe falle">MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m corridas</span>
-              {MRk && (
-                <span style={{ color: criticos.length ? '#c62828' : '#15803d' }}
-                  title={`El diseño de ${form.nombre} es su corte: ${form.cantInf}#${form.calInf}/${form.cantSup}#${form.calSup} corridas + ${MRk.kI}/${MRk.kS} bastones (MR+ ${fmt(MRk.MRP)} · MR− ${fmt(MRk.MRN)} t·m). Lo que pase de ahí es bastón puntual extra.`}>
-                  diseño {MRk.kI}/{MRk.kS} bastones → {criticos.length ? `${criticos.length} piden bastón extra` : 'ninguno pide extra'}
-                </span>
-              )}
+              <span style={{ color: 'var(--color-tx3)' }}
+                title={`Base del análisis: lo que la trabe lleva en TODA su longitud — ${form.cantInf}#${form.calInf}/${form.cantSup}#${form.calSup} corridas${(kCorr.inf || kCorr.sup) ? ` + ${kCorr.inf}/${kCorr.sup} bastón corrido` : ''}. Lo que se reparte encima son bastones puntuales.`}>
+                base MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m
+                {(kCorr.inf || kCorr.sup) ? ` (corridas + ${kCorr.inf}/${kCorr.sup} bastón corrido)` : ' (sólo corridas)'}
+              </span>
               <span style={{ marginLeft: 'auto' }}>
                 acero: <b>{fmt(group.acero.total, 0)} kg</b> ({fmt(group.acero.base, 0)} corridas + {fmt(group.acero.bastones, 0)} bastones)
                 {group.acero.uniforme != null && <> · uniforme {group.uniforme.inf.n}#{group.uniforme.inf.bar.num}/{group.uniforme.sup.n}#{group.uniforme.sup.bar.num}: {fmt(group.acero.uniforme, 0)} kg → <b style={{ color: group.acero.ahorro > 0 ? '#15803d' : '#92400e' }}>{group.acero.ahorro >= 0 ? 'ahorro' : 'exceso'} {fmt(Math.abs(group.acero.ahorro), 0)} kg ({fmt(100 * Math.abs(group.acero.ahorro) / group.acero.uniforme, 0)} %)</b></>}
               </span>
             </div>
             <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: -2 }}>
-              Aquí se diseñan <b>bastones puntuales</b>: acero local que se suma al armado corrido y sólo existe donde el momento lo pide, con su longitud y su posición.
-              El <b>diseño</b> de {form.nombre} es su corte — {form.cantInf}#{form.calInf} abajo / {form.cantSup}#{form.calSup} arriba corridas
-              {MRk && (MRk.kI || MRk.kS) ? ` + ${MRk.kI}/${MRk.kS} bastones` : ' y sin bastones'} — y en el corte se distinguen: círculo lleno = corrida, círculo hueco = bastón.
+              <b>Bastón corrido</b>: recorre la trabe, se dibuja en el corte y cuenta en el MR — es la base de este análisis.
+              <b> Bastón puntual</b>: sólo existe donde el momento lo pide, no va en el corte y se dibuja en el alzado con su longitud.
+              Base de {form.nombre}: {form.cantInf}#{form.calInf} abajo / {form.cantSup}#{form.calSup} arriba corridas
+              {(kCorr.inf || kCorr.sup) ? ` + ${kCorr.inf}/${kCorr.sup} bastón corrido` : ' (sin bastón corrido)'}.
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {puedeCorrer && (
+                <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="correr-baston"
+                  onClick={() => setForm({
+                    cantBastonInf: Math.min((+form.cantInf || 0), kCorr.inf + group.kMaxInf),
+                    cantBastonSup: Math.min((+form.cantSup || 0), kCorr.sup + group.kMaxSup),
+                    cantBastonPuntInf: 0, cantBastonPuntSup: 0,
+                  })}
+                  title="Convierte el bastón puntual en corrido: pasa a recorrer la trabe, se dibuja en el corte, sube el MR de la sección y el grupo deja de pedir puntuales (más acero, un detalle más simple)">
+                  ⇢ Correr el bastón en la sección ({kCorr.inf}/{kCorr.sup} → {Math.min((+form.cantInf || 0), kCorr.inf + group.kMaxInf)}/{Math.min((+form.cantSup || 0), kCorr.sup + group.kMaxSup)})
+                </button>
+              )}
               {(kInfMismatch || kSupMismatch) && (
-                <button className="btn btn-secondary" style={{ fontSize: 10.5, color: faltan ? '#92400e' : 'var(--color-tx2)', borderColor: faltan ? '#fcd34d' : 'var(--color-border)' }} data-testid="cubrir-grupo"
-                  onClick={() => setForm({ cantBastonInf: group.kMaxInf, cantBastonSup: group.kMaxSup })}
-                  title={faltan
-                    ? 'La sección dibuja menos bastones de los que pide algún miembro del grupo: con esto los cubre a todos'
-                    : 'El análisis a lo largo cubre el grupo con menos bastones de los que lleva dibujados la sección: con esto se ajusta al mínimo necesario'}>
-                  {faltan ? '⚠ ← Subir' : '← Bajar'} los bastones de la sección a {group.kMaxInf}/{group.kMaxSup} (hoy {form.cantBastonInf}/{form.cantBastonSup}) — cubre todo el grupo
+                <button className="btn btn-secondary" style={{ fontSize: 10.5, color: '#92400e', borderColor: '#fcd34d' }} data-testid="cubrir-grupo"
+                  onClick={() => setForm({ cantBastonPuntInf: group.kMaxInf, cantBastonPuntSup: group.kMaxSup })}
+                  title="Deja anotado en la trabe cuántos bastones puntuales reparte el análisis (no van al corte; salen en el alzado)">
+                  ← Anotar {group.kMaxInf}/{group.kMaxSup} bastones puntuales en {form.nombre} (hoy {form.cantBastonPuntInf || 0}/{form.cantBastonPuntSup || 0})
                 </button>
               )}
               {criticos.length > 0 && criticos.length < group.n && (
                 <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="separar-criticos"
                   onClick={() => separar(criticos)}
-                  title="Crea otra trabe con los elementos que piden más que el diseño, ya bastoneada, y los quita de ésta: así no se sobredimensiona toda la familia por unos cuantos">
-                  ⧉ Separar los {criticos.length} que piden extra en otra trabe
+                  title="Crea otra trabe con los elementos que piden bastón puntual y los quita de ésta: así no se sobredimensiona toda la familia por unos cuantos">
+                  ⧉ Separar los {criticos.length} que piden puntual en otra trabe
                 </button>
               )}
               <button className="btn btn-secondary" style={{ fontSize: 10.5 }} onClick={() => setShowOpt((v) => !v)}>
@@ -499,7 +496,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               {vista === 'tabla' && (
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, color: 'var(--color-tx3)' }}>ver</span>
-                  {[['todos', `todos (${group.n})`], ['baston', `piden bastón (${conBaston.length})`], ['criticos', `extra sobre el diseño (${criticos.length})`]].map(([id, lbl]) => (
+                  {[['todos', `todos (${group.n})`], ['criticos', `piden puntual (${criticos.length})`], ['baston', `no alcanzan (${insuficientes.length})`]].map(([id, lbl]) => (
                     <button key={id} onClick={() => setFiltro(id)} data-testid={`filtro-${id}`} className="btn"
                       style={{ fontSize: 10, padding: '3px 9px', background: filtro === id ? 'var(--color-accent2)' : 'var(--color-panel)', color: filtro === id ? '#fff' : 'var(--color-tx2)', border: '1px solid var(--color-border)' }}>{lbl}</button>
                   ))}
@@ -584,7 +581,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)' }}>
                 <thead><tr>
                   <th style={TH}>{group.results.some((r) => r.isElement) ? 'Elemento' : 'Miembro'}</th><th style={TH}>L (m)</th><th style={TH}>Mu+</th><th style={TH}>Mu−</th><th style={TH}>Vu</th>
-                  <th style={TH} title="Bastones puntuales que pide el análisis: acero local que se suma a las corridas">Bastón puntual inf.</th><th style={TH}>Bastón puntual sup.</th><th style={TH}>Estado vs diseño</th>
+                  <th style={TH} title="Acero local que se suma al armado corrido, sólo donde el momento lo pide">Bastón puntual inf.</th><th style={TH}>Bastón puntual sup.</th><th style={TH}>Estado</th>
                 </tr></thead>
                 <tbody>
                   {filas.map((r) => (
@@ -658,26 +655,26 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {(() => {
                     const k = bastonesDe(selected)
-                    const igual = k.kInf === (+form.cantBastonInf || 0) && k.kSup === (+form.cantBastonSup || 0)
-                    const dejaCorto = k.kInf < group.kMaxInf || k.kSup < group.kMaxSup
+                    const anotado = k.kInf === (+form.cantBastonPuntInf || 0) && k.kSup === (+form.cantBastonPuntSup || 0)
+                    const menosQueElGrupo = k.kInf < group.kMaxInf || k.kSup < group.kMaxSup
                     return (
                       <>
                         <button className="btn btn-primary" style={{ fontSize: 10.5 }} data-testid="aplicar-baston"
-                          disabled={igual}
-                          onClick={() => aplicarBastones([selected], `Bastoneo de ${unitLabel(selected)} aplicado`)}
-                          title={dejaCorto
-                            ? `Ojo: otros miembros de ${form.nombre} piden hasta ${group.kMaxInf}/${group.kMaxSup}. Aplícalo si vas a separar este elemento en su propia trabe.`
-                            : 'Dibuja en el corte de esta trabe los bastones que pide este elemento'}>
-                          ← Aplicar su bastoneo a la sección ({k.kInf}/{k.kSup}){igual ? ' · ya está' : ''}
+                          disabled={anotado}
+                          onClick={() => aplicarBastones([selected], `${unitLabel(selected)}: bastón puntual anotado en ${form.nombre}`)}
+                          title={menosQueElGrupo
+                            ? `Ojo: otros elementos de ${form.nombre} piden hasta ${group.kMaxInf}/${group.kMaxSup} puntuales. Anótalo así si vas a separarlo en su propia trabe.`
+                            : 'Anota en la trabe los bastones puntuales que pide este elemento (no van al corte: salen en el alzado)'}>
+                          ← Anotar su bastón puntual ({k.kInf}/{k.kSup}){anotado ? ' · ya está' : ''}
                         </button>
-                        {!igual && dejaCorto && <Pill tone="warn">el grupo pide hasta {group.kMaxInf}/{group.kMaxSup}</Pill>}
+                        {!anotado && menosQueElGrupo && <Pill tone="warn">el grupo pide hasta {group.kMaxInf}/{group.kMaxSup}</Pill>}
                         <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="separar-uno"
                           onClick={() => separar([selected])}
-                          title="Saca este elemento a una trabe aparte, ya bastoneada, y lo quita de ésta">
+                          title="Saca este elemento a una trabe aparte con su propio bastoneo, y lo quita de ésta">
                           ⧉ Separarlo en otra trabe
                         </button>
                         <span style={{ fontSize: 10, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>
-                          bastoneado: MR+ {fmt(group.caps.inf.withK(k.kInf)?.MRT || group.caps.MRP)} · MR− {fmt(group.caps.sup.withK(k.kSup)?.MRT || group.caps.MRN)} t·m
+                          con {k.kInf}/{k.kSup} puntual(es): MR+ {fmt(group.caps.inf.withK(k.kInf)?.MRT || group.caps.MRP)} · MR− {fmt(group.caps.sup.withK(k.kSup)?.MRT || group.caps.MRN)} t·m
                           {' vs '}Mu+ {fmt(selected.profile.muPmax)} · Mu− {fmt(selected.profile.muNmax)}
                         </span>
                       </>
@@ -686,7 +683,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 </div>
                 {selected.status === 'insuficiente' && (
                   <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
-                    Ni con {group.caps.inf.kMax}/{group.caps.sup.kMax} bastones (uno por varilla) alcanza:
+                    Ni con {group.caps.inf.kMax}/{group.caps.sup.kMax} bastón(es) puntual(es) más (uno por varilla libre) alcanza:
                     {selected.inf.need.map((n, i) => <span key={'i' + i}> M+ {fmt(n.peak)} en x={fmt(n.peakX)} m (MR máx {fmt(n.MRmax)}).</span>)}
                     {selected.sup.need.map((n, i) => <span key={'s' + i}> M− {fmt(n.peak)} en x={fmt(n.peakX)} m (MR máx {fmt(n.MRmax)}).</span>)}
                     {' '}Sube el armado corrido o la sección.

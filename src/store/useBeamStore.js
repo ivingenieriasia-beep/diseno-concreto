@@ -30,10 +30,15 @@ const defaultSection = (nombre = '') => ({
   calInf: '3',
   cantInf: 2,
   fc: 250,
+  // Bastones CORRIDOS: recorren la trabe, se dibujan en el corte y cuentan en el MR
   cantBastonSup: 0,
   calBastonSup: '3',
   cantBastonInf: 0,
   calBastonInf: '3',
+  // Bastones PUNTUALES que el análisis longitudinal repartió: no van en el
+  // corte (no existen en toda la longitud), se dibujan en el alzado
+  cantBastonPuntSup: 0,
+  cantBastonPuntInf: 0,
   calEst: '2.5',
   sepLcuarto: 8,
   sepRest: 16,

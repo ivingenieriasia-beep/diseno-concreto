@@ -282,12 +282,12 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
       trabeBlocks.push(para([run('Análisis longitudinal — bastones donde hacen falta', { bold: true, size: 21, color: '1F2937' })], { before: 140, after: 60 }))
       trabeBlocks.push(para([
         run(`Se revisaron ${G.n} ${G.results.some((r) => r.isElement) ? 'elementos (miembros de RAM unidos en su longitud real)' : 'miembros'} de este tipo de trabe con la envolvente por estaciones del modelo${t.perfil.combo ? ` (${t.perfil.combo})` : ''}. `),
-        run(`Con el armado corrido (MR+ = ${fmt(G.caps.MRP)} t·m, MR− = ${fmt(G.caps.MRN)} t·m) `),
+        run(`Con el armado que recorre toda la trabe (corridas${(G.caps.kCorrInf || G.caps.kCorrSup) ? ` + ${G.caps.kCorrInf}/${G.caps.kCorrSup} bastón corrido` : ''}: MR+ = ${fmt(G.caps.MRP)} t·m, MR− = ${fmt(G.caps.MRN)} t·m) `),
         run(`${G.nOk} miembro(s) quedan cubiertos y ${G.nBast} requieren bastón sólo en la zona donde el momento rebasa esa resistencia`, { bold: true }),
         run(G.nInsuf ? `; ${G.nInsuf} resultan insuficientes aun con un bastón por varilla` : ''),
         run(G.nShear ? `; ${G.nShear} no cumplen por cortante con la separación de estribos propuesta` : ''),
         run(`. Los bastones se prolongan al menos máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm más allá del punto teórico de corte y desarrollan Ld = ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm desde el punto de momento máximo (NTC-2017 §5.1 y §6.1.2); los que llegan a un apoyo se anclan en él. La envolvente de resistencia considera el acero del bastón desarrollado gradualmente a lo largo de Ld desde cada extremo, y se verificó que el momento actuante queda por debajo de ella en toda la longitud del elemento. `),
-        run(`Acero: ${fmt(G.acero.total, 0)} kg (${fmt(G.acero.base, 0)} kg corridas + ${fmt(G.acero.bastones, 0)} kg bastones)`),
+        run(`Acero: ${fmt(G.acero.total, 0)} kg (${fmt(G.acero.base, 0)} kg corridas + ${fmt(G.acero.bastones, 0)} kg bastones puntuales)`),
         ...(G.acero.ahorro != null ? [run(` frente a ${fmt(G.acero.uniforme, 0)} kg del diseño uniforme (${G.uniforme.inf.n}#${G.uniforme.inf.bar.num} / ${G.uniforme.sup.n}#${G.uniforme.sup.bar.num} corridas sin bastones): `), run(`${G.acero.ahorro >= 0 ? 'ahorro' : 'exceso'} de ${fmt(Math.abs(G.acero.ahorro), 0)} kg (${fmt(100 * Math.abs(G.acero.ahorro) / G.acero.uniforme, 0)} %)`, { bold: true, color: G.acero.ahorro > 0 ? OKC : 'B45309' }), run('.')] : [run('.')]),
         ...(!G.caps.okBase ? [run(' El armado corrido no cumple por sí solo los mínimos (As mín / b mín).', { bold: true, color: BADC })] : []),
       ], { align: AlignmentType.JUSTIFIED }))

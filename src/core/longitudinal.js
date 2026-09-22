@@ -293,7 +293,13 @@ export function sectionCapacities(t) {
   const infNum = CAL_TO_NUM[t.calInf] || 3, supNum = CAL_TO_NUM[t.calSup] || 3
   const bInfNum = CAL_TO_NUM[t.calBastonInf] || infNum, bSupNum = CAL_TO_NUM[t.calBastonSup] || supNum
   const nInf = Math.max(1, +t.cantInf || 0), nSup = Math.max(1, +t.cantSup || 0)
-  const fInf = mk(infNum, nInf, bInfNum), fSup = mk(supNum, nSup, bSupNum)
+  // Los bastones del corte son CORRIDOS: recorren la trabe, se ven en la
+  // sección y forman parte de la base. Lo que este módulo propone encima son
+  // bastones PUNTUALES, así que withK(kp) = base + kp puntuales.
+  const kCorrInf = Math.max(0, Math.min(+t.cantBastonInf || 0, nInf))
+  const kCorrSup = Math.max(0, Math.min(+t.cantBastonSup || 0, nSup))
+  const fInfTot = mk(infNum, nInf, bInfNum), fSupTot = mk(supNum, nSup, bSupNum)
+  const fInf = (kp) => fInfTot(kCorrInf + kp), fSup = (kp) => fSupTot(kCorrSup + kp)
   const vInf = VARILLAS.find((v) => v.num === infNum) || VARILLAS[2]
   const vSup = VARILLAS.find((v) => v.num === supNum) || VARILLAS[2]
   const vbInf = VARILLAS.find((v) => v.num === bInfNum) || vInf
@@ -312,8 +318,9 @@ export function sectionCapacities(t) {
 
   return {
     fc, fy, b, h, r, d,
-    inf: { num: infNum, n: nInf, bar: vInf, bast: vbInf, base: baseP, withK: fInf, Ld: LdInf, ext: Math.max(d, 12 * vbInf.diam), kMax: nInf },
-    sup: { num: supNum, n: nSup, bar: vSup, bast: vbSup, base: baseN, withK: fSup, Ld: LdSup, ext: Math.max(d, 12 * vbSup.diam), kMax: nSup },
+    inf: { num: infNum, n: nInf, bar: vInf, bast: vbInf, base: baseP, withK: fInf, Ld: LdInf, ext: Math.max(d, 12 * vbInf.diam), kCorr: kCorrInf, kMax: Math.max(0, nInf - kCorrInf) },
+    sup: { num: supNum, n: nSup, bar: vSup, bast: vbSup, base: baseN, withK: fSup, Ld: LdSup, ext: Math.max(d, 12 * vbSup.diam), kCorr: kCorrSup, kMax: Math.max(0, nSup - kCorrSup) },
+    kCorrInf, kCorrSup,
     MRP: baseP?.MRT || 0, MRN: baseN?.MRT || 0,
     shear: { varEstNum, nramas, AsUsada, sL4, sRest },
     okBase: !!(baseP && baseN && baseP.okBmin && baseN.okBmin && baseP.okMax && baseN.okMax && baseP.okMin && baseN.okMin),
@@ -682,8 +689,8 @@ export function optimizeBase(t, perfil, { calibres = ['3', '4', '5', '6'], nMax 
   const units = unitsFor(perfil)
   const evalLecho = (lechoKey, cal, n) => {
     const patch = lechoKey === 'inf'
-      ? { calInf: cal, cantInf: n, calBastonInf: cal, cantBastonInf: n }
-      : { calSup: cal, cantSup: n, calBastonSup: cal, cantBastonSup: n }
+      ? { calInf: cal, cantInf: n, calBastonInf: cal, cantBastonInf: 0 }
+      : { calSup: cal, cantSup: n, calBastonSup: cal, cantBastonSup: 0 }
     const tt = { ...t, ...patch }
     const caps = sectionCapacities(tt)
     const lecho = caps[lechoKey]
@@ -729,17 +736,14 @@ export function bastonesDe(r) {
 }
 
 /**
- * Lo que una unidad pide MÁS ALLÁ del armado del diseño: el diseño ya lleva
- * kBaseInf/kBaseSup bastones dibujados en el corte, así que sólo son "bastón
- * puntual extra" los que pasan de ahí.
- * @returns { extraInf, extraSup, extra:bool, cubiertoPorDiseno:bool }
+ * Estado de una unidad frente al DISEÑO de la trabe (corridas + bastones
+ * corridos, que es la base del análisis): cuántos bastones PUNTUALES pide.
+ * @returns { kInf, kSup, pidePuntual, cubierto }
  */
-export function extraDe(r, kBaseInf = 0, kBaseSup = 0) {
+export function extraDe(r) {
   const { kInf, kSup } = bastonesDe(r)
-  const extraInf = Math.max(0, kInf - Math.max(0, kBaseInf))
-  const extraSup = Math.max(0, kSup - Math.max(0, kBaseSup))
-  const extra = extraInf > 0 || extraSup > 0 || r?.status === 'insuficiente' || !!r?.shearFail
-  return { kInf, kSup, extraInf, extraSup, extra, cubiertoPorDiseno: !extra && (kInf > 0 || kSup > 0) }
+  const pidePuntual = kInf > 0 || kSup > 0 || r?.status === 'insuficiente' || !!r?.shearFail
+  return { kInf, kSup, pidePuntual, cubierto: !pidePuntual }
 }
 
 /** Bastones que cubren a todas las unidades de una lista */
@@ -750,9 +754,11 @@ export function bastonesDeVarios(rs) {
 
 export function applyBase(t, opt, kMaxInf, kMaxSup) {
   const patch = {}
-  if (opt?.inf) Object.assign(patch, { calInf: opt.inf.cal, cantInf: opt.inf.n, calBastonInf: opt.inf.cal })
-  if (opt?.sup) Object.assign(patch, { calSup: opt.sup.cal, cantSup: opt.sup.n, calBastonSup: opt.sup.cal })
-  if (kMaxInf !== undefined) patch.cantBastonInf = kMaxInf
-  if (kMaxSup !== undefined) patch.cantBastonSup = kMaxSup
+  // el óptimo es armado CORRIDO: sin bastones corridos encima
+  if (opt?.inf) Object.assign(patch, { calInf: opt.inf.cal, cantInf: opt.inf.n, calBastonInf: opt.inf.cal, cantBastonInf: 0 })
+  if (opt?.sup) Object.assign(patch, { calSup: opt.sup.cal, cantSup: opt.sup.n, calBastonSup: opt.sup.cal, cantBastonSup: 0 })
+  // y lo que el análisis reparte encima son bastones PUNTUALES
+  if (kMaxInf !== undefined) patch.cantBastonPuntInf = kMaxInf
+  if (kMaxSup !== undefined) patch.cantBastonPuntSup = kMaxSup
   return patch
 }

@@ -226,7 +226,9 @@ describe('optimizador y aplicar', () => {
     }
     const patch = applyBase(secc(), opt.best, 1, 0)
     expect(patch.cantInf).toBe(opt.best.inf.n); expect(patch.calInf).toBe(opt.best.inf.cal)
-    expect(patch.cantBastonInf).toBe(1); expect(patch.cantBastonSup).toBe(0)
+    // el óptimo es armado corrido limpio y los bastones que reparte son puntuales
+    expect(patch.cantBastonInf).toBe(0); expect(patch.cantBastonSup).toBe(0)
+    expect(patch.cantBastonPuntInf).toBe(1); expect(patch.cantBastonPuntSup).toBe(0)
   })
   it('uniformDesign: no propone armados que no caben en el ancho', () => {
     const u = uniformDesign(secc({ ancho: 15, calInf: '8', calSup: '8' }), [{ profile: { muPmax: 30, muNmax: 30 } }])
@@ -332,32 +334,32 @@ describe('bajar el bastoneo a la sección', () => {
     expect(bastonesDeVarios([a, b])).toEqual({ kInf: 1, kSup: 3 })
     expect(bastonesDeVarios([])).toEqual({ kInf: 0, kSup: 0 })
   })
-  it('aplicar los bastones del grupo hace que la sección cubra a todos sus miembros', () => {
+  it('correr el bastón en la sección sube la base y deja al grupo sin puntuales', () => {
     const P = parseRamStations(T4)
     const perfil = { members: P.members, L: 4, Lpor: {}, minLen: 0.6 }
     const G = analyzeGroup(T(), perfil)
-    expect(G.kMaxInf + G.kMaxSup).toBeGreaterThan(0)
-    // con los bastones del grupo dibujados, el MR de la sección cubre el Mu de todos
-    const conBastones = { ...T(), cantBastonInf: G.kMaxInf, cantBastonSup: G.kMaxSup }
-    const caps = sectionCapacities(conBastones)
-    const MRP = caps.inf.withK(G.kMaxInf).MRT, MRN = caps.sup.withK(G.kMaxSup).MRT
-    const sobran = G.results.filter((r) => r.status !== 'insuficiente' && (r.profile.muPmax > MRP + 1e-9 || r.profile.muNmax > MRN + 1e-9))
-    expect(sobran).toHaveLength(0)
-    // y es estrictamente más que el armado corrido solo
-    expect(MRN).toBeGreaterThan(caps.MRN)
+    expect(G.kMaxInf + G.kMaxSup).toBeGreaterThan(0)   // con 2#3 pelón sí hacen falta puntuales
+    // si esos bastones se corren (se dibujan en el corte), pasan a ser la base…
+    const corridos = { ...T(), cantBastonInf: G.kMaxInf, cantBastonSup: G.kMaxSup }
+    const caps = sectionCapacities(corridos)
+    expect(caps.kCorrInf).toBe(G.kMaxInf)
+    expect(caps.MRN).toBeGreaterThan(sectionCapacities(T()).MRN)
+    // …y entonces ya nadie pide bastón puntual (salvo los que no alcanzan de plano)
+    const G2 = analyzeGroup(corridos, perfil)
+    expect(G2.nBast).toBe(G2.nInsuf ? G2.nBast : 0)
+    expect(G2.kMaxInf).toBeLessThanOrEqual(G.kMaxInf)
+    expect(G2.nOk).toBeGreaterThan(G.nOk)
   })
-  it('extraDe separa lo que ya cubre el diseño de lo que es bastón puntual extra', () => {
-    const r = { inf: { bars: [{ k: 1 }] }, sup: { bars: [{ k: 3 }] }, status: 'baston' }
-    // el corte ya lleva 1/1 bastones: abajo queda cubierto, arriba faltan 2
-    expect(extraDe(r, 1, 1)).toMatchObject({ kInf: 1, kSup: 3, extraInf: 0, extraSup: 2, extra: true })
-    // con 1/3 dibujados no pide nada más
-    expect(extraDe(r, 1, 3)).toMatchObject({ extraInf: 0, extraSup: 0, extra: false, cubiertoPorDiseno: true })
-    // sin bastones en el diseño, todo es extra
-    expect(extraDe(r, 0, 0)).toMatchObject({ extraInf: 1, extraSup: 3, extra: true })
-    // el que no alcanza ni con un bastón por varilla siempre pide más
-    expect(extraDe({ inf: { bars: [] }, sup: { bars: [{ k: 2 }] }, status: 'insuficiente' }, 9, 9).extra).toBe(true)
-    // y el que pasa sólo con corridas no pide nada
-    expect(extraDe({ inf: { bars: [] }, sup: { bars: [] }, status: 'ok' }, 0, 0)).toMatchObject({ extra: false, cubiertoPorDiseno: false })
+  it('extraDe dice cuántos bastones PUNTUALES pide cada elemento sobre el diseño', () => {
+    // el diseño (corridas + bastones corridos) ya es la base del análisis:
+    // lo que queda son puntuales, y k es directamente su número
+    expect(extraDe({ inf: { bars: [{ k: 1 }] }, sup: { bars: [{ k: 3 }] }, status: 'baston' }))
+      .toMatchObject({ kInf: 1, kSup: 3, pidePuntual: true, cubierto: false })
+    expect(extraDe({ inf: { bars: [] }, sup: { bars: [] }, status: 'ok' }))
+      .toMatchObject({ kInf: 0, kSup: 0, pidePuntual: false, cubierto: true })
+    // el que no alcanza ni con un bastón por varilla siempre pide algo
+    expect(extraDe({ inf: { bars: [] }, sup: { bars: [{ k: 2 }] }, status: 'insuficiente' }).pidePuntual).toBe(true)
+    expect(extraDe({ inf: { bars: [] }, sup: { bars: [] }, status: 'ok', shearFail: true }).pidePuntual).toBe(true)
   })
   it('el bastoneo de un elemento suelto puede quedar por debajo del que pide el grupo', () => {
     const P = parseRamStations(T4)

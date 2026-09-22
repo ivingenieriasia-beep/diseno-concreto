@@ -496,7 +496,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
         const bars = (arr, cal) => arr.length ? arr.map((b) => `${b.k}#${cal} L=${fmt(b.len, 2)} @${fmt(b.x0, 2)}${b.ancla ? ` ⟂${b.ancla}` : ''}`).join(' · ') : '—'
         const est = (r) => r.status === 'insuficiente' ? '<span style="color:#dc2626;font-weight:700">✗ insuficiente</span>'
           : r.shearFail ? '<span style="color:#dc2626;font-weight:700">✗ cortante</span>'
-            : r.status === 'baston' ? '<span style="color:#1d4ed8;font-weight:700">bastón</span>' : '<span style="color:#15803d;font-weight:700">✓ corridas</span>'
+            : r.status === 'baston' ? '<span style="color:#1d4ed8;font-weight:700">bastón puntual</span>' : '<span style="color:#15803d;font-weight:700">✓ corridas</span>'
         const filas = G.results.map((r) => `<tr>
           <td>${esc0(unitLabel(r))}${r.isElement ? `<div style="font-size:9px;color:#6b7280">${r.members.length} miembros de RAM</div>` : ''}</td><td>${fmt(r.L, 2)}</td><td>${fmt(r.profile.muPmax, 2)}</td><td>${fmt(r.profile.muNmax, 2)}</td><td>${fmt(r.profile.vuMax, 2)}</td>
           <td style="color:#2563a8">${esc0(bars(r.inf.bars, t.calBastonInf))}</td><td style="color:#c94f2a">${esc0(bars(r.sup.bars, t.calBastonSup))}</td><td>${est(r)}</td></tr>`).join('')
@@ -515,12 +515,12 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
           <div class="nota" style="background:#f5f3ff;border-color:#ddd6fe;color:#3b0764">
             ${G.n} miembros del reporte «${esc0(t.perfil.archivo || '')}»${t.perfil.combo ? ` (${esc0(t.perfil.combo)})` : ''}:
             <b>${G.nOk}</b> pasan con las corridas, <b>${G.nBast}</b> requieren bastón${G.nInsuf ? `, <b style="color:#dc2626">${G.nInsuf} insuficientes</b>` : ''}${G.nShear ? `, <b style="color:#dc2626">${G.nShear} fallan por cortante</b>` : ''}.
-            MR+ corridas ${fmt(G.caps.MRP, 2)} · MR− corridas ${fmt(G.caps.MRN, 2)} t·m · Ld bastón ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm · prolongación ≥ máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm.
-            Acero: <b>${fmt(G.acero.total, 0)} kg</b> (${fmt(G.acero.base, 0)} corridas + ${fmt(G.acero.bastones, 0)} bastones). ${ahorro}
+            MR+ base ${fmt(G.caps.MRP, 2)} · MR− base ${fmt(G.caps.MRN, 2)} t·m (corridas${(G.caps.kCorrInf || G.caps.kCorrSup) ? ` + ${G.caps.kCorrInf}/${G.caps.kCorrSup} bastón corrido` : ''}) · Ld bastón ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm · prolongación ≥ máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm.
+            Acero: <b>${fmt(G.acero.total, 0)} kg</b> (${fmt(G.acero.base, 0)} corridas + ${fmt(G.acero.bastones, 0)} bastones puntuales). ${ahorro}
             ${!G.caps.okBase ? '<br><b style="color:#dc2626">El armado corrido no cumple por sí solo (As mín / As máx / b mín).</b>' : ''}
           </div>
           <table class="summary"><tr><th>Elemento / miembro</th><th>L (m)</th><th>Mu+</th><th>Mu−</th><th>Vu</th><th>Bastón inf.</th><th>Bastón sup.</th><th>Estado</th></tr>${filas}</table>
-          <div style="font-size:10px;color:#6b7280;margin-top:4px">Bastón: desde donde Mu rebasa el MR de las corridas, prolongado ≥ máx(d, 12db) y con Ld desde el pico; posición medida desde el apoyo I; ⟂ = se ancla en ese apoyo. En el diagrama la envolvente de resistencia sube en rampa a lo largo de Ld donde empieza el bastón y baja donde termina; el momento actuante queda por debajo en toda la longitud.</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:4px">Bastón puntual (acero local, no va en el corte): desde donde Mu rebasa el MR base, prolongado ≥ máx(d, 12db) y con Ld desde el pico; posición medida desde el apoyo I; ⟂ = se ancla en ese apoyo. En el diagrama la envolvente de resistencia sube en rampa a lo largo de Ld donde empieza el bastón y baja donde termina; el momento actuante queda por debajo en toda la longitud.</div>
           <div style="font-size:14px;font-weight:800;margin:16px 0 6px;color:#0f172a">Patrones de armado (${G.patterns.length})</div>
           ${patrones}`
       }

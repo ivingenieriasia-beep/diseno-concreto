@@ -59,8 +59,10 @@ export function elevationSvg(t, r, opts = {}) {
     P(`<line x1="${x.toFixed(1)}" y1="${ySup.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(ySup + hook * dir).toFixed(1)}" stroke="${C.top}" stroke-width="2"/>`)
     P(`<line x1="${x.toFixed(1)}" y1="${yInf.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(yInf - hook * dir).toFixed(1)}" stroke="${C.bot}" stroke-width="2"/>`)
   }
-  const supLbl = `${t.cantSup}#${t.calSup} corridas`
-  const infLbl = `${t.cantInf}#${t.calInf} corridas`
+  const kcS = Math.max(0, Math.min(+t.cantBastonSup || 0, +t.cantSup || 0))
+  const kcI = Math.max(0, Math.min(+t.cantBastonInf || 0, +t.cantInf || 0))
+  const supLbl = `${t.cantSup}#${t.calSup} corridas${kcS ? ` + ${kcS}#${t.calBastonSup} bastón corrido` : ''}`
+  const infLbl = `${t.cantInf}#${t.calInf} corridas${kcI ? ` + ${kcI}#${t.calBastonInf} bastón corrido` : ''}`
   P(`<text x="${(ox + 6).toFixed(1)}" y="${(ySup - 6).toFixed(1)}" font-size="${fs}" font-weight="600" fill="${C.top}">${esc(supLbl)}</text>`)
   P(`<text x="${(ox + 6).toFixed(1)}" y="${(yInf + fs + 4).toFixed(1)}" font-size="${fs}" font-weight="600" fill="${C.bot}">${esc(infLbl)}</text>`)
 
@@ -75,7 +77,7 @@ export function elevationSvg(t, r, opts = {}) {
       if (b.ancla?.includes('I')) P(`<line x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x0.toFixed(1)}" y2="${(y + dir * hook).toFixed(1)}" stroke="${color}" stroke-width="2.5"/>`)
       if (b.ancla?.includes('J')) P(`<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + dir * hook).toFixed(1)}" stroke="${color}" stroke-width="2.5"/>`)
       // etiqueta
-      const lbl = `bastón ${b.k}#${cal} L=${f2(b.len)} m${b.ancla ? ` (anclar en ${b.ancla})` : ''}`
+      const lbl = `bastón puntual ${b.k}#${cal} L=${f2(b.len)} m${b.ancla ? ` (anclar en ${b.ancla})` : ''}`
       const ty = dir > 0 ? y + fs + 3 : y - 5
       P(`<text x="${((x0 + x1) / 2).toFixed(1)}" y="${ty.toFixed(1)}" font-size="${fs}" font-weight="700" fill="${color}" text-anchor="middle">${esc(lbl)}</text>`)
       // cotas del bastón (debajo de la trabe, escalonadas)
@@ -233,17 +235,18 @@ export function diagramSvg(r, caps, opts = {}) {
   }
   // etiqueta de pico: anclada hacia adentro del diagrama
   const peakAnchor = (x) => (x < 0.25 * L ? ['start', 3] : x > 0.75 * L ? ['end', -3] : ['middle', 0])
-  mrLine(MRP, C.bot, `MR+ corridas ${f2(MRP)}`, true)
-  mrLine(-MRN, C.top, `MR− corridas ${f2(MRN)}`, true)
+  const baseTxt = (caps.kCorrInf || caps.kCorrSup) ? 'base (corridas + bastón corrido)' : 'corridas'
+  mrLine(MRP, C.bot, `MR+ ${baseTxt} ${f2(MRP)}`, true)
+  mrLine(-MRN, C.top, `MR− ${baseTxt} ${f2(MRN)}`, true)
   // Envolvente REAL de resistencia: sube en rampa (Ld) donde empieza el bastón y baja donde termina
   const capPath = (cap, sign) => cap.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.x).toFixed(1)},${ym(sign * p.MR).toFixed(1)}`).join(' ')
   if (r.inf.cap && kInf) {
     P(`<path d="${capPath(r.inf.cap, 1)}" fill="none" stroke="${C.bot}" stroke-width="2.2"/>`)
-    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(MRPk) + 11).toFixed(1)}" font-size="9.5" fill="${C.bot}">MR+ con ${kInf} bastón(es) ${f2(MRPk)} — envolvente desarrollada (Ld ${f2(caps.inf.Ld.Ld / 100)} m)</text>`)
+    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(MRPk) + 11).toFixed(1)}" font-size="9.5" fill="${C.bot}">MR+ con ${kInf} bastón(es) puntual(es) ${f2(MRPk)} — envolvente desarrollada (Ld ${f2(caps.inf.Ld.Ld / 100)} m)</text>`)
   }
   if (r.sup.cap && kSup) {
     P(`<path d="${capPath(r.sup.cap, -1)}" fill="none" stroke="${C.top}" stroke-width="2.2"/>`)
-    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(-MRNk) - 3).toFixed(1)}" font-size="9.5" fill="${C.top}">MR− con ${kSup} bastón(es) ${f2(MRNk)} — envolvente desarrollada (Ld ${f2(caps.sup.Ld.Ld / 100)} m)</text>`)
+    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(-MRNk) - 3).toFixed(1)}" font-size="9.5" fill="${C.top}">MR− con ${kSup} bastón(es) puntual(es) ${f2(MRNk)} — envolvente desarrollada (Ld ${f2(caps.sup.Ld.Ld / 100)} m)</text>`)
   }
   // puntos donde Mu rebasa la envolvente (no debería haber tras alargar; si los hay, en rojo)
   for (const v of [...(r.inf.capViol || []).map((v) => ({ ...v, s: 1 })), ...(r.sup.capViol || []).map((v) => ({ ...v, s: -1 }))]) {

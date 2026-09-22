@@ -191,7 +191,7 @@ export default function BeamForm() {
               {/* Bastón superior */}
               <div style={{ paddingLeft: 8, borderLeft: '2px solid var(--color-steel-top)', opacity: 0.85 }}>
                 <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Bast&oacute;n sup. (0–{maxBSup})
+                  Bast&oacute;n corrido sup. (0–{maxBSup})
                 </div>
                 <Row>
                   <Field label="Calibre">
@@ -204,8 +204,13 @@ export default function BeamForm() {
                   </Field>
                 </Row>
                 <div style={{ fontSize: 9.5, color: 'var(--color-tx3)', marginTop: 3, lineHeight: 1.35 }}>
-                  Uno por varilla (amarre de pares). Suma al As y al MR; no cambia b m&iacute;n.
+                  Uno por varilla (amarre de pares). <b>Corrido</b>: recorre la trabe, se dibuja en el corte y suma al As y al MR; no cambia b m&iacute;n.
                 </div>
+                {+form.cantBastonPuntSup > 0 && (
+                  <div style={{ fontSize: 9.5, color: '#1d4ed8', marginTop: 3, lineHeight: 1.35 }}>
+                    + {form.cantBastonPuntSup} bast&oacute;n(es) <b>puntual(es)</b> del an&aacute;lisis longitudinal: no van en el corte ni en este MR, salen en el alzado con su longitud.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -227,7 +232,7 @@ export default function BeamForm() {
               {/* Bastón inferior */}
               <div style={{ paddingLeft: 8, borderLeft: '2px solid var(--color-steel-bot)', opacity: 0.85 }}>
                 <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Bast&oacute;n inf. (0–{maxBInf})
+                  Bast&oacute;n corrido inf. (0–{maxBInf})
                 </div>
                 <Row>
                   <Field label="Calibre">
@@ -240,8 +245,13 @@ export default function BeamForm() {
                   </Field>
                 </Row>
                 <div style={{ fontSize: 9.5, color: 'var(--color-tx3)', marginTop: 3, lineHeight: 1.35 }}>
-                  Uno por varilla (amarre de pares). Suma al As y al MR; no cambia b m&iacute;n.
+                  Uno por varilla (amarre de pares). <b>Corrido</b>: recorre la trabe, se dibuja en el corte y suma al As y al MR; no cambia b m&iacute;n.
                 </div>
+                {+form.cantBastonPuntInf > 0 && (
+                  <div style={{ fontSize: 9.5, color: '#1d4ed8', marginTop: 3, lineHeight: 1.35 }}>
+                    + {form.cantBastonPuntInf} bast&oacute;n(es) <b>puntual(es)</b> del an&aacute;lisis longitudinal: no van en el corte ni en este MR, salen en el alzado con su longitud.
+                  </div>
+                )}
               </div>
             </div>
           </div>
