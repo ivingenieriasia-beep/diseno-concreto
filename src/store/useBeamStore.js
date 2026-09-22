@@ -61,6 +61,7 @@ const useBeamStore = create((set, get) => ({
   sections: [],
   selectedIdx: -1,
   model: null,    // { archivo, rows:[{member,nj,nk,seccion,…}], nodes:{id:{x,y,z}} }
+  longFocus: null, // { member, fallan:[ids], ts } — «bastonear» desde la envolvente
   form: defaultSection(),
   calcAlert: false,
   dbStatus: null, // { status: 'db_match'|'db_partial'|'new_design', gid }
@@ -163,6 +164,9 @@ const useBeamStore = create((set, get) => ({
   // Geometría del modelo de RAM (nudos + miembros): es del modelo, no de una
   // trabe, así que se carga una vez y la usan todas las secciones.
   setModel: (model) => set({ model }),
+
+  // Pide abrir Longitudinal centrado en un miembro (lo dispara la envolvente)
+  setLongFocus: (v) => set({ longFocus: v ? { ...v, ts: Date.now() } : null }),
 
   // Perfil por estaciones de la sección activa (análisis longitudinal)
   setPerfil: (perfil) => set((s) => {

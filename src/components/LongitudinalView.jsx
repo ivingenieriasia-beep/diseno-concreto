@@ -62,6 +62,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const setForm = useBeamStore((s) => s.setForm)
   const model = useBeamStore((s) => s.model)
   const setModel = useBeamStore((s) => s.setModel)
+  const longFocus = useBeamStore((s) => s.longFocus)
   const hasSel = selectedIdx >= 0 && selectedIdx < sections.length
 
   const fileRef = useRef(null)
@@ -74,6 +75,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const [Ltxt, setLtxt] = useState('')
   const [zoom, setZoom] = useState('fit')   // fit | 1 | 2  (visor del alzado)
   const [drop, setDrop] = useState(false)
+  const [filtro, setFiltro] = useState('todos')  // todos | criticos | baston
+  const [foco, setFoco] = useState(null)         // miembro que llegó desde la envolvente
 
   const perfil = form.perfil
   useEffect(() => { setLtxt(perfil?.L ? String(perfil.L) : '') }, [perfil?.L, selectedIdx])
@@ -99,12 +102,43 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     return group.results.find((r) => r.id === sel) || group.results.find((r) => r.status !== 'ok') || group.results[0]
   }, [group, sel])
 
+  // MR de la sección TAL COMO ESTÁ DETALLADA (corridas + los bastones que lleva
+  // dibujados). Es el mismo criterio de la envolvente de la pestaña Detalle, y
+  // por eso ahí «no pasan» muchos menos que los que aquí «requieren bastón»:
+  // el análisis longitudinal parte del armado corrido solo.
+  const MRk = useMemo(() => {
+    if (!group) return null
+    const kI = Math.min(+form.cantBastonInf || 0, group.caps.inf.kMax)
+    const kS = Math.min(+form.cantBastonSup || 0, group.caps.sup.kMax)
+    return {
+      kI, kS,
+      MRP: (kI ? group.caps.inf.withK(kI)?.MRT : group.caps.MRP) || group.caps.MRP,
+      MRN: (kS ? group.caps.sup.withK(kS)?.MRT : group.caps.MRN) || group.caps.MRN,
+    }
+  }, [group, form.cantBastonInf, form.cantBastonSup])
+  const esCritico = (r) => !!MRk && (r.profile.muPmax > MRk.MRP + 1e-9 || r.profile.muNmax > MRk.MRN + 1e-9 || r.shearFail)
+  const criticos = useMemo(() => (group ? group.results.filter(esCritico) : []), [group, MRk]) // eslint-disable-line
+  const filas = useMemo(() => {
+    if (!group) return []
+    if (filtro === 'criticos') return criticos
+    if (filtro === 'baston') return group.results.filter((r) => r.status !== 'ok')
+    return group.results
+  }, [group, filtro, criticos])
+
   const mismatch = useMemo(() => {
     if (!perfilFull?.secPor) return null
     const ids = perfilFull.members.map((m) => m.id)
     return sectionMismatches(perfilFull.secPor, ids, form)
   }, [perfilFull, form.ancho, form.peralte]) // eslint-disable-line
   const excluidos = useMemo(() => new Set((perfil?.excluir || []).map(String)), [perfil?.excluir])
+
+  useEffect(() => { if (longFocus?.ts) { setFoco({ member: String(longFocus.member), fallan: (longFocus.fallan || []).map(String) }); setFiltro('todos') } }, [longFocus?.ts]) // eslint-disable-line
+  // al llegar enfocado, seleccionar la unidad (elemento o miembro) que lo contiene
+  useEffect(() => {
+    if (!foco || !group) return
+    const u = group.results.find((r) => (r.isElement ? r.members.some((m) => String(m.id) === foco.member) : String(r.id) === foco.member))
+    if (u) setSel(u.id)
+  }, [foco, group])
 
   const patchPerfil = (p) => setPerfil({ ...perfil, ...p })
 
@@ -311,6 +345,27 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
 
         {msg && <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>{msg}</div>}
 
+        {foco && (
+          <div style={{ fontSize: 11, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <b>🎯 M-{foco.member}</b>
+            {group ? (
+              <>
+                <span>llegó desde la envolvente para resolverlo con bastones.</span>
+                {foco.fallan.length > 1 && criticos.length > 0 && (
+                  <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid="foco-todos"
+                    onClick={() => setFiltro('criticos')}
+                    title="En la envolvente no pasan varios miembros; aquí se agrupan por elemento contra la sección tal como está detallada">
+                    ¿Trasladar también los demás que no pasan? — ver sólo esos ({criticos.length})
+                  </button>
+                )}
+              </>
+            ) : (
+              <span>carga aquí el reporte por estaciones de esta trabe (paso 1) para ponerle bastón sólo donde hace falta.</span>
+            )}
+            <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#1d4ed8', fontSize: 11 }} onClick={() => setFoco(null)}>✕</button>
+          </div>
+        )}
+
         {group && (
           <>
             {needL && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px' }}>Captura la longitud L del grupo (o por miembro en la tabla), o carga la geometría del modelo para calcularla sola.</div>}
@@ -342,7 +397,13 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               {group.nInsuf > 0 && <span style={{ color: '#c62828' }}>{group.nInsuf} insuficientes</span>}
               {group.nShear > 0 && <span style={{ color: '#c62828' }}>{group.nShear} fallan por cortante</span>}
               {group.results.some(smaxWarn) && <span style={{ color: '#92400e' }} title="La separación de estribos supera d/2 (o d/4 con cortante alto) en alguna zona; la NTC la limita cuando se requieren estribos">⚠ {group.results.filter(smaxWarn).length} con s &gt; s máx</span>}
-              <span style={{ color: 'var(--color-tx3)' }}>MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m</span>
+              <span style={{ color: 'var(--color-tx3)' }} title="El análisis a lo largo parte del armado corrido solo: «con bastón» es dónde hace falta añadirlo, no que la trabe falle">MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m corridas</span>
+              {MRk && (MRk.kI > 0 || MRk.kS > 0) && (
+                <span style={{ color: criticos.length ? '#c62828' : '#15803d' }}
+                  title={`Con los ${MRk.kI}/${MRk.kS} bastones que ya lleva dibujados la sección: MR+ ${fmt(MRk.MRP)} · MR− ${fmt(MRk.MRN)} t·m. Éste es el criterio de la envolvente de la pestaña Detalle.`}>
+                  con la sección detallada ({MRk.kI}/{MRk.kS} bastones): {criticos.length ? `${criticos.length} no pasan` : 'pasan todos'}
+                </span>
+              )}
               <span style={{ marginLeft: 'auto' }}>
                 acero: <b>{fmt(group.acero.total, 0)} kg</b> ({fmt(group.acero.base, 0)} corridas + {fmt(group.acero.bastones, 0)} bastones)
                 {group.acero.uniforme != null && <> · uniforme {group.uniforme.inf.n}#{group.uniforme.inf.bar.num}/{group.uniforme.sup.n}#{group.uniforme.sup.bar.num}: {fmt(group.acero.uniforme, 0)} kg → <b style={{ color: group.acero.ahorro > 0 ? '#15803d' : '#92400e' }}>{group.acero.ahorro >= 0 ? 'ahorro' : 'exceso'} {fmt(Math.abs(group.acero.ahorro), 0)} kg ({fmt(100 * Math.abs(group.acero.ahorro) / group.acero.uniforme, 0)} %)</b></>}
@@ -367,6 +428,15 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 title="DXF con los alzados de todas las trabes que tengan cargado el reporte por estaciones">
                 ⬇ DXF alzados · todas ({sections.filter((t) => t.perfil?.members?.length).length})
               </button>
+              {vista === 'tabla' && (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: 'var(--color-tx3)' }}>ver</span>
+                  {[['todos', `todos (${group.n})`], ['baston', `con bastón (${group.results.filter((r) => r.status !== 'ok').length})`], ['criticos', `no pasan con la sección (${criticos.length})`]].map(([id, lbl]) => (
+                    <button key={id} onClick={() => setFiltro(id)} data-testid={`filtro-${id}`} className="btn"
+                      style={{ fontSize: 10, padding: '3px 9px', background: filtro === id ? 'var(--color-accent2)' : 'var(--color-panel)', color: filtro === id ? '#fff' : 'var(--color-tx2)', border: '1px solid var(--color-border)' }}>{lbl}</button>
+                  ))}
+                </div>
+              )}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
                 {[['tabla', 'Miembros'], ['patrones', `Patrones (${group.patterns.length})`], ...(hayModelo ? [['modelo', '🏗 Modelo']] : [])].map(([id, lbl]) => (
                   <button key={id} onClick={() => setView(id)} data-testid={`view-${id}`} className="btn" style={{ fontSize: 11, padding: '4px 12px', background: vista === id ? 'var(--color-accent)' : 'var(--color-panel)', color: vista === id ? '#fff' : 'var(--color-tx2)', border: '1px solid var(--color-border)' }}>{lbl}</button>
@@ -449,7 +519,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                   <th style={TH}>Bastón inf.</th><th style={TH}>Bastón sup.</th><th style={TH}>Estado</th>
                 </tr></thead>
                 <tbody>
-                  {group.results.map((r) => (
+                  {filas.map((r) => (
                     <tr key={r.id} onClick={() => setSel(r.id)} style={{ cursor: 'pointer', background: selected?.id === r.id ? 'rgba(91,197,174,0.12)' : r.status === 'insuficiente' || r.shearFail ? 'rgba(198,40,40,0.05)' : undefined }}>
                       <td style={{ ...TD, fontWeight: 700, whiteSpace: 'normal' }}>
                         {unitLabel(r)}
@@ -470,7 +540,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                       <td style={TD}>{statusPill(r)}</td>
                     </tr>
                   ))}
-                  {[...excluidos].map((id) => (
+                  {filtro !== 'todos' && (
+                    <tr><td style={{ ...TD, color: 'var(--color-tx3)', fontSize: 10 }} colSpan={8}>
+                      {filas.length} de {group.n} · <button style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', color: 'var(--color-tx3)' }} onClick={() => setFiltro('todos')}>ver todos</button>
+                    </td></tr>
+                  )}
+                  {filtro === 'todos' && [...excluidos].map((id) => (
                     <tr key={'ex' + id} style={{ opacity: 0.55 }}>
                       <td style={{ ...TD, fontWeight: 700 }}>M-{id} <button onClick={() => toggleExcluir(id)} style={{ fontSize: 9, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tx3)', textDecoration: 'underline', padding: 0 }}>incluir</button></td>
                       <td style={TD} colSpan={7}><Pill tone="muted">excluido del grupo{perfilFull.secPor?.[id] ? ` · ${perfilFull.secPor[id]}` : ''}</Pill></td>

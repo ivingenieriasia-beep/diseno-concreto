@@ -44,6 +44,7 @@ export default function App() {
   const sections = useBeamStore((s) => s.sections)
   const loadProject = useBeamStore((s) => s.loadProject)
   const model = useBeamStore((s) => s.model)
+  const longFocus = useBeamStore((s) => s.longFocus)
   const calcAlert = useBeamStore((s) => s.calcAlert)
   const columns = useColumnStore((s) => s.columns)
   const loadColumns = useColumnStore((s) => s.loadColumns)
@@ -122,6 +123,11 @@ export default function App() {
     setModulos((ms) => (ms.includes(mod.id) ? ms : [...ms, mod.id]))
     setMainTab(mod.id)
   }, [])
+
+  // «Bastonear» desde la envolvente abre Longitudinal en ese miembro
+  useEffect(() => {
+    if (longFocus?.ts) abrirModulo(getModulo('longitudinal'))
+  }, [longFocus?.ts, abrirModulo])
 
   const cerrarModulo = useCallback((id) => {
     setModulos((ms) => ms.filter((x) => x !== id))

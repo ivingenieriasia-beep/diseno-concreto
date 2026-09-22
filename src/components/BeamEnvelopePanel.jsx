@@ -4,6 +4,11 @@ import { parseRamEnvelope, evaluateBeamEnvelope } from '../core/ramParser'
 import { parseRamStations, looksLikeStations } from '../core/longitudinal'
 
 const TD = { padding: '4px 8px', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap' }
+const btnMini = {
+  fontSize: 9.5, padding: '1px 6px', borderRadius: 4, cursor: 'pointer',
+  border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+  color: 'var(--color-accent2)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
+}
 const TH = { padding: '5px 8px', background: '#1a2040', color: '#fff', fontSize: 10, textAlign: 'left' }
 const fmt = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
 
@@ -18,6 +23,8 @@ export default function BeamEnvelopePanel({ R }) {
   const setEnvelope = useBeamStore((s) => s.setEnvelope)
   const setPerfil = useBeamStore((s) => s.setPerfil)
   const setCalc = useBeamStore((s) => s.setCalc)
+  const setLongFocus = useBeamStore((s) => s.setLongFocus)
+  const perfil = form.perfil
   const [msg, setMsg] = useState('')
   const fileRef = useRef(null)
 
@@ -163,13 +170,17 @@ export default function BeamEnvelopePanel({ R }) {
                         {r.ok ? '✓ pasa' : '✗ no pasa'}
                       </span>
                     </td>
-                    <td style={TD}>
-                      <button style={{
-                        fontSize: 9.5, padding: '1px 6px', borderRadius: 4, cursor: 'pointer',
-                        border: '1px solid var(--color-border)', background: 'var(--color-bg)',
-                        color: 'var(--color-accent2)', fontFamily: 'var(--font-mono)',
-                      }} onClick={() => aplicar(r.MuP, r.MuN, r.Vu)} title="Usar los valores de este miembro">
+                    <td style={{ ...TD, display: 'flex', gap: 4 }}>
+                      <button style={btnMini} onClick={() => aplicar(r.MuP, r.MuN, r.Vu)} title="Usar los valores de este miembro en la calculadora">
                         usar
+                      </button>
+                      <button style={{ ...btnMini, color: r.ok ? 'var(--color-tx3)' : '#c62828', borderColor: r.ok ? 'var(--color-border)' : '#ef9a9a' }}
+                        data-testid={`bastonear-${r.member}`}
+                        onClick={() => setLongFocus({ member: String(r.member), fallan: ev.results.filter((x) => !x.ok).map((x) => String(x.member)) })}
+                        title={perfil?.members?.length
+                          ? 'Abre Longitudinal en este miembro para resolverlo con bastones sólo donde hace falta'
+                          : 'Abre Longitudinal (ahí se carga la envolvente por estaciones para poner bastones sólo donde hacen falta)'}>
+                        bastonear →
                       </button>
                     </td>
                   </tr>
