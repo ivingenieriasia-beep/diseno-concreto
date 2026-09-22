@@ -208,6 +208,16 @@ const useBeamStore = create((set, get) => ({
     set({ selectedIdx: idx, form })
   },
 
+  // Añade una sección ya armada (p. ej. al separar los elementos críticos
+  // de una trabe en otra) y la deja seleccionada.
+  addSection: (sec) => {
+    const nombre = (sec?.nombre || '').trim() || `T-${++counter}`
+    const nueva = { ...defaultSection(nombre), ...sec, nombre, calc: { ...defaultCalc(), ...(sec?.calc || {}) } }
+    const sections = [...get().sections, nueva]
+    set({ sections, selectedIdx: sections.length - 1, form: { ...nueva } })
+    return sections.length - 1
+  },
+
   createSection: () => {
     counter++
     const sec = defaultSection(`T-${counter}`)

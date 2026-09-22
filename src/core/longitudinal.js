@@ -716,6 +716,24 @@ export function optimizeBase(t, perfil, { calibres = ['3', '4', '5', '6'], nMax 
 }
 
 /** Sección con el armado óptimo aplicado (para "Aplicar a la sección") */
+/**
+ * Bastones que pide una unidad (miembro o elemento): el mayor número
+ * simultáneo por lecho. Es lo que hay que dibujar en el corte para que la
+ * sección cubra lo que el análisis a lo largo encontró.
+ */
+export function bastonesDe(r) {
+  return {
+    kInf: Math.max(0, ...(r?.inf?.bars || []).map((b) => b.k)),
+    kSup: Math.max(0, ...(r?.sup?.bars || []).map((b) => b.k)),
+  }
+}
+
+/** Bastones que cubren a todas las unidades de una lista */
+export function bastonesDeVarios(rs) {
+  const k = (rs || []).map(bastonesDe)
+  return { kInf: Math.max(0, ...k.map((x) => x.kInf)), kSup: Math.max(0, ...k.map((x) => x.kSup)) }
+}
+
 export function applyBase(t, opt, kMaxInf, kMaxSup) {
   const patch = {}
   if (opt?.inf) Object.assign(patch, { calInf: opt.inf.cal, cantInf: opt.inf.n, calBastonInf: opt.inf.cal })

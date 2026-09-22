@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
-import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel } from '../core/longitudinal'
+import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios } from '../core/longitudinal'
 import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches } from '../core/geometry'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
 import { svgToDxf } from '../core/svgToDxf'
@@ -62,6 +62,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const setForm = useBeamStore((s) => s.setForm)
   const model = useBeamStore((s) => s.model)
   const setModel = useBeamStore((s) => s.setModel)
+  const addSection = useBeamStore((s) => s.addSection)
   const longFocus = useBeamStore((s) => s.longFocus)
   const hasSel = selectedIdx >= 0 && selectedIdx < sections.length
 
@@ -245,6 +246,48 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     setMsg(`DXF de alzados generado: ${n} patrón(es) de ${list.length} trabe(s), a escala real (1 unidad = 1 cm${dxfScale !== 1 ? `, factor ${dxfScale}` : ''}).`)
   }
 
+  // Baja a la sección los bastones que pide el análisis (los dibuja el corte)
+  const aplicarBastones = (unidades, nota) => {
+    const { kInf, kSup } = bastonesDeVarios(unidades)
+    setForm({ cantBastonInf: kInf, cantBastonSup: kSup })
+    setMsg(`${nota}: la sección queda con ${kInf}/${kSup} bastón(es) #${form.calBastonInf}/#${form.calBastonSup}.`)
+  }
+
+  const nombreLibre = (base) => {
+    const usados = new Set(sections.map((x) => x.nombre))
+    for (const suf of 'abcdefghijklmnopqrstuvwxyz') if (!usados.has(`${base}${suf}`)) return `${base}${suf}`
+    return `${base}-${sections.length + 1}`
+  }
+
+  /**
+   * Separa unas unidades (elementos o miembros) en una trabe nueva ya
+   * bastoneada. La original deja de cargar con ellas —en el análisis y en su
+   * envolvente—, así que cada detalle queda dibujado para lo que de verdad es.
+   */
+  function separar(unidades) {
+    const ids = [...new Set(unidades.flatMap((r) => (r.isElement ? r.members.map((m) => String(m.id)) : [String(r.id)])))]
+    if (!ids.length || !perfil?.members?.length) return
+    const idSet = new Set(ids)
+    const { kInf, kSup } = bastonesDeVarios(unidades)
+    const env = form.envelope
+    const nueva = {
+      ...form,
+      nombre: nombreLibre(form.nombre),
+      perfil: { ...perfil, members: perfil.members.filter((m) => idSet.has(String(m.id))), excluir: [] },
+      envelope: env?.points ? { ...env, points: env.points.filter((p) => idSet.has(String(p.member))) } : env,
+    }
+    // primero se descuentan de la trabe activa, que todavía es la seleccionada
+    patchPerfil({ excluir: [...new Set([...(perfil.excluir || []), ...ids])] })
+    if (env?.points) setEnvelope({ ...env, points: env.points.filter((p) => !idSet.has(String(p.member))) })
+    const anterior = form.nombre
+    addSection(nueva)
+    setForm({ cantBastonInf: kInf, cantBastonSup: kSup })
+    setSel(null); setFiltro('todos'); setFoco(null)
+    const insuf = unidades.filter((r) => r.status === 'insuficiente').length
+    setMsg(`${nueva.nombre}: ${unidades.length} elemento(s) (${ids.length} miembro(s)) con ${kInf}/${kSup} bastón(es). ${anterior} ya no los incluye.`
+      + (insuf ? ` ${insuf} no alcanzan ni con un bastón por varilla: súbeles el armado corrido o la sección (⚙ Optimizar).` : ''))
+  }
+
   const toggleExcluir = (id) => {
     const ex = new Set((perfil.excluir || []).map(String))
     ex.has(String(id)) ? ex.delete(String(id)) : ex.add(String(id))
@@ -267,6 +310,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const needL = group && group.results.some((r) => !(r.L > 0))
   const kInfMismatch = group && group.kMaxInf !== (+form.cantBastonInf || 0)
   const kSupMismatch = group && group.kMaxSup !== (+form.cantBastonSup || 0)
+  // ¿la sección lleva menos bastones de los que pide el grupo (faltan) o más (sobran)?
+  const faltan = group && (group.kMaxInf > (+form.cantBastonInf || 0) || group.kMaxSup > (+form.cantBastonSup || 0))
   const hayEsfuerzos = perfil?.members?.length > 0
   const hayModelo = model?.rows?.length > 0 && nodes.size > 0
   const vista = view === 'modelo' && !hayModelo ? 'tabla' : view
@@ -411,10 +456,19 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {(kInfMismatch || kSupMismatch) && (
-                <button className="btn btn-secondary" style={{ fontSize: 10.5, color: '#92400e', borderColor: '#fcd34d' }}
+                <button className="btn btn-secondary" style={{ fontSize: 10.5, color: faltan ? '#92400e' : 'var(--color-tx2)', borderColor: faltan ? '#fcd34d' : 'var(--color-border)' }} data-testid="cubrir-grupo"
                   onClick={() => setForm({ cantBastonInf: group.kMaxInf, cantBastonSup: group.kMaxSup })}
-                  title="La sección dibuja los bastones máximos del grupo para que el corte y el alzado coincidan">
-                  ⚠ Sección con {form.cantBastonInf}/{form.cantBastonSup} bastones vs máx. del grupo {group.kMaxInf}/{group.kMaxSup} — actualizar sección
+                  title={faltan
+                    ? 'La sección dibuja menos bastones de los que pide algún miembro del grupo: con esto los cubre a todos'
+                    : 'El análisis a lo largo cubre el grupo con menos bastones de los que lleva dibujados la sección: con esto se ajusta al mínimo necesario'}>
+                  {faltan ? '⚠ ← Subir' : '← Bajar'} los bastones de la sección a {group.kMaxInf}/{group.kMaxSup} (hoy {form.cantBastonInf}/{form.cantBastonSup}) — cubre todo el grupo
+                </button>
+              )}
+              {criticos.length > 0 && criticos.length < group.n && (
+                <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="separar-criticos"
+                  onClick={() => separar(criticos)}
+                  title="Crea otra trabe con los elementos que no pasan, ya bastoneada, y los quita de ésta: así no se sobredimensiona toda la familia por unos cuantos">
+                  ⧉ Separar los {criticos.length} que no pasan en otra trabe
                 </button>
               )}
               <button className="btn btn-secondary" style={{ fontSize: 10.5 }} onClick={() => setShowOpt((v) => !v)}>
@@ -586,6 +640,35 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                   {selected.shear.extremos.ok === false && <Pill tone="bad">extremos: E@{selected.shear.extremos.sReq ?? '—'} necesario</Pill>}
                   {selected.shear.centro.ok === false && <Pill tone="bad">centro: E@{selected.shear.centro.sReq ?? '—'} necesario</Pill>}
                   <span style={{ color: 'var(--color-tx3)' }}>Ld bastón {fmt(group.caps.inf.Ld.Ld, 0)}/{fmt(group.caps.sup.Ld.Ld, 0)} cm · prolongación ≥ máx(d, 12db) = {fmt(group.caps.inf.ext, 0)} cm</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {(() => {
+                    const k = bastonesDe(selected)
+                    const igual = k.kInf === (+form.cantBastonInf || 0) && k.kSup === (+form.cantBastonSup || 0)
+                    const dejaCorto = k.kInf < group.kMaxInf || k.kSup < group.kMaxSup
+                    return (
+                      <>
+                        <button className="btn btn-primary" style={{ fontSize: 10.5 }} data-testid="aplicar-baston"
+                          disabled={igual}
+                          onClick={() => aplicarBastones([selected], `Bastoneo de ${unitLabel(selected)} aplicado`)}
+                          title={dejaCorto
+                            ? `Ojo: otros miembros de ${form.nombre} piden hasta ${group.kMaxInf}/${group.kMaxSup}. Aplícalo si vas a separar este elemento en su propia trabe.`
+                            : 'Dibuja en el corte de esta trabe los bastones que pide este elemento'}>
+                          ← Aplicar su bastoneo a la sección ({k.kInf}/{k.kSup}){igual ? ' · ya está' : ''}
+                        </button>
+                        {!igual && dejaCorto && <Pill tone="warn">el grupo pide hasta {group.kMaxInf}/{group.kMaxSup}</Pill>}
+                        <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="separar-uno"
+                          onClick={() => separar([selected])}
+                          title="Saca este elemento a una trabe aparte, ya bastoneada, y lo quita de ésta">
+                          ⧉ Separarlo en otra trabe
+                        </button>
+                        <span style={{ fontSize: 10, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>
+                          bastoneado: MR+ {fmt(group.caps.inf.withK(k.kInf)?.MRT || group.caps.MRP)} · MR− {fmt(group.caps.sup.withK(k.kSup)?.MRT || group.caps.MRN)} t·m
+                          {' vs '}Mu+ {fmt(selected.profile.muPmax)} · Mu− {fmt(selected.profile.muNmax)}
+                        </span>
+                      </>
+                    )
+                  })()}
                 </div>
                 {selected.status === 'insuficiente' && (
                   <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>

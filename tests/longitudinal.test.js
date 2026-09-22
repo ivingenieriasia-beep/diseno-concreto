@@ -2,11 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import {
-  parseRamStations, looksLikeStations, memberProfile, profileAt, exceedZones, developmentLength,
-  sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign,
-  capacityAt, capacityProfile, capacityViolations, mrForAs,
-} from '../src/core/longitudinal.js'
+import { parseRamStations, looksLikeStations, memberProfile, profileAt, exceedZones, developmentLength, sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign, capacityAt, capacityProfile, capacityViolations, mrForAs, bastonesDe, bastonesDeVarios } from '../src/core/longitudinal.js'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../src/core/longitudinalSvg.js'
 import { calcFlexion } from '../src/core/sectionCalculator.js'
 
@@ -319,5 +315,41 @@ describe('envolvente de resistencia desarrollada (rampas de Ld)', () => {
     const d = diagramSvg(r, G.caps)
     expect(d).toMatch(/envolvente desarrollada \(Ld/)
     expect(d).toMatch(/stroke-width="2.2"/)
+  })
+})
+
+describe('bajar el bastoneo a la sección', () => {
+  const T = () => ({ nombre: 'T-4', ancho: 15, peralte: 20, recub: 3, fc: 250, calSup: '3', cantSup: 2, calInf: '3', cantInf: 2, calBastonSup: '3', cantBastonSup: 0, calBastonInf: '3', cantBastonInf: 0, calEst: '2.5', sepLcuarto: 8, sepRest: 16, calc: { fy: 4200, varEstNum: 2.5, nramas: 2 } })
+  it('bastonesDe: el mayor número simultáneo por lecho de una unidad', () => {
+    const r = { inf: { bars: [{ k: 1 }, { k: 2 }] }, sup: { bars: [{ k: 1 }] } }
+    expect(bastonesDe(r)).toEqual({ kInf: 2, kSup: 1 })
+    expect(bastonesDe({ inf: { bars: [] }, sup: { bars: [] } })).toEqual({ kInf: 0, kSup: 0 })
+    expect(bastonesDe(null)).toEqual({ kInf: 0, kSup: 0 })
+  })
+  it('bastonesDeVarios cubre a todas las unidades de la lista', () => {
+    const a = { inf: { bars: [{ k: 1 }] }, sup: { bars: [] } }
+    const b = { inf: { bars: [] }, sup: { bars: [{ k: 3 }] } }
+    expect(bastonesDeVarios([a, b])).toEqual({ kInf: 1, kSup: 3 })
+    expect(bastonesDeVarios([])).toEqual({ kInf: 0, kSup: 0 })
+  })
+  it('aplicar los bastones del grupo hace que la sección cubra a todos sus miembros', () => {
+    const P = parseRamStations(T4)
+    const perfil = { members: P.members, L: 4, Lpor: {}, minLen: 0.6 }
+    const G = analyzeGroup(T(), perfil)
+    expect(G.kMaxInf + G.kMaxSup).toBeGreaterThan(0)
+    // con los bastones del grupo dibujados, el MR de la sección cubre el Mu de todos
+    const conBastones = { ...T(), cantBastonInf: G.kMaxInf, cantBastonSup: G.kMaxSup }
+    const caps = sectionCapacities(conBastones)
+    const MRP = caps.inf.withK(G.kMaxInf).MRT, MRN = caps.sup.withK(G.kMaxSup).MRT
+    const sobran = G.results.filter((r) => r.status !== 'insuficiente' && (r.profile.muPmax > MRP + 1e-9 || r.profile.muNmax > MRN + 1e-9))
+    expect(sobran).toHaveLength(0)
+    // y es estrictamente más que el armado corrido solo
+    expect(MRN).toBeGreaterThan(caps.MRN)
+  })
+  it('el bastoneo de un elemento suelto puede quedar por debajo del que pide el grupo', () => {
+    const P = parseRamStations(T4)
+    const G = analyzeGroup(T(), { members: P.members, L: 4, Lpor: {}, minLen: 0.6 })
+    const suave = G.results.find((r) => bastonesDe(r).kSup < G.kMaxSup)
+    expect(suave).toBeTruthy()   // por eso la app avisa antes de aplicarlo a toda la trabe
   })
 })
