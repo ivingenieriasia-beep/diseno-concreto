@@ -9,6 +9,7 @@
 
 import { parseRamEnvelope } from './ramParser'
 import { parseRamStations, looksLikeStations } from './longitudinal'
+import { parseRamActions, looksLikeActions } from './ramActions'
 
 /** "T-2A.txt" → "t2a": casa el archivo con el chip pese a guiones, espacios y mayúsculas */
 export function claveNombre(s) {
@@ -54,14 +55,15 @@ export function repartirEnvolventes(archivos, destinos = {}) {
 
     const texto = a.texto || ''
     let item = null
-    if (dest.tipo === 'trabe' && looksLikeStations(texto)) {
-      const P = parseRamStations(texto)
+    if (dest.tipo === 'trabe' && (looksLikeActions(texto) || looksLikeStations(texto))) {
+      const acc = looksLikeActions(texto) ? parseRamActions(texto) : null
+      const P = acc?.members?.length ? acc : parseRamStations(texto)
       if (!P.members.length) { ilegibles.push({ archivo: a.nombre, motivo: P.warnings[0] || 'sin miembros' }); continue }
       item = {
-        ...dest, archivo: a.nombre, formato: 'estaciones',
+        ...dest, archivo: a.nombre, formato: P.formato || 'estaciones',
         env: { archivo: a.nombre, combo: P.combo, unidades: P.unidades, invertir: false, points: P.points, fromStations: true },
         perfil: {
-          archivo: a.nombre, combo: P.combo, unidades: P.unidades,
+          archivo: a.nombre, combo: P.combo, unidades: P.unidades, formato: P.formato || 'estaciones',
           members: P.members, L: 0, Lpor: {}, invertir: false, minLen: 0.6, porElemento: true,
         },
         miembros: P.members.length, puntos: P.points.length, combo: P.combo,
@@ -94,12 +96,14 @@ export function repartirEnvolventes(archivos, destinos = {}) {
 export function resumenReparto(r) {
   const nT = r.asignados.filter((a) => a.tipo === 'trabe').length
   const nC = r.asignados.filter((a) => a.tipo === 'columna').length
+  const nAcc = r.asignados.filter((a) => a.formato === 'acciones').length
   const nEst = r.asignados.filter((a) => a.formato === 'estaciones').length
   const partes = []
   if (nT) partes.push(`${nT} trabe(s)`)
   if (nC) partes.push(`${nC} columna(s)`)
   let txt = partes.length ? `Envolventes cargadas en ${partes.join(' y ')}` : 'No se cargó ninguna envolvente'
-  if (nEst) txt += ` · ${nEst} por estaciones (listas para Longitudinal)`
+  if (nAcc) txt += ` · ${nAcc} por puntos de inflexión (listas para Longitudinal, con su longitud)`
+  if (nEst) txt += ` · ${nEst} por estaciones (rejilla fija)`
   if (r.repetidos.length) txt += ` · ${r.repetidos.length} repetida(s): quedó la última`
   if (r.sinDestino.length) txt += ` · sin sección que coincida: ${r.sinDestino.join(', ')}`
   if (r.ilegibles.length) txt += ` · no se pudieron leer: ${r.ilegibles.map((x) => x.archivo).join(', ')}`

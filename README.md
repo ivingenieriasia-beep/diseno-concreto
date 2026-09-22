@@ -62,6 +62,32 @@ plantillas de fábrica se pueden ocultar y restaurar; las tuyas se borran.
 Todo lo capturado viaja en el `.json` del proyecto y en el autoguardado, junto a
 las trabes y las columnas.
 
+## Reportes de RAM Elements
+
+Todo se carga desde **📥 Reportes de RAM** (barra superior). Nombra cada archivo
+como su chip —`T-5.txt`, `C-1.txt`, `N-1.txt`— y suéltalos todos juntos: el
+contenido decide qué es cada uno y el nombre decide a qué sección va. Un mismo
+.txt puede traer varios reportes seguidos; la app los separa y se queda con el
+mejor de cada cosa.
+
+| Reporte en RAM | Dónde se pide | Parámetros | Qué llena |
+|---|---|---|---|
+| **Esfuerzos en puntos de importancia + puntos de inflexión** ⭐ | Imprimir análisis → Miembros | Marca las combinaciones a envolver · Agrupar por: Elementos | El módulo **Longitudinal**: bastones puntuales con su longitud, estribos por claro y alzados. Trae la distancia en metros, así que la longitud de cada miembro sale sola. |
+| **Envolvente de esfuerzos en puntos fijos** | Imprimir análisis → Miembros | **Nro. estaciones a imprimir: 20 o más** | Lo mismo, si no tienes el anterior. Es una rejilla fija: con 10 estaciones llegó a saltarse el pico por 49 %. |
+| **Máximos esfuerzos** | Imprimir análisis → Miembros | Las mismas combinaciones | La revisión de la sección (pestaña Cálculo) y la de columnas (P, Mx, My). Además le sirve de red de seguridad al análisis a lo largo. |
+| **Datos de Geometría** (Nudos + Miembros) | Imprimir datos → Datos de geometría | Las dos tablas en un solo archivo | Longitudes, la unión de tramos colineales en elementos completos y el visor del modelo. Se carga **una vez por proyecto**. |
+
+⭐ = el recomendado. Sus estaciones caen en los picos y en los puntos de
+inflexión, que es justo donde la rejilla fija falla.
+
+**Orden que conviene:** primero la geometría, luego los esfuerzos a lo largo de
+cada tipo de trabe y, si los exportaste aparte, los máximos de trabes y
+columnas.
+
+**Si dos reportes no coinciden** (por venir de combinaciones distintas), la app
+lo dice nombrando el elemento, los dos valores y los dos archivos — y diseña
+con el mayor de los dos.
+
 ## Desarrollo
 
 ```bash

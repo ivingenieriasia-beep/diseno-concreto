@@ -224,7 +224,7 @@ export function detectSupports(element, { minJump = 0.15 } = {}) {
  * @param invertir  true si en el modelo el M33 positivo va al revés
  * @returns { L, x:[m], muP:[t·m], muN:[t·m], vu:[t], stations:[{x, muP, muN, vu}] }
  */
-export function memberProfile(member, L, invertir = false, { ajustar = true } = {}) {
+export function memberProfile(member, L, invertir = false, { ajustar = true, ref = null } = {}) {
   const len = member.Lreport || +L || 0
   const st = member.stations.map((s) => {
     const mx = invertir ? -s.m33.min : s.m33.max
@@ -243,11 +243,33 @@ export function memberProfile(member, L, invertir = false, { ajustar = true } = 
   // secciones que RAM evalúa; las estaciones impresas son sólo una muestra
   // (10 puntos) y se pueden quedar cortas. Si es así, el perfil se escala por
   // rama para no subestimar el momento con el que se diseñan los bastones.
-  const rep = member.repMax && member.repMin ? {
-    muP: Math.max(0, invertir ? -member.repMin.m33 : member.repMax.m33),
-    muN: Math.max(0, invertir ? member.repMax.m33 : -member.repMin.m33),
-    vu: Math.max(Math.abs(member.repMax.v2 ?? 0), Math.abs(member.repMin.v2 ?? 0)),
+  // …y, si la trabe tiene cargada una envolvente por miembro (otro reporte de
+  // RAM), también manda: entre las dos fuentes gobierna la mayor. Así el
+  // diseño nunca queda por debajo de lo que cualquiera de los dos reporta.
+  const deFila = (a, b) => (a && b ? {
+    muP: Math.max(0, invertir ? -b.m33 : a.m33),
+    muN: Math.max(0, invertir ? a.m33 : -b.m33),
+    vu: Math.max(Math.abs(a.v2 ?? 0), Math.abs(b.v2 ?? 0)),
+  } : null)
+  const repPropio = deFila(member.repMax, member.repMin)
+  const repRef = ref ? {
+    muP: Math.max(0, invertir ? -(ref.m33min ?? 0) : (ref.m33max ?? 0)),
+    muN: Math.max(0, invertir ? (ref.m33max ?? 0) : -(ref.m33min ?? 0)),
+    vu: Math.abs(ref.v2 ?? 0),
   } : null
+  const rep = repPropio || repRef ? {
+    muP: Math.max(repPropio?.muP ?? 0, repRef?.muP ?? 0),
+    muN: Math.max(repPropio?.muN ?? 0, repRef?.muN ?? 0),
+    vu: Math.max(repPropio?.vu ?? 0, repRef?.vu ?? 0),
+    fuentes: [repPropio && 'reporte', repRef && 'envolvente'].filter(Boolean),
+  } : null
+
+  // lo que dan las estaciones impresas, tal cual, antes de cualquier ajuste
+  const crudo = {
+    muPmax: Math.max(0, ...st.map((s) => s.muP)),
+    muNmax: Math.max(0, ...st.map((s) => s.muN)),
+    vuMax: Math.max(0, ...st.map((s) => s.vu)),
+  }
 
   let ajuste = null
   if (ajustar && rep) {
@@ -277,7 +299,7 @@ export function memberProfile(member, L, invertir = false, { ajustar = true } = 
   }
 
   return {
-    L: len, stations: st, rep, ajuste,
+    L: len, stations: st, rep, ajuste, crudo,
     muPmax: Math.max(0, ...st.map((s) => s.muP)),
     muNmax: Math.max(0, ...st.map((s) => s.muN)),
     vuMax: Math.max(0, ...st.map((s) => s.vu)),
@@ -620,8 +642,8 @@ export function shearZones(profile, caps, supports = null) {
  * Análisis completo de un miembro contra la sección.
  * @returns { id, L, profile, inf, sup, shear, status:'ok'|'baston'|'insuficiente', signature }
  */
-export function analyzeMember(member, caps, { L, invertir = false, minLen, ajustar = true } = {}) {
-  const profile = memberProfile(member, L, invertir, { ajustar })
+export function analyzeMember(member, caps, { L, invertir = false, minLen, ajustar = true, ref = null } = {}) {
+  const profile = memberProfile(member, L, invertir, { ajustar, ref })
   const inf = bastonesForLecho(profile, caps.inf, 'muP', { minLen, caps })
   const sup = bastonesForLecho(profile, caps.sup, 'muN', { minLen, caps })
   const supports = member.isElement ? detectSupports(member) : [0, profile.L]
@@ -677,6 +699,24 @@ export function unitsFor(perfil) {
   return out
 }
 
+/**
+ * Envolvente por miembro que trae la trabe (perfil.envRef, sacada del reporte
+ * de máximos cargado en la sección). Para un elemento se toma la de todos sus
+ * tramos: lo que gobierna es el mayor de los dos reportes.
+ */
+export function refDeUnidad(mb, perfil) {
+  const tabla = perfil?.envRef
+  if (!tabla) return null
+  const ids = mb.isElement ? mb.members.map((m) => String(m.id)) : [String(mb.id)]
+  let r = null
+  for (const id of ids) {
+    const e = tabla[id]
+    if (!e) continue
+    r = r ? { m33max: Math.max(r.m33max, e.m33max), m33min: Math.min(r.m33min, e.m33min), v2: Math.max(r.v2, e.v2) } : { ...e }
+  }
+  return r
+}
+
 // ── 6. Grupo completo, patrones y acero ───────────────────────
 export const barWeight = (area) => area * KG_PER_M_PER_CM2 // kg/m
 
@@ -689,7 +729,7 @@ export function analyzeGroup(t, perfil) {
   const Ldef = +perfil?.L || 0
   const results = unitsFor(perfil).map((mb) => {
     const L = mb.Lreport || +(perfil?.Lpor?.[mb.id]) || Ldef
-    return analyzeMember(mb, caps, { L, invertir: !!perfil?.invertir, minLen: perfil?.minLen, ajustar: perfil?.ajustarAMaximos !== false })
+    return analyzeMember(mb, caps, { L, invertir: !!perfil?.invertir, minLen: perfil?.minLen, ajustar: perfil?.ajustarAMaximos !== false, ref: refDeUnidad(mb, perfil) })
   })
 
   // Patrones (misma firma de bastones) → un dibujo por patrón
@@ -775,7 +815,7 @@ export function optimizeBase(t, perfil, { calibres = ['3', '4', '5', '6'], nMax 
     let kgBase = 0, kgBast = 0, nBast = 0, nInsuf = 0
     for (const mb of units) {
       const L = mb.Lreport || +(perfil?.Lpor?.[mb.id]) || +perfil.L || 0
-      const profile = memberProfile(mb, L, !!perfil.invertir, { ajustar: perfil?.ajustarAMaximos !== false })
+      const profile = memberProfile(mb, L, !!perfil.invertir, { ajustar: perfil?.ajustarAMaximos !== false, ref: refDeUnidad(mb, perfil) })
       const res = bastonesForLecho(profile, lecho, lechoKey === 'inf' ? 'muP' : 'muN', { minLen: perfil?.minLen, caps })
       kgBase += L * n * w
       kgBast += res.bars.reduce((s, b) => s + b.k * b.len * w, 0)

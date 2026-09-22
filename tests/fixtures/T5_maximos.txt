@@ -1,0 +1,290 @@
+﻿                                                                 
+
+Fecha Actual: 22/09/2026 04:32 p. m.                                                      
+Sistema de unidades: Métrico                                                              
+Nombre del archivo: C:\Users\Admin\AppData\Roaming\Bentley\Engineering\RAM 
+Elements\26.0.1\RE\Unzipped\MODELO 3D Jofrito.retx
+
+                                 Resultados del Análisis
+
+Miembros
+
+Máximos esfuerzos en miembros
+
+Nota.-     ec es el estado de carga crítico
+Envolvente de esfuerzos para :
+     CD=1.3CM+1.5CV
+
+MIEMBRO   31
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.64 CD     1.23 CD     0.13 CD     0.12 CD     0.34 CD     0.35 CD
+      Min -0.40 CD    -3.64 CD    -0.52 CD     0.00 CD    -0.39 CD    -4.50 CD
+----------------------------------------------------------------------
+
+MIEMBRO   22
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.00 CD     2.02 CD     0.02 CD     0.16 CD     0.05 CD     0.92 CD
+      Min  0.00 CD    -3.22 CD    -0.02 CD    -0.01 CD    -0.03 CD    -4.36 CD
+----------------------------------------------------------------------
+
+MIEMBRO   18
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.01 CD     1.45 CD     0.09 CD     0.00 CD     0.04 CD     0.11 CD
+      Min -0.06 CD    -0.80 CD    -0.04 CD    -0.34 CD    -0.04 CD    -1.03 CD
+----------------------------------------------------------------------
+
+MIEMBRO   29
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.17 CD     1.47 CD     0.07 CD     0.00 CD     0.09 CD     0.95 CD
+      Min -0.58 CD    -2.20 CD     0.01 CD     0.00 CD    -0.03 CD    -1.77 CD
+----------------------------------------------------------------------
+
+MIEMBRO   32
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.52 CD     2.13 CD     0.60 CD     0.02 CD     0.41 CD     2.27 CD
+      Min -0.02 CD    -1.90 CD    -0.01 CD    -0.17 CD    -0.51 CD    -2.26 CD
+----------------------------------------------------------------------
+
+MIEMBRO   34
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.11 CD    -0.30 CD     0.04 CD     0.02 CD     0.02 CD     0.01 CD
+      Min  0.11 CD    -1.82 CD     0.04 CD     0.02 CD    -0.09 CD    -2.94 CD
+----------------------------------------------------------------------
+
+MIEMBRO   38
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.21 CD     2.11 CD     0.04 CD     0.01 CD     0.08 CD     0.94 CD
+      Min -0.16 CD    -1.52 CD     0.02 CD     0.00 CD    -0.07 CD    -1.69 CD
+----------------------------------------------------------------------
+
+MIEMBRO   175
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.07 CD     2.66 CD     0.11 CD     0.01 CD     0.22 CD     0.88 CD
+      Min -0.98 CD    -2.77 CD    -0.04 CD    -0.02 CD    -0.04 CD    -2.84 CD
+----------------------------------------------------------------------
+
+MIEMBRO   650
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.13 CD     0.16 CD     0.00 CD     0.01 CD     0.00 CD    -0.04 CD
+      Min  0.11 CD    -0.70 CD    -0.01 CD    -0.02 CD     0.00 CD    -0.23 CD
+----------------------------------------------------------------------
+
+MIEMBRO   681
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.11 CD     0.40 CD     0.00 CD    -0.01 CD     0.00 CD     0.44 CD
+      Min  0.10 CD     0.30 CD     0.00 CD    -0.01 CD     0.00 CD     0.27 CD
+----------------------------------------------------------------------
+
+MIEMBRO   764
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.09 CD     0.10 CD     0.00 CD     0.00 CD     0.00 CD     0.47 CD
+      Min  0.09 CD     0.00 CD     0.00 CD    -0.01 CD     0.00 CD     0.44 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1737
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.14 CD     0.98 CD     0.00 CD    -0.01 CD     0.00 CD     0.27 CD
+      Min  0.13 CD     0.82 CD     0.00 CD    -0.01 CD     0.00 CD    -0.19 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1755
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.06 CD     2.49 CD    -0.01 CD    -0.01 CD     0.00 CD    -0.52 CD
+      Min  0.06 CD     2.27 CD    -0.03 CD    -0.02 CD    -0.01 CD    -1.37 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1756
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.19 CD    -0.46 CD    -0.03 CD    -0.03 CD     0.00 CD     0.01 CD
+      Min -0.22 CD    -0.51 CD    -0.06 CD    -0.04 CD    -0.02 CD    -0.17 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1772
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.13 CD    -0.26 CD     0.00 CD     0.00 CD     0.00 CD     0.07 CD
+      Min -0.13 CD    -0.36 CD     0.00 CD    -0.01 CD     0.00 CD    -0.09 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1800
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.08 CD    -0.10 CD     0.01 CD     0.00 CD     0.00 CD     0.59 CD
+      Min  0.06 CD    -0.21 CD     0.00 CD     0.00 CD     0.00 CD     0.51 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1801
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.05 CD     1.25 CD     0.00 CD     0.00 CD     0.00 CD     0.08 CD
+      Min  0.05 CD     1.12 CD     0.00 CD     0.00 CD     0.00 CD    -0.52 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1810
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.04 CD     0.64 CD     0.00 CD     0.00 CD     0.00 CD     0.38 CD
+      Min  0.03 CD     0.53 CD     0.00 CD     0.00 CD     0.00 CD     0.08 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1811
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.03 CD     0.31 CD     0.00 CD     0.00 CD     0.00 CD     0.50 CD
+      Min  0.02 CD     0.20 CD     0.00 CD     0.00 CD     0.00 CD     0.38 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1812
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.02 CD     0.04 CD     0.00 CD     0.00 CD     0.00 CD     0.51 CD
+      Min  0.01 CD    -0.07 CD     0.00 CD     0.00 CD     0.00 CD     0.50 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1813
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.01 CD    -0.23 CD     0.00 CD     0.00 CD     0.00 CD     0.50 CD
+      Min  0.01 CD    -0.34 CD     0.00 CD     0.00 CD     0.00 CD     0.35 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1814
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.00 CD    -0.57 CD     0.00 CD     0.01 CD     0.00 CD     0.35 CD
+      Min  0.00 CD    -0.68 CD     0.00 CD     0.01 CD     0.00 CD     0.04 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1815
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.01 CD    -1.89 CD     0.01 CD     0.01 CD     0.00 CD     0.03 CD
+      Min  0.00 CD    -2.23 CD     0.00 CD     0.00 CD     0.00 CD    -1.00 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1816
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.02 CD    -5.04 CD     0.07 CD     0.03 CD     0.00 CD    -1.04 CD
+      Min  0.01 CD    -5.18 CD     0.06 CD     0.03 CD    -0.01 CD    -1.74 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1817
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.14 CD     0.33 CD     0.00 CD    -0.01 CD     0.00 CD    -0.03 CD
+      Min -0.16 CD     0.23 CD     0.00 CD    -0.01 CD     0.00 CD    -0.17 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1820
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.13 CD     0.27 CD     0.00 CD     0.01 CD     0.00 CD     0.08 CD
+      Min -0.13 CD     0.16 CD     0.00 CD     0.00 CD     0.00 CD    -0.03 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1821
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.15 CD    -0.32 CD     0.00 CD     0.00 CD     0.00 CD    -0.09 CD
+      Min -0.16 CD    -0.42 CD     0.00 CD     0.00 CD     0.00 CD    -0.27 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1824
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.19 CD     0.29 CD     0.00 CD     0.00 CD     0.00 CD    -0.14 CD
+      Min -0.23 CD     0.24 CD     0.00 CD     0.00 CD     0.00 CD    -0.27 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1932
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.00 CD    -3.29 CD     0.05 CD     0.04 CD     0.00 CD    -1.07 CD
+      Min  0.00 CD    -3.62 CD     0.04 CD     0.03 CD    -0.01 CD    -1.60 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1937
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.06 CD    -0.07 CD     0.00 CD     0.01 CD     0.00 CD     0.51 CD
+      Min  0.04 CD    -0.83 CD     0.00 CD    -0.01 CD     0.00 CD    -0.13 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1959
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.03 CD    -1.69 CD     0.01 CD     0.01 CD     0.00 CD    -0.14 CD
+      Min  0.02 CD    -1.91 CD     0.00 CD     0.01 CD     0.00 CD    -1.05 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1986
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.89 CD    -0.08 CD     0.07 CD    -0.01 CD     0.02 CD     0.80 CD
+      Min -0.89 CD    -2.61 CD     0.07 CD    -0.01 CD    -0.10 CD    -1.46 CD
+----------------------------------------------------------------------
+
+MIEMBRO   1987
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max -0.91 CD     2.56 CD    -0.04 CD     0.01 CD     0.02 CD     0.68 CD
+      Min -0.91 CD    -2.16 CD    -0.04 CD     0.01 CD    -0.11 CD    -1.49 CD
+----------------------------------------------------------------------
+
+MIEMBRO   2062
+          Axial ec Cortante V2       ec Cortante V3 ec  Torsión ec      M22 ec      M33 ec
+          [Ton]       [Ton]       [Ton]     [Ton*m]     [Ton*m]     [Ton*m]
+----------------------------------------------------------------------
+      Max  0.05 CD     2.71 CD    -0.07 CD    -0.19 CD     0.06 CD     0.20 CD
+      Min  0.05 CD     1.97 CD    -0.07 CD    -0.19 CD    -0.03 CD    -3.07 CD
+----------------------------------------------------------------------
+
+

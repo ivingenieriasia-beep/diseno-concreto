@@ -14,7 +14,7 @@ const SCALE_PRESETS = [
   { label: '1:50', value: 50 },
 ]
 
-export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew, recents = [], onOpenRecent, onVerifyResumido, onVerifyDetallado, onMemoria, onExportDcheck, onModulos, onToast, dxfScale, setDxfScale, projectName, setProjectName }) {
+export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew, recents = [], onOpenRecent, onVerifyResumido, onVerifyDetallado, onMemoria, onExportDcheck, onModulos, onToast, onAbrirCentro, dxfScale, setDxfScale, projectName, setProjectName }) {
   const sections = useBeamStore((s) => s.sections)
   const selectedIdx = useBeamStore((s) => s.selectedIdx)
   const selectSection = useBeamStore((s) => s.selectSection)
@@ -315,11 +315,11 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
           <button
             className="btn btn-secondary"
             data-testid="cargar-envolventes"
-            onClick={() => envRef.current?.click()}
+            onClick={() => onAbrirCentro?.()}
             style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99, flexShrink: 0 }}
-            title="Carga de golpe los reportes de RAM guardados con el nombre de su sección (T-4.txt → chip T-4, C-1.txt → columna C-1). Sirven tanto la envolvente por miembro como el reporte por estaciones."
+            title="Centro de carga: todos los reportes de RAM que lee la app, qué pedir en cada uno y dónde cae"
           >
-            📥 Envolventes
+            📥 Reportes de RAM
           </button>
         )}
 

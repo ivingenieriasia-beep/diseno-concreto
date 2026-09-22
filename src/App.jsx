@@ -9,6 +9,7 @@ import ColumnsView from './components/ColumnsView'
 import LongitudinalView from './components/LongitudinalView'
 import LoadsView from './components/LoadsView'
 import ModuleLauncher from './components/ModuleLauncher'
+import LoadCenter from './components/LoadCenter'
 import ModuleIcon from './components/ModuleIcon'
 import MemoriaDialog from './components/MemoriaDialog'
 import useBeamStore from './store/useBeamStore'
@@ -63,6 +64,7 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [modulos, setModulos] = useState(() => cargarAbiertos())
   const [launcher, setLauncher] = useState(false)
+  const [centro, setCentro] = useState(false)
   const restored = useRef(false)
 
   const showToast = useCallback((msg, tone = 'ok') => {
@@ -325,9 +327,11 @@ export default function App() {
         onMemoria={() => setMemoriaOpen(true)} onExportDcheck={handleExportDcheck}
         onModulos={() => setLauncher(true)}
         onToast={showToast}
+        onAbrirCentro={() => setCentro(true)}
         dxfScale={dxfScale} setDxfScale={setDxfScale}
         projectName={projectName} setProjectName={setProjectName}
       />
+      {centro && <LoadCenter onClose={() => setCentro(false)} onToast={showToast} />}
       <MemoriaDialog
         open={memoriaOpen}
         onClose={() => setMemoriaOpen(false)}

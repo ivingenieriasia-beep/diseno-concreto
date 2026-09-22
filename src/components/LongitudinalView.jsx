@@ -5,6 +5,7 @@ import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches }
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
 import { svgToDxf } from '../core/svgToDxf'
 import { parseRamEnvelope } from '../core/ramParser'
+import { parseRamActions, looksLikeActions } from '../core/ramActions'
 import ModelView from './ModelView'
 
 const fmt = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
@@ -81,8 +82,28 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
 
   // ── Geometría del modelo (compartida) → longitudes, secciones y elementos ──
   const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
+  // Envolvente por miembro de la sección (otro reporte de RAM): entra al
+  // análisis como referencia, para que el diseño no quede por debajo de ella.
+  const envRef = useMemo(() => {
+    const pts = form.envelope?.points
+    if (!pts?.length) return null
+    const out = {}
+    for (const p of pts) {
+      const k = String(p.member)
+      const a = out[k] || { m33max: -Infinity, m33min: Infinity, v2: 0 }
+      a.m33max = Math.max(a.m33max, p.m33 ?? 0)
+      a.m33min = Math.min(a.m33min, p.m33 ?? 0)
+      a.v2 = Math.max(a.v2, Math.abs(p.v2 ?? 0))
+      out[k] = a
+    }
+    return out
+  }, [form.envelope])
+
   // perfil + geometría: lo que ven el análisis y la tabla
-  const perfilFull = useMemo(() => attachGeometry(perfil, model), [perfil, model])
+  const perfilFull = useMemo(() => {
+    const p = attachGeometry(perfil, model)
+    return p ? { ...p, envRef } : p
+  }, [perfil, model, envRef])
   const chains = perfilFull?.geom?.chains || []
 
   const group = useMemo(() => {
@@ -145,8 +166,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
       let eP = 0, eN = 0, hay = false
       for (const id of ids) { const a = porMiembro.get(id); if (a) { hay = true; eP = Math.max(eP, a.P); eN = Math.max(eN, a.N) } }
       if (!hay) continue
-      const d = Math.max(eP - r.profile.muPmax, eN - r.profile.muNmax)
-      if (d > 0.02) casos.push({ r, eP, eN, d })
+      // se compara contra lo que dan las estaciones impresas: el perfil ya
+      // viene elevado a la mayor de las dos fuentes, pero el desfase entre
+      // reportes hay que decirlo igual
+      const c = r.profile.crudo || r.profile
+      const d = Math.max(eP - c.muPmax, eN - c.muNmax)
+      if (d > 0.02) casos.push({ r, eP, eN, d, c })
     }
     if (!casos.length) return null
     casos.sort((a, b) => b.d - a.d)
@@ -185,7 +210,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
           continue
         }
         const text = await f.text()
-        if (looksLikeStations(text)) { const e = cargarEstaciones(f.name, text); perfilNuevo = e.perfil; notas.push(e.nota); continue }
+        // el de acciones discriminadas manda: es el único que garantiza el pico
+        if (looksLikeActions(text) || looksLikeStations(text)) {
+          const e = cargarEstaciones(f.name, text)
+          perfilNuevo = e.perfil; notas.push(e.nota)
+          continue
+        }
         const g = parseGeometryReport(text)
         if (g.rows.length || g.nodes.size) {
           if (g.rows.length) rows = g.rows
@@ -223,13 +253,14 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   }
 
   function cargarEstaciones(nombre, text) {
-    const P = parseRamStations(text)
+    const acc = looksLikeActions(text) ? parseRamActions(text) : null
+    const P = acc?.members?.length ? acc : parseRamStations(text)
     if (!P.members.length) return { perfil: null, nota: `${nombre}: ${P.warnings[0] || 'sin miembros'}` }
     const Lprev = perfil?.L || +(form.calc?.L) || 0
     const nuevo = {
       ...(perfil || {}),
       archivo: nombre, combo: P.combo, unidades: P.unidades,
-      members: P.members, L: Lprev || 0, Lpor: perfil?.Lpor || {},
+      members: P.members, L: Lprev || 0, Lpor: perfil?.Lpor || {}, formato: P.formato || 'estaciones',
       invertir: !!perfil?.invertir, minLen: perfil?.minLen ?? 0.6,
       porElemento: perfil?.porElemento ?? true,
     }
@@ -238,7 +269,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     setEnvelope({ archivo: nombre, combo: P.combo, unidades: P.unidades, invertir: !!perfil?.invertir, points: P.points, fromStations: true })
     setSel(null)
     const enM = P.members.filter((m) => m.Lreport).length
-    return { perfil: nuevo, nota: `${nombre}: ${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ''}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}` }
+    const tipo = P.formato === 'acciones' ? 'acciones discriminadas (puntos de inflexión)' : 'envolvente por estaciones'
+    return { perfil: nuevo, nota: `${nombre}: ${tipo} · ${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ''}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}` }
   }
 
   const onInput = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; cargarArchivos(fs) }
@@ -370,7 +402,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
             📂 Cargar reportes de RAM
           </button>
           <Paso n="1" titulo="Esfuerzos por estaciones" listo={hayEsfuerzos} onClick={abrir}
-            hint="RAM: Miembros → Envolvente de esfuerzos (por estaciones) de todos los miembros de este tipo de trabe"
+            hint="RAM: Miembros → Acciones discriminadas y puntos de inflexión (o, en su defecto, Envolvente de esfuerzos por estaciones) de todos los miembros de este tipo de trabe"
             detalle={hayEsfuerzos ? `${perfil.archivo} · ${perfil.members.length} miembros${perfil.combo ? ` · ${perfil.combo}` : ''}` : '.txt de la envolvente por estaciones'}
             onQuitar={() => { setPerfil(null); if (form.envelope?.fromStations) setEnvelope(null); setMsg('') }} />
           <Paso n="2" titulo="Geometría del modelo" listo={hayModelo} onClick={abrir}
@@ -490,11 +522,11 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
                 <b>La envolvente de la sección pide más que este reporte</b> en {desfase.casos.length} elemento(s).
                 El mayor: <b>{unitLabel(desfase.peor.r)}</b> — la envolvente reporta Mu+ {fmt(desfase.peor.eP)} · Mu− {fmt(desfase.peor.eN)} t·m
-                y aquí el perfil llega a Mu+ {fmt(desfase.peor.r.profile.muPmax)} · Mu− {fmt(desfase.peor.r.profile.muNmax)}.
+                y las estaciones de este reporte sólo llegan a Mu+ {fmt(desfase.peor.c.muPmax)} · Mu− {fmt(desfase.peor.c.muNmax)}.
                 {desfase.env && desfase.perfil && desfase.env !== desfase.perfil
-                  ? <> Vienen de archivos distintos (<b>{desfase.env}</b> vs <b>{desfase.perfil}</b>): revisa que sean la misma combinación de carga y vuelve a exportar el de estaciones si hace falta.</>
+                  ? <> Vienen de archivos distintos (<b>{desfase.env}</b> vs <b>{desfase.perfil}</b>): revisa que sean la misma combinación de carga.</>
                   : <> Revisa que el reporte por estaciones cubra las mismas combinaciones que la envolvente.</>}
-                {' '}Mientras no coincidan, los bastones se están diseñando con el momento menor.
+                {' '}El diseño <b>ya usa el mayor de los dos</b> (el perfil se escala), pero conviene reexportar el de estaciones para ver dónde cae ese pico.
               </div>
             )}
             {!capsOk && <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
@@ -620,7 +652,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 <>
                   <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>Analizar {form.nombre} a lo largo</div>
                   <div style={{ color: 'var(--color-tx2)' }}>
-                    <div><b>1 · Esfuerzos.</b> En RAM: <i>Miembros → Envolvente de esfuerzos</i>, por estaciones, de todos los miembros de este tipo de trabe. Guardar como TXT.</div>
+                    <div><b>1 · Esfuerzos.</b> En RAM: <i>Miembros → Acciones discriminadas y puntos de inflexión</i>, de todos los miembros de este tipo de trabe. Guardar como TXT. Es el mejor reporte: sus estaciones caen en los picos y los puntos de inflexión, trae la distancia en metros (la longitud sale sola) y una envolvente por combinación. También se acepta <i>Envolvente de esfuerzos</i> por estaciones, pero ésa es una rejilla fija y puede saltarse el pico.</div>
                     <div><b>2 · Geometría</b> (opcional, muy recomendable). En RAM: <i>Datos de Geometría → Guardar como TXT</i>. Un solo archivo trae Nudos y Miembros: con él la app saca la longitud de cada miembro, une los tramos colineales en elementos completos y dibuja el modelo.</div>
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
