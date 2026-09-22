@@ -6,8 +6,12 @@
   --color-border: #d6d0c6;
   --color-border2: #ccc8c0;
   --color-tx: #1a1814;
+  --color-tx1: #1a1814;
   --color-tx2: #4a4640;
   --color-tx3: #8a8580;
+  /* Pestañas: la activa se levanta sobre el fondo, la inactiva se apaga */
+  --color-surface: #f5f3ef;
+  --color-muted: #8a8580;
   --color-accent: #5bc5ae;
   --color-accent2: #1a7a5e;
   --color-steel-top: #c94f2a;

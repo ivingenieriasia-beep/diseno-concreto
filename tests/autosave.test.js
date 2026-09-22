@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, listRecents, removeRecent, isEmptyProject, timeAgo, debounce, PROJECT_VERSION } from '../src/core/autosave.js'
+import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, listRecents, removeRecent, isEmptyProject, hasCargas, emptyCargas, timeAgo, debounce, PROJECT_VERSION } from '../src/core/autosave.js'
 
 // localStorage mínimo en memoria
 function memStorage() {
@@ -58,6 +58,30 @@ describe('autosave', () => {
     expect(saveSnapshot(packProject({ sections: [sec] }))).toBe(false)
     expect(loadSnapshot()).toBeNull()
     expect(listRecents()).toEqual([])
+  })
+
+  it('la bajada de cargas viaja en el proyecto', () => {
+    const cargas = { losas: [{ id: 'L1', nombre: 'Azotea', capas: [] }], muros: [], tableros: [], unidad: 'ton' }
+    const p = packProject({ projectName: 'Obra', cargas })
+    expect(p.cargas).toEqual(cargas)
+    expect(p.version).toBe(PROJECT_VERSION)
+
+    saveSnapshot(p)
+    expect(loadSnapshot().cargas.losas[0].nombre).toBe('Azotea')
+  })
+
+  it('un proyecto con sólo cargas capturadas no se considera vacío', () => {
+    expect(isEmptyProject(packProject({}))).toBe(true)
+    expect(isEmptyProject(packProject({ cargas: { tableros: [{ id: 'T1' }] } }))).toBe(false)
+    expect(hasCargas(emptyCargas())).toBe(false)
+    expect(hasCargas(null)).toBe(false)
+    expect(hasCargas({ muros: [{ id: 'M1' }] })).toBe(true)
+  })
+
+  it('un proyecto viejo sin cargas se abre igual', () => {
+    const viejo = { version: 3, projectName: 'Antiguo', sections: [], columns: [], savedAt: new Date().toISOString() }
+    expect(isEmptyProject(viejo)).toBe(true)
+    expect(packProject(viejo).cargas).toEqual(emptyCargas())
   })
 
   it('timeAgo y debounce', () => {
