@@ -16,7 +16,11 @@ const defaultCalc = () => ({
   conCompresion: false, MuCorte: 0,
 })
 
+let uidSeq = 0
+const nuevoUid = () => `s${Date.now().toString(36)}${(uidSeq++).toString(36)}`
+
 const defaultSection = (nombre = '') => ({
+  uid: nuevoUid(),   // identidad estable: sobrevive a renombrar y a reordenar
   nombre,
   peralte: 20,
   ancho: 15,
@@ -212,7 +216,7 @@ const useBeamStore = create((set, get) => ({
   // de una trabe en otra) y la deja seleccionada.
   addSection: (sec) => {
     const nombre = (sec?.nombre || '').trim() || `T-${++counter}`
-    const nueva = { ...defaultSection(nombre), ...sec, nombre, calc: { ...defaultCalc(), ...(sec?.calc || {}) } }
+    const nueva = { ...defaultSection(nombre), ...sec, uid: nuevoUid(), nombre, calc: { ...defaultCalc(), ...(sec?.calc || {}) } }
     const sections = [...get().sections, nueva]
     set({ sections, selectedIdx: sections.length - 1, form: { ...nueva } })
     return sections.length - 1
@@ -227,8 +231,8 @@ const useBeamStore = create((set, get) => ({
   },
 
   loadProject: (sections, model = null) => {
-    // Ensure all sections have calc block
-    const fixed = sections.map((s) => ({ ...defaultSection(), ...s, calc: { ...defaultCalc(), ...(s.calc || {}) } }))
+    // Ensure all sections have calc block (y uid, que los proyectos viejos no traen)
+    const fixed = sections.map((s) => ({ ...defaultSection(), ...s, uid: s.uid || nuevoUid(), calc: { ...defaultCalc(), ...(s.calc || {}) } }))
     const form = fixed.length > 0 ? { ...fixed[0] } : defaultSection()
     // Que "+ Nueva" siga numerando después de las existentes (T-7 tras T-6)
     counter = fixed.reduce((m, s) => Math.max(m, +(/^T-(\d+)$/.exec(s.nombre || '')?.[1] || 0)), 0)
@@ -236,6 +240,23 @@ const useBeamStore = create((set, get) => ({
     const heredado = model || fixed.map((s) => s.perfil?.geom).find((g) => g?.rows?.length && g?.nodes) || null
     set({ sections: fixed, selectedIdx: fixed.length > 0 ? 0 : -1, form, model: heredado && { archivo: heredado.archivo || '', rows: heredado.rows, nodes: heredado.nodes } })
   },
+
+  /**
+   * Mueve una sección a otra posición (arrastrando su chip). La selección
+   * sigue apuntando a la misma trabe, esté donde esté.
+   */
+  moveSection: (from, to) => set((s) => {
+    const n = s.sections.length
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return {}
+    const sections = [...s.sections]
+    const [it] = sections.splice(from, 1)
+    sections.splice(to, 0, it)
+    let selectedIdx = s.selectedIdx
+    if (selectedIdx === from) selectedIdx = to
+    else if (from < selectedIdx && to >= selectedIdx) selectedIdx -= 1
+    else if (from > selectedIdx && to <= selectedIdx) selectedIdx += 1
+    return { sections, selectedIdx }
+  }),
 
   removeSection: (idx) => set((s) => {
     const sections = s.sections.filter((_, i) => i !== idx)
@@ -252,7 +273,7 @@ const useBeamStore = create((set, get) => ({
   }),
 }))
 
-// Expose for postMessage / BD patch integration
-window.__BEAM_STORE__ = useBeamStore
+// Expose for postMessage / BD patch integration (en pruebas no hay window)
+if (typeof window !== 'undefined') window.__BEAM_STORE__ = useBeamStore
 
 export default useBeamStore

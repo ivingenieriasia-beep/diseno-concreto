@@ -132,6 +132,11 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .btn-export:hover { background: #15664e; }
 
+/* Reacomodo del tablero al reordenar los chips (se anima la posición, no el
+   dibujo; el SVG exportado no lleva nada de esto porque va en una clase) */
+.sec-move { transition: transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) { .sec-move { transition: none; } }
+
 /* ── Section chips ───────────────────────── */
 .chip {
   display: inline-flex;
@@ -161,6 +166,10 @@ input[type="number"] { -moz-appearance: textfield; }
   margin-left: 2px;
 }
 .chip .chip-x:hover { opacity: 1; }
+.chip[draggable='true'] { cursor: grab; }
+.chip.dragging { opacity: 0.4; cursor: grabbing; }
+.chip.drop-left { box-shadow: -3px 0 0 0 var(--color-accent); }
+.chip.drop-right { box-shadow: 3px 0 0 0 var(--color-accent); }
 
 /* ── Sidebar ─────────────────────────────── */
 .sidebar {

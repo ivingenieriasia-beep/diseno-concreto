@@ -19,9 +19,11 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
   const selectSection = useBeamStore((s) => s.selectSection)
   const removeSection = useBeamStore((s) => s.removeSection)
   const createSection = useBeamStore((s) => s.createSection)
+  const moveSection = useBeamStore((s) => s.moveSection)
   const columnsCount = useColumnStore((s) => s.columns.length)
   const hasContent = sections.length > 0 || columnsCount > 0
 
+  const [arrastre, setArrastre] = useState(null) // { from, over, lado }
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState('')
   const [verifyOpen, setVerifyOpen] = useState(false)
@@ -214,19 +216,57 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
 
       {/* Section chips */}
       <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
-        {sections.map((s, i) => (
-          <span
-            key={s.nombre + i}
-            className={`chip ${i === selectedIdx ? 'active' : ''}`}
-            onClick={() => selectSection(i)}
-          >
-            {s.nombre || `S-${i + 1}`}
+        {sections.map((s, i) => {
+          const arr = arrastre
+          const marca = arr && arr.from !== i && arr.over === i ? (arr.lado === 'izq' ? ' drop-left' : ' drop-right') : ''
+          return (
             <span
-              className="chip-x"
-              onClick={(e) => { e.stopPropagation(); removeSection(i) }}
-            >&times;</span>
-          </span>
-        ))}
+              key={s.uid || s.nombre + i}
+              data-testid={`chip-${i}`}
+              className={`chip ${i === selectedIdx ? 'active' : ''}${arr?.from === i ? ' dragging' : ''}${marca}`}
+              onClick={() => selectSection(i)}
+              draggable
+              tabIndex={0}
+              title="Arrástralo para cambiarlo de lugar en el tablero (Alt + ← / → con el teclado)"
+              onDragStart={(e) => {
+                setArrastre({ from: i, over: i, lado: 'der' })
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/plain', String(i))   // Firefox necesita datos
+              }}
+              onDragEnd={() => setArrastre(null)}
+              onDragOver={(e) => {
+                if (!arrastre) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                const r = e.currentTarget.getBoundingClientRect()
+                const lado = e.clientX < r.left + r.width / 2 ? 'izq' : 'der'
+                if (arrastre.over !== i || arrastre.lado !== lado) setArrastre({ ...arrastre, over: i, lado })
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const from = arrastre?.from ?? +e.dataTransfer.getData('text/plain')
+                if (Number.isInteger(from)) {
+                  // soltar a la derecha de un chip que está antes no corre el índice
+                  let to = arrastre?.lado === 'der' ? i + 1 : i
+                  if (from < to) to -= 1
+                  moveSection(from, Math.max(0, Math.min(sections.length - 1, to)))
+                }
+                setArrastre(null)
+              }}
+              onKeyDown={(e) => {
+                if (!e.altKey) return
+                if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); moveSection(i, i - 1) }
+                if (e.key === 'ArrowRight' && i < sections.length - 1) { e.preventDefault(); moveSection(i, i + 1) }
+              }}
+            >
+              {s.nombre || `S-${i + 1}`}
+              <span
+                className="chip-x"
+                onClick={(e) => { e.stopPropagation(); removeSection(i) }}
+              >&times;</span>
+            </span>
+          )
+        })}
         <button
           className="btn btn-primary"
           onClick={createSection}

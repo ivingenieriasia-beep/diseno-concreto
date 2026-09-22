@@ -30,7 +30,7 @@ function SectionGroup({ t, ox, oy }) {
   const cpy = hpx + fs * 2.2
 
   return (
-    <g transform={`translate(${ox},${oy})`}>
+    <g className="sec-move" transform={`translate(${ox},${oy})`}>
       {/* Section outline */}
       <rect width={bpx} height={hpx} fill="none" stroke="#c4517a" strokeWidth="2" />
 
@@ -215,7 +215,7 @@ export default function BeamCanvas({ sections, svgRef }) {
           const cellTotalH = rowH[row] - GAP
           const ox = cellStartX + MARGIN_L + (cellTotalW - MARGIN_L - MARGIN_R - bpx) / 2
           const oy = cellStartY + MARGIN_T + (cellTotalH - MARGIN_T - MARGIN_B - hpx) / 2
-          return <SectionGroup key={t.nombre + i} t={t} ox={ox} oy={oy} />
+          return <SectionGroup key={t.uid || t.nombre + i} t={t} ox={ox} oy={oy} />
         })}
       </svg>
     </div>
