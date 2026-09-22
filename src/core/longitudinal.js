@@ -840,6 +840,43 @@ export function optimizeBase(t, perfil, { calibres = ['3', '4', '5', '6'], nMax 
 
 /** Sección con el armado óptimo aplicado (para "Aplicar a la sección") */
 /**
+ * Miembros que aparecen en el reporte de más de una trabe. Pasa al sacar una
+ * variante (T-5A) de una familia: si el .txt de la original sigue trayendo
+ * esos miembros, la misma viga se diseña dos veces y con dos secciones.
+ * Los ya excluidos no cuentan.
+ * @returns [{ id, trabes:[{idx, nombre}] }]
+ */
+export function miembrosCompartidos(sections) {
+  const porId = new Map()
+  ;(sections || []).forEach((s, idx) => {
+    const ex = new Set((s?.perfil?.excluir || []).map(String))
+    for (const m of s?.perfil?.members || []) {
+      const k = String(m.id)
+      if (ex.has(k)) continue
+      if (!porId.has(k)) porId.set(k, [])
+      porId.get(k).push({ idx, nombre: s.nombre })
+    }
+  })
+  const out = []
+  for (const [id, trabes] of porId) if (trabes.length > 1) out.push({ id, trabes })
+  return out
+}
+
+/** Los compartidos de una trabe, agrupados por la otra trabe con la que choca */
+export function compartidosCon(sections, nombre) {
+  const porOtra = new Map()
+  for (const c of miembrosCompartidos(sections)) {
+    if (!c.trabes.some((t) => t.nombre === nombre)) continue
+    for (const t of c.trabes) {
+      if (t.nombre === nombre) continue
+      if (!porOtra.has(t.nombre)) porOtra.set(t.nombre, { nombre: t.nombre, idx: t.idx, ids: [] })
+      porOtra.get(t.nombre).ids.push(c.id)
+    }
+  }
+  return [...porOtra.values()]
+}
+
+/**
  * Bastones que pide una unidad (miembro o elemento): el mayor número
  * simultáneo por lecho. Es lo que hay que dibujar en el corte para que la
  * sección cubra lo que el análisis a lo largo encontró.

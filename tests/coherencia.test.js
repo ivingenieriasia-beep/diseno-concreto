@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseRamStations, memberProfile, analyzeGroup, refDeUnidad } from '../src/core/longitudinal.js'
+import { parseRamStations, memberProfile, analyzeGroup, refDeUnidad, miembrosCompartidos, compartidosCon } from '../src/core/longitudinal.js'
 import { beamEnvelopeByMember, parseRamEnvelope } from '../src/core/ramParser.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -107,5 +107,43 @@ describe('T-5: la envolvente cargada gobierna sobre las estaciones', () => {
     expect(refDeUnidad(el, { envRef })).toEqual({ m33max: 0.92, m33min: -4.5, v2: 3.64 })
     expect(refDeUnidad({ id: '22' }, { envRef })).toEqual({ m33max: 0.92, m33min: -4.36, v2: 3.22 })
     expect(refDeUnidad({ id: '99' }, { envRef })).toBeNull()
+  })
+})
+
+// ── Una variante sacada de una familia (T-5A) no debe seguir contando en T-5 ──
+describe('miembros que aparecen en dos trabes', () => {
+  const perfil = (ids, excluir = []) => ({ members: ids.map((id) => ({ id: String(id), stations: [] })), excluir })
+  const proyecto = [
+    { nombre: 'T-5', perfil: perfil([1757, 1825, 1830, 22, 31]) },
+    { nombre: 'T-5A', perfil: perfil([1757, 1825, 1830]) },
+    { nombre: 'T-6', perfil: perfil([900]) },
+    { nombre: 'T-7', perfil: null },
+  ]
+
+  it('detecta los miembros repartidos en más de una trabe', () => {
+    const c = miembrosCompartidos(proyecto)
+    expect(c.map((x) => x.id).sort()).toEqual(['1757', '1825', '1830'])
+    expect(c[0].trabes.map((t) => t.nombre)).toEqual(['T-5', 'T-5A'])
+  })
+
+  it('los agrupa por la trabe con la que chocan', () => {
+    const c = compartidosCon(proyecto, 'T-5')
+    expect(c).toHaveLength(1)
+    expect(c[0]).toMatchObject({ nombre: 'T-5A', idx: 1 })
+    expect(c[0].ids.sort()).toEqual(['1757', '1825', '1830'])
+    expect(compartidosCon(proyecto, 'T-6')).toEqual([])
+    expect(compartidosCon(proyecto, 'T-7')).toEqual([])
+  })
+
+  it('excluirlos de una de las dos resuelve el choque', () => {
+    const arreglado = [{ ...proyecto[0], perfil: perfil([1757, 1825, 1830, 22, 31], ['1757', '1825', '1830']) }, ...proyecto.slice(1)]
+    expect(miembrosCompartidos(arreglado)).toEqual([])
+    expect(compartidosCon(arreglado, 'T-5')).toEqual([])
+  })
+
+  it('un proyecto sin reportes no truena', () => {
+    expect(miembrosCompartidos([])).toEqual([])
+    expect(miembrosCompartidos(null)).toEqual([])
+    expect(miembrosCompartidos([{ nombre: 'X' }])).toEqual([])
   })
 })

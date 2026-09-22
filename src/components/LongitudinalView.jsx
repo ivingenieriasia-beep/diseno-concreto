@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
-import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios, extraDe } from '../core/longitudinal'
+import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios, extraDe, compartidosCon } from '../core/longitudinal'
 import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches } from '../core/geometry'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
 import { svgToDxf } from '../core/svgToDxf'
@@ -177,6 +177,10 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     casos.sort((a, b) => b.d - a.d)
     return { casos, peor: casos[0], env: form.envelope.archivo, perfil: perfilFull.archivo }
   }, [group, form.envelope, perfilFull])
+
+  // ¿Esta trabe comparte miembros con otra? (una variante sacada de la familia
+  // cuyo reporte original sigue trayéndolos: se diseñarían dos veces)
+  const compartidos = useMemo(() => compartidosCon(sections, form.nombre), [sections, form.nombre])
 
   const mismatch = useMemo(() => {
     if (!perfilFull?.secPor) return null
@@ -474,6 +478,26 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
         {group && (
           <>
             {needL && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px' }}>Captura la longitud L del grupo (o por miembro en la tabla), o carga la geometría del modelo para calcularla sola.</div>}
+            {compartidos.map((c) => {
+              const enGrupo = group.results.filter((r) => {
+                const ids = r.isElement ? r.members.map((m) => String(m.id)) : [String(r.id)]
+                return ids.some((id) => c.ids.includes(id))
+              })
+              return (
+                <div key={c.nombre} style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>
+                    <b>{c.ids.length} miembro(s) de este reporte también están en {c.nombre}</b>
+                    {enGrupo.length ? <> ({enGrupo.map((r) => unitLabel(r)).join(', ')})</> : null}: se están diseñando dos veces, con dos secciones distintas.
+                    Si ya son de {c.nombre}, sácalos de {form.nombre}.
+                  </span>
+                  <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid={`excluir-compartidos-${c.nombre}`}
+                    onClick={() => patchPerfil({ excluir: [...new Set([...(perfil.excluir || []), ...c.ids])] })}
+                    title={`Quita esos miembros del grupo de ${form.nombre}; siguen analizándose en ${c.nombre}`}>
+                    Excluirlos de {form.nombre}
+                  </button>
+                </div>
+              )
+            })}
             {mismatch?.distintos?.length > 0 && (
               <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>
