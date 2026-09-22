@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel } from '../core/longitudinal'
-import { parseNodeXlsx, parseNodeText, parseMemberGeometry, memberLengths, chainMembers, sectionMismatches } from '../core/geometry'
+import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches } from '../core/geometry'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
 import { svgToDxf } from '../core/svgToDxf'
 import { parseRamEnvelope } from '../core/ramParser'
+import ModelView from './ModelView'
 
 const fmt = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
 const TD = { padding: '4px 8px', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap', fontSize: 11 }
@@ -28,10 +29,29 @@ const smaxWarn = (r) => (r.shear.extremos.okSmax === false || r.shear.centro.okS
 
 const barsTxt = (bars, cal) => bars.length ? bars.map((b) => `${b.k}#${cal} L=${fmt(b.len)} @${fmt(b.x0)}${b.ancla ? ` ⟂${b.ancla}` : ''}`).join(' · ') : '—'
 
+/** Botón-ficha de un paso de carga: dice si ya está y qué se cargó */
+function Paso({ n, titulo, listo, detalle, onClick, onQuitar, hint }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 7, padding: '4px 10px', borderRadius: 8, fontSize: 11,
+      background: listo ? '#e8f5e9' : 'var(--color-panel)', border: `1px solid ${listo ? '#a5d6a7' : 'var(--color-border)'}`,
+    }} title={hint}>
+      <span style={{ fontWeight: 800, color: listo ? '#15803d' : 'var(--color-tx3)' }}>{listo ? '✓' : n}</span>
+      <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontSize: 11, color: 'var(--color-tx1)', textAlign: 'left' }}>
+        {titulo}
+      </button>
+      {detalle && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-tx3)' }}>{detalle}</span>}
+      {listo && onQuitar && <button onClick={onQuitar} title="quitar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tx3)', fontSize: 11, padding: 0 }}>✕</button>}
+    </div>
+  )
+}
+
 /**
  * Pestaña "Longitudinal": la trabe seleccionada contra el reporte por
  * estaciones de todos sus miembros. Bastones sólo donde y en quien hacen
  * falta, patrones para dibujar pocos detalles, y acero total vs uniforme.
+ * La geometría del modelo (nudos + miembros) se carga una sola vez y la
+ * comparten todas las trabes del proyecto.
  */
 export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const form = useBeamStore((s) => s.form)
@@ -40,29 +60,39 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const setPerfil = useBeamStore((s) => s.setPerfil)
   const setEnvelope = useBeamStore((s) => s.setEnvelope)
   const setForm = useBeamStore((s) => s.setForm)
+  const model = useBeamStore((s) => s.model)
+  const setModel = useBeamStore((s) => s.setModel)
   const hasSel = selectedIdx >= 0 && selectedIdx < sections.length
 
   const fileRef = useRef(null)
   const geomRef = useRef(null)
   const [msg, setMsg] = useState('')
-  const [sel, setSel] = useState(null)      // miembro seleccionado (id)
-  const [view, setView] = useState('tabla') // tabla | patrones
+  const [sel, setSel] = useState(null)      // miembro/elemento seleccionado (id)
+  const [view, setView] = useState('tabla') // tabla | patrones | modelo
   const [showOpt, setShowOpt] = useState(false)
+  const [ajustes, setAjustes] = useState(false)
   const [Ltxt, setLtxt] = useState('')
-  const [zoom, setZoom] = useState('fit') // fit | 1 | 2  (visor del alzado)
+  const [zoom, setZoom] = useState('fit')   // fit | 1 | 2  (visor del alzado)
+  const [drop, setDrop] = useState(false)
 
   const perfil = form.perfil
   useEffect(() => { setLtxt(perfil?.L ? String(perfil.L) : '') }, [perfil?.L, selectedIdx])
 
+  // ── Geometría del modelo (compartida) → longitudes, secciones y elementos ──
+  const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
+  // perfil + geometría: lo que ven el análisis y la tabla
+  const perfilFull = useMemo(() => attachGeometry(perfil, model), [perfil, model])
+  const chains = perfilFull?.geom?.chains || []
+
   const group = useMemo(() => {
-    if (!hasSel || !perfil?.members?.length) return null
-    try { return analyzeGroup(form, perfil) } catch (e) { console.error(e); return null }
-  }, [hasSel, form, perfil])
+    if (!hasSel || !perfilFull?.members?.length) return null
+    try { return analyzeGroup(form, perfilFull) } catch (e) { console.error(e); return null }
+  }, [hasSel, form, perfilFull])
 
   const opt = useMemo(() => {
     if (!showOpt || !group) return null
-    try { return optimizeBase(form, perfil) } catch (e) { console.error(e); return null }
-  }, [showOpt, group, form, perfil])
+    try { return optimizeBase(form, perfilFull) } catch (e) { console.error(e); return null }
+  }, [showOpt, group, form, perfilFull])
 
   const selected = useMemo(() => {
     if (!group) return null
@@ -70,42 +100,90 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   }, [group, sel])
 
   const mismatch = useMemo(() => {
-    if (!perfil?.secPor) return null
-    const ids = perfil.members.map((m) => m.id)
-    return sectionMismatches(perfil.secPor, ids, form)
-  }, [perfil, form.ancho, form.peralte]) // eslint-disable-line
+    if (!perfilFull?.secPor) return null
+    const ids = perfilFull.members.map((m) => m.id)
+    return sectionMismatches(perfilFull.secPor, ids, form)
+  }, [perfilFull, form.ancho, form.peralte]) // eslint-disable-line
   const excluidos = useMemo(() => new Set((perfil?.excluir || []).map(String)), [perfil?.excluir])
 
-  function onFile(e) {
-    const file = e.target.files?.[0]; if (!file) return
-    const rd = new FileReader()
-    rd.onload = (ev) => {
-      const text = ev.target.result
-      if (!looksLikeStations(text)) {
+  const patchPerfil = (p) => setPerfil({ ...perfil, ...p })
+
+  // ── Carga de archivos: un solo camino, el contenido decide qué es cada uno ──
+  async function cargarArchivos(files) {
+    if (!files.length) return
+    const notas = []
+    let rows = null, nds = null, perfilNuevo = null
+    const nombreGeom = []
+    for (const f of files) {
+      try {
+        if (/\.xlsx$/i.test(f.name)) {
+          nds = await parseNodeXlsx(await f.arrayBuffer())
+          nombreGeom.push(f.name)
+          notas.push(`${f.name}: ${nds.size} nudos`)
+          continue
+        }
+        const text = await f.text()
+        if (looksLikeStations(text)) { const e = cargarEstaciones(f.name, text); perfilNuevo = e.perfil; notas.push(e.nota); continue }
+        const g = parseGeometryReport(text)
+        if (g.rows.length || g.nodes.size) {
+          if (g.rows.length) rows = g.rows
+          if (g.nodes.size) nds = g.nodes
+          nombreGeom.push(f.name)
+          notas.push(`${f.name}: ${[g.rows.length && `${g.rows.length} miembros`, g.nodes.size && `${g.nodes.size} nudos`].filter(Boolean).join(' + ')}${g.warnings.length ? ` (${g.warnings.join(' ')})` : ''}`)
+          continue
+        }
         const env = parseRamEnvelope(text)
         if (env.points.length) {
-          setEnvelope({ archivo: file.name, combo: env.combo, unidades: env.unidades, invertir: false, points: env.points })
-          setMsg(`Este archivo es el reporte de máximos por miembro (${new Set(env.points.map((p) => p.member)).size} miembros): se cargó como envolvente de la sección. Para el análisis a lo largo exporta «Envolvente de esfuerzos» por estaciones.`)
-        } else setMsg('No se reconoció el formato. Exporta en RAM «Envolvente de esfuerzos» (por estaciones).')
-        return
-      }
-      const P = parseRamStations(text)
-      if (!P.members.length) { setMsg(P.warnings[0] || 'Sin miembros.'); return }
-      const Lprev = perfil?.L || +(form.calc?.L) || 0
-      setPerfil({
-        archivo: file.name, combo: P.combo, unidades: P.unidades,
-        members: P.members, L: Lprev || 0, Lpor: {}, invertir: !!perfil?.invertir, minLen: perfil?.minLen ?? 0.6,
-      })
-      // La envolvente de sección (máximos por miembro) sale del mismo reporte
-      setEnvelope({ archivo: file.name, combo: P.combo, unidades: P.unidades, invertir: !!perfil?.invertir, points: P.points, fromStations: true })
-      const enM = P.members.filter((m) => m.Lreport).length
-      setMsg(`${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ' · captura la longitud L del grupo'}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}`)
-      setSel(null)
+          setEnvelope({ archivo: f.name, combo: env.combo, unidades: env.unidades, invertir: false, points: env.points })
+          notas.push(`${f.name}: máximos por miembro (${new Set(env.points.map((p) => p.member)).size}) → envolvente de la sección; para el análisis a lo largo exporta «Envolvente de esfuerzos» por estaciones`)
+          continue
+        }
+        notas.push(`${f.name}: no se reconoció (ni esfuerzos ni geometría)`)
+      } catch (err) { notas.push(`${f.name}: ${err.message}`) }
     }
-    rd.readAsText(file); e.target.value = ''
+    // La geometría se guarda completa: es del modelo, no de esta trabe
+    if (rows || nds) {
+      const R = rows || model?.rows || []
+      const N = nds || nodes
+      if (!R.length) notas.push('falta el reporte de miembros (NJ/NK)')
+      else if (!N.size) notas.push('faltan las coordenadas de los nudos')
+      else {
+        const nuevo = { archivo: nombreGeom.join(' + ') || model?.archivo || '', rows: R, nodes: Object.fromEntries(N) }
+        setModel(nuevo)
+        const p2 = attachGeometry(perfilNuevo || perfil, nuevo)
+        if (p2?.geom) {
+          const multi = p2.geom.chains.filter((c) => c.members.length > 1).length
+          notas.push(`${Object.keys(p2.Lpor).length} longitudes calculadas · ${p2.geom.chains.length} elementos (${multi} formados por varios miembros colineales)`)
+        }
+      }
+    }
+    setMsg(notas.join(' · '))
   }
 
-  const patchPerfil = (p) => setPerfil({ ...perfil, ...p })
+  function cargarEstaciones(nombre, text) {
+    const P = parseRamStations(text)
+    if (!P.members.length) return { perfil: null, nota: `${nombre}: ${P.warnings[0] || 'sin miembros'}` }
+    const Lprev = perfil?.L || +(form.calc?.L) || 0
+    const nuevo = {
+      ...(perfil || {}),
+      archivo: nombre, combo: P.combo, unidades: P.unidades,
+      members: P.members, L: Lprev || 0, Lpor: perfil?.Lpor || {},
+      invertir: !!perfil?.invertir, minLen: perfil?.minLen ?? 0.6,
+      porElemento: perfil?.porElemento ?? true,
+    }
+    setPerfil(nuevo)
+    // La envolvente de sección (máximos por miembro) sale del mismo reporte
+    setEnvelope({ archivo: nombre, combo: P.combo, unidades: P.unidades, invertir: !!perfil?.invertir, points: P.points, fromStations: true })
+    setSel(null)
+    const enM = P.members.filter((m) => m.Lreport).length
+    return { perfil: nuevo, nota: `${nombre}: ${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ''}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}` }
+  }
+
+  const onInput = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; cargarArchivos(fs) }
+  const onDrop = (e) => {
+    e.preventDefault(); setDrop(false)
+    cargarArchivos([...(e.dataTransfer?.files || [])])
+  }
 
   // ── DXF de alzados (aparte del DXF de secciones de la barra) ──
   function download(content, filename, mime = 'text/plain') {
@@ -118,10 +196,9 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     const list = scope === 'all' ? sections.filter((t) => t.perfil?.members?.length) : [form]
     let inner = '', W = 0, H = 0, n = 0
     for (const t of list) {
-      if (!t.perfil?.members?.length) continue
       let g = null
-      try { g = t === form && group ? group : analyzeGroup(t, t.perfil) } catch { continue }
-      if (!g || !g.results.some((r) => r.L > 0)) continue
+      try { g = analyzeGroup(t, t === form ? perfilFull : attachGeometry(t.perfil, model)) } catch { continue }
+      if (!g?.patterns?.length) continue
       const e = elevationsGridSvg(t, g, 14)
       inner += `<g transform="translate(0,${H.toFixed(1)})">${e.inner}</g>`
       H += e.H + 40; W = Math.max(W, e.W); n += g.patterns.length
@@ -134,54 +211,6 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     setMsg(`DXF de alzados generado: ${n} patrón(es) de ${list.length} trabe(s), a escala real (1 unidad = 1 cm${dxfScale !== 1 ? `, factor ${dxfScale}` : ''}).`)
   }
 
-  // Geometría: reporte de miembros (NJ, NK, sección) + coordenadas de nudos → L por miembro y elementos
-  async function onGeomFiles(e) {
-    const files = [...(e.target.files || [])]
-    e.target.value = ''
-    if (!files.length || !perfil?.members?.length) return
-    let geomRows = perfil.geom?.rows || null
-    let nodes = null
-    const notas = []
-    for (const f of files) {
-      try {
-        if (/\.xlsx$/i.test(f.name)) {
-          nodes = await parseNodeXlsx(await f.arrayBuffer())
-          notas.push(`${f.name}: ${nodes.size} nudos`)
-        } else {
-          const text = await f.text()
-          const g = parseMemberGeometry(text)
-          if (g.rows.length) { geomRows = g.rows; notas.push(`${f.name}: ${g.rows.length} miembros con NJ/NK`) }
-          else {
-            const n = parseNodeText(text)
-            if (n.size) { nodes = n; notas.push(`${f.name}: ${n.size} nudos`) }
-            else notas.push(`${f.name}: no se reconoció (ni miembros ni nudos)`)
-          }
-        }
-      } catch (err) { notas.push(`${f.name}: ${err.message}`) }
-    }
-    if (nodes) {
-      // sólo se guardan los nudos que usan estos miembros (el proyecto queda ligero)
-      const usados = new Map()
-      for (const r of geomRows || []) for (const n of [r.nj, r.nk]) if (nodes.has(n)) usados.set(n, nodes.get(n))
-      nodes = usados.size ? usados : nodes
-    }
-    const nodesMap = nodes || new Map(Object.entries(perfil.geom?.nodes || {}))
-    if (!geomRows || !nodesMap.size) {
-      setMsg(`${notas.join(' · ')} — faltan ${!geomRows ? 'el reporte de miembros (NJ/NK)' : 'las coordenadas de nudos'}; carga ambos archivos (puedes seleccionarlos juntos).`)
-      patchPerfil({ geom: { ...(perfil.geom || {}), rows: geomRows || perfil.geom?.rows || null, nodes: nodes ? Object.fromEntries(nodes) : (perfil.geom?.nodes || null) } })
-      return
-    }
-    const ids = perfil.members.map((m) => m.id)
-    const { Lpor, secPor, missing } = memberLengths(geomRows.filter((r) => ids.includes(String(r.member))), nodesMap)
-    const chains = chainMembers(geomRows, nodesMap, ids)
-    const nEl = chains.length, nMulti = chains.filter((c) => c.members.length > 1).length
-    patchPerfil({
-      Lpor: { ...(perfil.Lpor || {}), ...Lpor }, secPor,
-      geom: { rows: geomRows, nodes: Object.fromEntries(nodesMap), chains, archivo: files.map((f) => f.name).join(' + ') },
-      porElemento: perfil.porElemento ?? true,
-    })
-    setMsg(`${notas.join(' · ')} → ${Object.keys(Lpor).length} longitudes calculadas${missing.length ? ` (${missing.length} sin nudos)` : ''} · ${nEl} elementos (${nMulti} formados por varios miembros colineales)`)
-  }
   const toggleExcluir = (id) => {
     const ex = new Set((perfil.excluir || []).map(String))
     ex.has(String(id)) ? ex.delete(String(id)) : ex.add(String(id))
@@ -204,11 +233,24 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
   const needL = group && group.results.some((r) => !(r.L > 0))
   const kInfMismatch = group && group.kMaxInf !== (+form.cantBastonInf || 0)
   const kSupMismatch = group && group.kMaxSup !== (+form.cantBastonSup || 0)
+  const hayEsfuerzos = perfil?.members?.length > 0
+  const hayModelo = model?.rows?.length > 0 && nodes.size > 0
+  const vista = view === 'modelo' && !hayModelo ? 'tabla' : view
+  const abrir = () => fileRef.current?.click()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <input ref={fileRef} data-testid="perfil-file" type="file" accept=".txt,.csv,text/plain" style={{ display: 'none' }} onChange={onFile} />
-      <input ref={geomRef} data-testid="geom-files" type="file" multiple accept=".txt,.csv,.xlsx,text/plain" style={{ display: 'none' }} onChange={onGeomFiles} />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}
+      onDragOver={(e) => { e.preventDefault(); if (!drop) setDrop(true) }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setDrop(false) }}
+      onDrop={onDrop}>
+      <input ref={fileRef} data-testid="perfil-file" type="file" multiple accept=".txt,.csv,.xlsx,text/plain" style={{ display: 'none' }} onChange={onInput} />
+      <input ref={geomRef} data-testid="geom-files" type="file" multiple accept=".txt,.csv,.xlsx,text/plain" style={{ display: 'none' }} onChange={onInput} />
+
+      {drop && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(91,197,174,0.10)', border: '3px dashed var(--color-accent)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ background: '#fff', padding: '10px 18px', borderRadius: 8, border: '1px solid var(--color-accent)', fontSize: 13, fontWeight: 700 }}>Suelta aquí los reportes de RAM (.txt / .xlsx)</div>
+        </div>
+      )}
 
       {/* Barra superior */}
       <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-panel)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -217,49 +259,61 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
           <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>
             {form.ancho}×{form.peralte} · corridas {form.cantInf}#{form.calInf} abajo / {form.cantSup}#{form.calSup} arriba · bastón #{form.calBastonInf}/#{form.calBastonSup} · E#{form.calEst}@{form.sepLcuarto}/{form.sepRest}
           </span>
-          <button className="btn btn-primary" style={{ fontSize: 11 }} onClick={() => fileRef.current?.click()}>
-            📄 Cargar «Envolvente de esfuerzos» por estaciones (RAM .txt)
+          <button className="btn btn-primary" style={{ fontSize: 11 }} onClick={abrir} data-testid="cargar-ram">
+            📂 Cargar reportes de RAM
           </button>
-          {perfil?.members?.length > 0 && (
+          <Paso n="1" titulo="Esfuerzos por estaciones" listo={hayEsfuerzos} onClick={abrir}
+            hint="RAM: Miembros → Envolvente de esfuerzos (por estaciones) de todos los miembros de este tipo de trabe"
+            detalle={hayEsfuerzos ? `${perfil.archivo} · ${perfil.members.length} miembros${perfil.combo ? ` · ${perfil.combo}` : ''}` : '.txt de la envolvente por estaciones'}
+            onQuitar={() => { setPerfil(null); if (form.envelope?.fromStations) setEnvelope(null); setMsg('') }} />
+          <Paso n="2" titulo="Geometría del modelo" listo={hayModelo} onClick={abrir}
+            hint="RAM: Datos de Geometría → Guardar como TXT (trae Nudos y Miembros en un solo archivo). Con esto la app calcula la longitud de cada miembro y une los tramos colineales en elementos completos."
+            detalle={hayModelo ? `${model.archivo || ''} · ${model.rows.length} miembros · ${nodes.size} nudos${chains.length ? ` · ${chains.length} elementos` : ''}` : 'opcional · .txt «Datos de Geometría»'}
+            onQuitar={() => { setModel(null); setMsg('') }} />
+          {hayEsfuerzos && (
             <>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)' }}><b>{perfil.archivo}</b> · {perfil.members.length} miembros{perfil.combo ? ` · ${perfil.combo}` : ''}</span>
-              <button className="btn btn-secondary" style={{ fontSize: 11 }} onClick={() => geomRef.current?.click()}
-                title="Reporte Datos de geometría → Miembros (.txt) + coordenadas de nudos (.xlsx o .txt). Calcula la L de cada miembro y une los tramos colineales en elementos completos">
-                📐 Geometría (miembros .txt + nudos .xlsx)
-              </button>
-              {perfil.geom?.chains?.length > 0 && (
-                <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }} title="Une los miembros colineales de RAM que comparten nudo en un solo elemento y lo analiza completo">
-                  <input type="checkbox" checked={perfil.porElemento !== false} onChange={(e) => patchPerfil({ porElemento: e.target.checked })} />
-                  por elemento ({perfil.geom.chains.length})
+              {chains.length > 0 && (
+                <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }} title="Une los miembros colineales de RAM que comparten nudo y analiza el elemento completo">
+                  <input type="checkbox" checked={perfilFull.porElemento !== false} onChange={(e) => patchPerfil({ porElemento: e.target.checked })} />
+                  por elemento ({chains.length})
                 </label>
               )}
-              <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                L del grupo (m)
-                <input className="field-input" data-testid="perfil-L" style={{ width: 70, fontSize: 11 }} value={Ltxt} onChange={(e) => setLtxt(e.target.value)} onBlur={commitL} onKeyDown={(e) => e.key === 'Enter' && commitL()} placeholder="4.00" />
-              </label>
-              <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }} title="Longitud mínima práctica de un bastón (obra)">
-                bastón mín (m)
-                <input className="field-input" style={{ width: 60, fontSize: 11 }} type="number" step="0.05" min="0" value={perfil.minLen ?? 0.6} onChange={(e) => patchPerfil({ minLen: Math.max(0, +e.target.value || 0) })} />
-              </label>
-              <button className="btn btn-secondary" style={{ fontSize: 10 }} onClick={() => { patchPerfil({ invertir: !perfil.invertir }); setEnvelope({ ...(form.envelope || {}), invertir: !perfil.invertir }) }}
-                title="Invierte el signo de M33 si en tu modelo el momento positivo va al revés">
-                {perfil.invertir ? 'M33 invertido ⇄' : 'M33 normal ⇄'}
-              </button>
-              <button style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tx3)', textDecoration: 'underline' }}
-                onClick={() => { setPerfil(null); if (form.envelope?.fromStations) setEnvelope(null); setMsg('') }}>quitar</button>
+              {(needL || !hayModelo) && (
+                <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  L del grupo (m)
+                  <input className="field-input" data-testid="perfil-L" style={{ width: 70, fontSize: 11 }} value={Ltxt} onChange={(e) => setLtxt(e.target.value)} onBlur={commitL} onKeyDown={(e) => e.key === 'Enter' && commitL()} placeholder="4.00" />
+                </label>
+              )}
+              <button className="btn btn-secondary" style={{ fontSize: 10 }} onClick={() => setAjustes((v) => !v)}>⚙ Ajustes</button>
             </>
           )}
-          {!perfil?.members?.length && (
-            <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>
-              En RAM: Miembros → Envolvente de esfuerzos (por estaciones) de todos los miembros de este tipo de trabe.
-            </span>
-          )}
         </div>
+
+        {ajustes && hayEsfuerzos && (
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', padding: '6px 10px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }} title="Longitud mínima práctica de un bastón (obra)">
+              bastón mín (m)
+              <input className="field-input" style={{ width: 60, fontSize: 11 }} type="number" step="0.05" min="0" value={perfil.minLen ?? 0.6} onChange={(e) => patchPerfil({ minLen: Math.max(0, +e.target.value || 0) })} />
+            </label>
+            <button className="btn btn-secondary" style={{ fontSize: 10 }} onClick={() => { patchPerfil({ invertir: !perfil.invertir }); setEnvelope({ ...(form.envelope || {}), invertir: !perfil.invertir }) }}
+              title="Invierte el signo de M33 si en tu modelo el momento positivo va al revés">
+              {perfil.invertir ? 'M33 invertido ⇄' : 'M33 normal ⇄'}
+            </button>
+            {hayModelo && (
+              <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                L del grupo (m)
+                <input className="field-input" style={{ width: 70, fontSize: 11 }} value={Ltxt} onChange={(e) => setLtxt(e.target.value)} onBlur={commitL} onKeyDown={(e) => e.key === 'Enter' && commitL()} placeholder="4.00" />
+              </label>
+            )}
+            <span style={{ fontSize: 10, color: 'var(--color-tx3)' }}>Puedes soltar los .txt de RAM en cualquier parte de esta pestaña.</span>
+          </div>
+        )}
+
         {msg && <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>{msg}</div>}
 
         {group && (
           <>
-            {needL && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px' }}>Captura la longitud L del grupo (o por miembro en la tabla) para convertir las estaciones a metros y calcular longitudes de bastón.</div>}
+            {needL && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px' }}>Captura la longitud L del grupo (o por miembro en la tabla), o carga la geometría del modelo para calcularla sola.</div>}
             {mismatch?.distintos?.length > 0 && (
               <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>
@@ -268,7 +322,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 </span>
                 {mismatch.distintos.some((d) => !excluidos.has(String(d.member))) && (
                   <button className="btn btn-secondary" style={{ fontSize: 10 }} onClick={() => patchPerfil({ excluir: [...new Set([...(perfil.excluir || []), ...mismatch.distintos.map((d) => d.member)])] })}>
-                    Excluir del grupo los de otra sección ({mismatch.distintos.map((d) => `M-${d.member}`).join(', ')})
+                    Excluir del grupo los de otra sección ({mismatch.distintos.length <= 8 ? mismatch.distintos.map((d) => `M-${d.member}`).join(', ') : `${mismatch.distintos.length} miembros`})
                   </button>
                 )}
                 {excluidos.size > 0 && <span style={{ color: 'var(--color-tx3)' }}>excluidos: {[...excluidos].join(', ')} <button style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', color: 'var(--color-tx3)' }} onClick={() => patchPerfil({ excluir: [] })}>restaurar</button></span>}
@@ -314,8 +368,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 ⬇ DXF alzados · todas ({sections.filter((t) => t.perfil?.members?.length).length})
               </button>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                {[['tabla', 'Miembros'], ['patrones', `Patrones (${group.patterns.length})`]].map(([id, lbl]) => (
-                  <button key={id} onClick={() => setView(id)} className="btn" style={{ fontSize: 11, padding: '4px 12px', background: view === id ? 'var(--color-accent)' : 'var(--color-panel)', color: view === id ? '#fff' : 'var(--color-tx2)', border: '1px solid var(--color-border)' }}>{lbl}</button>
+                {[['tabla', 'Miembros'], ['patrones', `Patrones (${group.patterns.length})`], ...(hayModelo ? [['modelo', '🏗 Modelo']] : [])].map(([id, lbl]) => (
+                  <button key={id} onClick={() => setView(id)} data-testid={`view-${id}`} className="btn" style={{ fontSize: 11, padding: '4px 12px', background: vista === id ? 'var(--color-accent)' : 'var(--color-panel)', color: vista === id ? '#fff' : 'var(--color-tx2)', border: '1px solid var(--color-border)' }}>{lbl}</button>
                 ))}
               </div>
             </div>
@@ -335,7 +389,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 ))}
                 {(opt.best.inf || opt.best.sup) && (
                   <button className="btn btn-primary" style={{ fontSize: 11, marginTop: 8 }}
-                    onClick={() => { const g2 = analyzeGroup({ ...form, ...applyBase(form, opt.best) }, perfil); setForm(applyBase(form, opt.best, g2.kMaxInf, g2.kMaxSup)); setShowOpt(false) }}>
+                    onClick={() => { const g2 = analyzeGroup({ ...form, ...applyBase(form, opt.best) }, perfilFull); setForm(applyBase(form, opt.best, g2.kMaxInf, g2.kMaxSup)); setShowOpt(false) }}>
                     ← Aplicar a la sección ({opt.best.inf ? `${opt.best.inf.n}#${opt.best.inf.cal}` : '—'} abajo / {opt.best.sup ? `${opt.best.sup.n}#${opt.best.sup.cal}` : '—'} arriba)
                   </button>
                 )}
@@ -345,11 +399,50 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
         )}
       </div>
 
+      {/* Sin reporte de esfuerzos: cómo empezar (y el modelo, si ya está) */}
+      {!group && (
+        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: hayModelo ? '8px 16px' : 20, display: 'flex', justifyContent: 'center' }}>
+            <div style={{ maxWidth: hayModelo ? '100%' : 720, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: hayModelo ? '8px 14px' : '16px 20px', fontSize: 12.5, lineHeight: 1.65 }}>
+              {hayModelo ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <b>Falta el paso 1:</b>
+                  <span style={{ color: 'var(--color-tx2)' }}>en RAM, <i>Miembros → Envolvente de esfuerzos</i> (por estaciones) de los miembros de {form.nombre}, guardar como TXT y cargarlo aquí para diseñar los bastones.</span>
+                  <button className="btn btn-primary" style={{ fontSize: 11.5 }} onClick={abrir}>📂 Elegir archivo…</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>Analizar {form.nombre} a lo largo</div>
+                  <div style={{ color: 'var(--color-tx2)' }}>
+                    <div><b>1 · Esfuerzos.</b> En RAM: <i>Miembros → Envolvente de esfuerzos</i>, por estaciones, de todos los miembros de este tipo de trabe. Guardar como TXT.</div>
+                    <div><b>2 · Geometría</b> (opcional, muy recomendable). En RAM: <i>Datos de Geometría → Guardar como TXT</i>. Un solo archivo trae Nudos y Miembros: con él la app saca la longitud de cada miembro, une los tramos colineales en elementos completos y dibuja el modelo.</div>
+                  </div>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={abrir}>📂 Elegir archivos…</button>
+                    <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>o suéltalos aquí. Se pueden cargar los dos juntos; la app reconoce cada uno por su contenido.</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          {hayModelo && (
+            <div style={{ flex: 1, minHeight: 380, borderTop: '1px solid var(--color-border)' }}>
+              <ModelView nodes={nodes} rows={model.rows} archivo={model.archivo} trabe={form.nombre}
+                results={null} chains={[]} excluidos={excluidos} porElemento={false} selectedId={null} onSelect={null} />
+            </div>
+          )}
+        </div>
+      )}
+
       {group && (
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Izquierda: tabla de miembros o patrones */}
-          <div style={{ width: view === 'tabla' ? 560 : 420, minWidth: 380, borderRight: '1px solid var(--color-border)', overflow: 'auto' }}>
-            {view === 'tabla' ? (
+          {/* Izquierda: tabla, patrones o modelo */}
+          <div style={{ width: vista === 'modelo' ? '58%' : vista === 'tabla' ? 560 : 420, minWidth: 380, borderRight: '1px solid var(--color-border)', overflow: vista === 'modelo' ? 'hidden' : 'auto' }}>
+            {vista === 'modelo' ? (
+              <ModelView nodes={nodes} rows={model.rows} archivo={model.archivo} trabe={form.nombre}
+                results={group.results} chains={chains} excluidos={excluidos}
+                porElemento={perfilFull.porElemento !== false} selectedId={selected?.id} onSelect={(id) => setSel(id)} />
+            ) : vista === 'tabla' ? (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)' }}>
                 <thead><tr>
                   <th style={TH}>{group.results.some((r) => r.isElement) ? 'Elemento' : 'Miembro'}</th><th style={TH}>L (m)</th><th style={TH}>Mu+</th><th style={TH}>Mu−</th><th style={TH}>Vu</th>
@@ -361,11 +454,11 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                       <td style={{ ...TD, fontWeight: 700, whiteSpace: 'normal' }}>
                         {unitLabel(r)}
                         {r.isElement && <div style={{ fontSize: 9, color: 'var(--color-tx3)', fontWeight: 400 }}>{r.members.length} tramos: {r.members.map((m) => m.id).join(' · ')}{r.supports?.length > 2 ? ` · ${r.supports.length - 2} apoyo(s) int.` : ''}</div>}
-                        {!r.isElement && perfil.secPor?.[r.id] && <div style={{ fontSize: 9, color: 'var(--color-tx3)', fontWeight: 400 }}>{perfil.secPor[r.id]}</div>}
+                        {!r.isElement && perfilFull.secPor?.[r.id] && <div style={{ fontSize: 9, color: 'var(--color-tx3)', fontWeight: 400 }}>{perfilFull.secPor[r.id]}</div>}
                         {!r.isElement && <button onClick={(e) => { e.stopPropagation(); toggleExcluir(r.id) }} style={{ fontSize: 9, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tx3)', textDecoration: 'underline', padding: 0 }}>excluir</button>}
                       </td>
                       <td style={TD}>
-                        {perfil.members.find((m) => m.id === r.id)?.Lreport || r.isElement || perfil.Lpor?.[r.id]
+                        {perfilFull.members.find((m) => m.id === r.id)?.Lreport || r.isElement || perfilFull.Lpor?.[r.id]
                           ? fmt(r.L)
                           : <input className="field-input" style={{ width: 56, fontSize: 10.5, padding: '1px 4px' }} placeholder={fmt(L)} value={perfil.Lpor?.[r.id] ?? ''} onChange={(e) => setLpor(r.id, e.target.value)} onClick={(e) => e.stopPropagation()} />}
                       </td>
@@ -380,7 +473,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                   {[...excluidos].map((id) => (
                     <tr key={'ex' + id} style={{ opacity: 0.55 }}>
                       <td style={{ ...TD, fontWeight: 700 }}>M-{id} <button onClick={() => toggleExcluir(id)} style={{ fontSize: 9, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tx3)', textDecoration: 'underline', padding: 0 }}>incluir</button></td>
-                      <td style={TD} colSpan={7}><Pill tone="muted">excluido del grupo{perfil.secPor?.[id] ? ` · ${perfil.secPor[id]}` : ''}</Pill></td>
+                      <td style={TD} colSpan={7}><Pill tone="muted">excluido del grupo{perfilFull.secPor?.[id] ? ` · ${perfilFull.secPor[id]}` : ''}</Pill></td>
                     </tr>
                   ))}
                 </tbody>
@@ -443,7 +536,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                     <span style={{ color: 'var(--color-tx3)', fontSize: 10 }}>{zoom === 'fit' ? '' : '(desplázate horizontalmente)'}</span>
                   </div>
                   <div style={{ overflowX: 'auto', overflowY: 'hidden', padding: 6 }}
-                    dangerouslySetInnerHTML={{ __html: elevationSvg(form, selected, { scale: zoom === '2' ? 8 : 5, title: `${form.nombre} · ${unitLabel(selected)}${view === 'patrones' ? ` · patrón ${group.patterns.find((p) => p.signature === selected.signature)?.label || ''}` : ''}` }).svg.replace('<svg ', zoom === 'fit' ? '<svg style="max-width:100%;height:auto;display:block" ' : '<svg style="height:auto;display:block" ') }} />
+                    dangerouslySetInnerHTML={{ __html: elevationSvg(form, selected, { scale: zoom === '2' ? 8 : 5, title: `${form.nombre} · ${unitLabel(selected)}${vista === 'patrones' ? ` · patrón ${group.patterns.find((p) => p.signature === selected.signature)?.label || ''}` : ''}` }).svg.replace('<svg ', zoom === 'fit' ? '<svg style="max-width:100%;height:auto;display:block" ' : '<svg style="height:auto;display:block" ') }} />
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--color-tx3)' }}>
                   La curva gruesa es la envolvente de resistencia real: sube en rampa a lo largo de Ld donde empieza el bastón (el acero se va desarrollando) y baja donde termina; si en la rampa el momento la rebasara, el bastón se alarga solo hasta cubrirlo. Bastón: desde el punto donde Mu rebasa el MR de las corridas, prolongado ≥ máx(d, 12db) y con Ld desde el pico; longitudes a múltiplos de 5 cm, medidas desde el apoyo I. Los que llegan a un extremo se anclan en él (gancho). Cortante por claros: cuartos extremos con @{form.sepLcuarto}, centro con @{form.sepRest}; los apoyos interiores (triángulos) se detectan donde el cortante salta y cambia de signo. Los alzados salen en su propio DXF (botones ⬇ DXF alzados), aparte del DXF de secciones de la barra.

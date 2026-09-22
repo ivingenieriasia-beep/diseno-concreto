@@ -23,6 +23,7 @@ import { initGlobalDB, getDB, getStats, onDBChange } from './core/globalDB'
 import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, listRecents, timeAgo, debounce, isEmptyProject } from './core/autosave'
 import { buildDcheck } from './core/dcheckExport'
 import { analyzeGroup } from './core/longitudinal'
+import { attachGeometry } from './core/geometry'
 
 function download(content, filename, mime = 'text/plain') {
   const blob = new Blob([content], { type: mime })
@@ -42,6 +43,7 @@ export default function App() {
   const fileInputRef = useRef(null)
   const sections = useBeamStore((s) => s.sections)
   const loadProject = useBeamStore((s) => s.loadProject)
+  const model = useBeamStore((s) => s.model)
   const calcAlert = useBeamStore((s) => s.calcAlert)
   const columns = useColumnStore((s) => s.columns)
   const loadColumns = useColumnStore((s) => s.loadColumns)
@@ -76,7 +78,7 @@ export default function App() {
 
   // ── Carga completa de un proyecto (archivo, reciente o autosave) ──
   const applyProject = useCallback((data) => {
-    loadProject(Array.isArray(data.sections) ? data.sections : [])
+    loadProject(Array.isArray(data.sections) ? data.sections : [], data.model || null)
     loadColumns(Array.isArray(data.columns) ? data.columns : [])
     loadCargas(data.cargas || {})
     setProjectName(data.projectName !== undefined ? data.projectName : '')
@@ -98,8 +100,8 @@ export default function App() {
   // Autoguardado en cada cambio
   useEffect(() => {
     if (!restored.current) return
-    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas() }))
-  }, [projectName, dxfScale, sections, columns, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas])
+    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model }))
+  }, [projectName, dxfScale, sections, columns, model, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas])
 
   // Las pestañas de módulos abiertas se recuerdan entre sesiones
   useEffect(() => { guardarAbiertos(modulos) }, [modulos])
@@ -175,7 +177,7 @@ export default function App() {
   }, [getSvgString, dxfScale, fileName])
 
   const handleSave = useCallback(() => {
-    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas() })
+    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model })
     download(JSON.stringify(data, null, 2), `${fileName}.json`, 'application/json')
     pushRecent(data)
     setRecents(listRecents())
@@ -236,7 +238,7 @@ export default function App() {
   }, [applyProject, showToast])
 
   const handleNew = useCallback(() => {
-    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas() })
+    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model })
     if (!isEmptyProject(current) && !confirm('¿Empezar un proyecto nuevo? Lo que hay ahora queda en "Recientes" (y en tu último .json guardado).')) return
     if (!isEmptyProject(current)) { pushRecent(current); setRecents(listRecents()) }
     applyProject({ sections: [], columns: [], cargas: {}, projectName: '', dxfScale: 1 })
@@ -279,10 +281,10 @@ export default function App() {
     for (const t of sections) {
       if (!t.perfil?.members?.length) continue
       n++
-      try { const g = analyzeGroup(t, t.perfil); if (!g.allOk || !g.caps.okBase) bad++ } catch { bad++ }
+      try { const g = analyzeGroup(t, attachGeometry(t.perfil, model)); if (!g.allOk || !g.caps.okBase) bad++ } catch { bad++ }
     }
     return { n, bad }
-  }, [sections])
+  }, [sections, model])
 
   // Contadores que se ven en la pestaña del módulo y en la paleta
   const badges = useMemo(() => ({

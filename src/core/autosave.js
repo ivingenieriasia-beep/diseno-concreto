@@ -9,7 +9,7 @@ const KEY = 'iv_autosave_v1'
 const RECENTS = 'iv_recents_v1'
 const MAX_RECENTS = 6
 
-export const PROJECT_VERSION = 4
+export const PROJECT_VERSION = 5
 
 /** Bajada de cargas vacía: la forma que toma un proyecto sin nada capturado */
 export const emptyCargas = () => ({ losas: [], muros: [], tableros: [], unidad: 'kg' })
@@ -19,10 +19,11 @@ export function hasCargas(c) {
 }
 
 /** Empaqueta el estado del proyecto tal como se guarda en el .json */
-export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null }) {
+export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null, model = null }) {
   return {
     version: PROJECT_VERSION, projectName, dxfScale, sections, columns,
     cargas: cargas || emptyCargas(),
+    model: model || null,   // geometría del modelo de RAM, común a todas las trabes
     savedAt: new Date().toISOString(),
   }
 }

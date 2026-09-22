@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseNodeXlsx, parseNodeText, parseMemberGeometry, memberLengths, chainMembers, sectionDims, sectionMismatches } from '../src/core/geometry.js'
+import { parseNodeXlsx, parseNodeText, parseMemberGeometry, parseGeometryReport, attachGeometry, memberLengths, chainMembers, sectionDims, sectionMismatches } from '../src/core/geometry.js'
 import { parseRamStations, unitsFor, buildElement, detectSupports, analyzeGroup, memberProfile } from '../src/core/longitudinal.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -136,5 +136,61 @@ describe('cadenas de miembros colineales → elementos', () => {
     expect(bar).toBeTruthy()
     expect(bar.x0).toBeGreaterThan(0)
     expect(bar.x1).toBeLessThan(e.L)
+  })
+})
+
+// ── Reporte "Datos de Geometría" completo en un solo .txt ──
+const JOF = readFileSync(join(here, 'fixtures', 'geometria_jofrito.txt'), 'utf-8')
+
+describe('reporte Datos de Geometría completo (un solo .txt)', () => {
+  it('separa las tablas y lee nudos y miembros del mismo archivo', () => {
+    const g = parseGeometryReport(JOF)
+    expect(g.tablas).toEqual(['nudos', 'restricciones', 'miembros', 'placas', 'nomenclatura'])
+    expect(g.rows).toHaveLength(1448)
+    expect(g.nodes.size).toBe(887)
+    expect(g.nodes.get('1')).toEqual({ x: 18.6111, y: 3, z: 21.4596 })
+    expect(g.rows[0]).toMatchObject({ member: '10', nj: '281', nk: '282', descripcion: 'T2', seccion: 'RcBeam 15X25', material: "f'c 250" })
+  })
+  it('no confunde las filas de placas ni de restricciones con miembros', () => {
+    const g = parseGeometryReport(JOF)
+    expect(g.rows.every((r) => /^\d+$/.test(r.nj) && /^\d+$/.test(r.nk))).toBe(true)
+    expect(g.rows.some((r) => /CAPA/.test(r.descripcion))).toBe(false)
+  })
+  it('respeta secciones con doble espacio ("COL  25 X 10") y no arrastra las columnas numéricas', () => {
+    const g = parseGeometryReport(JOF)
+    const col = g.rows.filter((r) => r.seccion === 'COL  25 X 10')
+    expect(col).toHaveLength(3)
+    expect(sectionDims(col[0].seccion)).toEqual({ b: 25, h: 10 })
+    expect([...new Set(g.rows.map((r) => r.material))]).toEqual(["f'c 250"])
+  })
+  it('con un solo archivo saca todas las longitudes', () => {
+    const g = parseGeometryReport(JOF)
+    const { Lpor, missing } = memberLengths(g.rows, g.nodes)
+    expect(missing).toHaveLength(0)
+    expect(Object.keys(Lpor)).toHaveLength(1448)
+    expect(Lpor['10']).toBeCloseTo(5.92, 2)
+  })
+  it('convierte a metros si la tabla de nudos viene en cm', () => {
+    const txt = 'Nudos\n\nNudo   X   Y   Z\n      [cm] [cm] [cm]\n---\n1  100.00  0.00  250.00\n\nMiembros\n\nMiembro NJ NK Descripción\n1  1  1  T1\n'
+    const g = parseGeometryReport(txt)
+    expect(g.nodes.get('1')).toEqual({ x: 1, y: 0, z: 2.5 })
+    expect(g.warnings[0]).toMatch(/cm/)
+  })
+  it('una tabla suelta sin título se sigue reconociendo por su forma', () => {
+    const solo = parseGeometryReport(GEOM)
+    expect(solo.rows).toHaveLength(98)
+    expect(solo.nodes.size).toBe(0)
+  })
+  it('attachGeometry pega longitudes, secciones y elementos al perfil, y respeta las L capturadas a mano', () => {
+    const g = parseGeometryReport(JOF)
+    const model = { rows: g.rows, nodes: Object.fromEntries(g.nodes) }
+    const ids = ['10', '11', '12']
+    const p = attachGeometry({ members: ids.map((id) => ({ id, stations: [] })), Lpor: { 12: 9.99 } }, model)
+    expect(p.Lpor['10']).toBeCloseTo(5.92, 2)
+    expect(p.Lpor['12']).toBe(9.99)        // la captura a mano manda
+    expect(p.secPor['10']).toBe('RcBeam 15X25')
+    expect(p.geom.chains.length).toBeGreaterThan(0)
+    expect(attachGeometry(null, model)).toBe(null)
+    expect(attachGeometry({ members: [] }, model)).toEqual({ members: [] })
   })
 })

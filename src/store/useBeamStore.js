@@ -60,6 +60,7 @@ let counter = 0
 const useBeamStore = create((set, get) => ({
   sections: [],
   selectedIdx: -1,
+  model: null,    // { archivo, rows:[{member,nj,nk,seccion,…}], nodes:{id:{x,y,z}} }
   form: defaultSection(),
   calcAlert: false,
   dbStatus: null, // { status: 'db_match'|'db_partial'|'new_design', gid }
@@ -159,6 +160,10 @@ const useBeamStore = create((set, get) => ({
     return { sections: updated, form }
   }),
 
+  // Geometría del modelo de RAM (nudos + miembros): es del modelo, no de una
+  // trabe, así que se carga una vez y la usan todas las secciones.
+  setModel: (model) => set({ model }),
+
   // Perfil por estaciones de la sección activa (análisis longitudinal)
   setPerfil: (perfil) => set((s) => {
     const newForm = { ...s.form, perfil }
@@ -207,13 +212,15 @@ const useBeamStore = create((set, get) => ({
     set({ sections, selectedIdx: idx, form: { ...sec } })
   },
 
-  loadProject: (sections) => {
+  loadProject: (sections, model = null) => {
     // Ensure all sections have calc block
     const fixed = sections.map((s) => ({ ...defaultSection(), ...s, calc: { ...defaultCalc(), ...(s.calc || {}) } }))
     const form = fixed.length > 0 ? { ...fixed[0] } : defaultSection()
     // Que "+ Nueva" siga numerando después de las existentes (T-7 tras T-6)
     counter = fixed.reduce((m, s) => Math.max(m, +(/^T-(\d+)$/.exec(s.nombre || '')?.[1] || 0)), 0)
-    set({ sections: fixed, selectedIdx: fixed.length > 0 ? 0 : -1, form })
+    // Proyectos anteriores guardaban la geometría dentro de cada perfil
+    const heredado = model || fixed.map((s) => s.perfil?.geom).find((g) => g?.rows?.length && g?.nodes) || null
+    set({ sections: fixed, selectedIdx: fixed.length > 0 ? 0 : -1, form, model: heredado && { archivo: heredado.archivo || '', rows: heredado.rows, nodes: heredado.nodes } })
   },
 
   removeSection: (idx) => set((s) => {

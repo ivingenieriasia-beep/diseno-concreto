@@ -1,9 +1,10 @@
 // ══════════════════════════════════════════════════════════════
 // Geometría del modelo RAM: longitudes de miembros
-//   · Reporte "Datos de Geometría → Miembros" (.txt): Miembro, NJ, NK,
-//     Descripción, Sección, Material…
-//   · Coordenadas de nudos: tabla Nudo, X, Y, Z (.xlsx exportado de RAM,
-//     o .txt/.csv con el reporte de nudos)
+//   · Reporte "Datos de Geometría" completo (.txt, «Guardar como TXT»):
+//     trae en un solo archivo las tablas Nudos y Miembros — es lo único
+//     que hace falta cargar.
+//   · También se aceptan por separado: el reporte de Miembros (.txt) y las
+//     coordenadas de nudos (.xlsx exportado de RAM, o .txt/.csv).
 // Con ambos, L = distancia NJ–NK de cada miembro, en metros.
 // El .xlsx se lee sin librerías de hojas de cálculo: es un zip (JSZip ya
 // viene con docx) con sheet1.xml y, si hay textos, sharedStrings.xml.
@@ -19,19 +20,51 @@ export function sectionDims(label) {
   return m ? { b: num(m[1]), h: num(m[2]) } : null
 }
 
+/** Columnas de texto del encabezado "Miembro NJ NK Descripción Sección Material d0…" */
+function columnasEncabezado(raw) {
+  const at = (re) => { const m = re.exec(raw); return m ? m.index : -1 }
+  const desc = at(/Descripci[oó]n|Description/i)
+  const sec = at(/Secci[oó]n|Section/i)
+  const mat = at(/Material/i)
+  if (desc < 0 || sec <= desc || mat <= sec) return null
+  const fin = at(/\bd0\b|Factor/i)
+  return { desc, sec, mat, fin: fin > mat ? fin : raw.length }
+}
+
+/**
+ * Descripción / Sección / Material de una fila.
+ * Se leen por la posición de las columnas (así "COL  25 X 10", con doble
+ * espacio, no se parte en dos); si no hubo encabezado, por bloques de 2+
+ * espacios, uniendo los de en medio en la sección.
+ */
+function camposMiembro(raw, cols, resto) {
+  if (cols && raw.length > cols.sec) {
+    const d = raw.slice(cols.desc, cols.sec).trim()
+    const s = raw.slice(cols.sec, cols.mat).trim()
+    // la columna numérica que sigue empieza antes de su encabezado: se corta
+    // el material en el primer hueco de 2+ espacios
+    const m = raw.slice(cols.mat, cols.fin).trim().split(/\s{2,}/)[0]
+    if (s) return [d, s, m]
+  }
+  const bloques = resto.trim().split(/\s{2,}/)
+  if (bloques.length <= 3) return [bloques[0] || '', bloques[1] || '', bloques[2] || '']
+  return [bloques[0], bloques.slice(1, -1).join(' '), bloques[bloques.length - 1]]
+}
+
 /** Reporte "Datos de Geometría → Miembros" */
 export function parseMemberGeometry(text) {
   const rows = []
   const warnings = []
   let sawHeader = false
+  let cols = null
   for (const raw of String(text || '').replace(/^﻿/, '').split(/\r?\n/)) {
     const line = raw.trim()
     if (!line) continue
-    if (/^Miembro\b/i.test(line) && /\bNJ\b/i.test(line) && /\bNK\b/i.test(line)) { sawHeader = true; continue }
+    if (/^Miembro\b/i.test(line) && /\bNJ\b/i.test(line) && /\bNK\b/i.test(line)) { sawHeader = true; cols = columnasEncabezado(raw); continue }
     const m = /^([A-Za-z0-9_.-]+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line)
     if (!m || !/^\d/.test(m[1])) continue
-    const rest = m[4].trim().split(/\s{2,}/)
-    rows.push({ member: m[1], nj: m[2], nk: m[3], descripcion: rest[0] || '', seccion: rest[1] || '', material: rest[2] || '' })
+    const [descripcion, seccion, material] = camposMiembro(raw, cols, m[4])
+    rows.push({ member: m[1], nj: m[2], nk: m[3], descripcion, seccion, material })
   }
   if (!rows.length) warnings.push('No se encontraron filas "Miembro NJ NK …". Exporta en RAM Datos de geometría → Miembros.')
   else if (!sawHeader) warnings.push('No se encontró el encabezado "Miembro NJ NK"; se leyeron las filas por su forma.')
@@ -39,7 +72,7 @@ export function parseMemberGeometry(text) {
 }
 
 /** Tabla de nudos en texto: líneas con id x y z (con o sin encabezado) */
-export function parseNodeText(text) {
+export function parseNodeText(text, { factor = 1 } = {}) {
   const nodes = new Map()
   for (const raw of String(text || '').replace(/^﻿/, '').split(/\r?\n/)) {
     const t = raw.trim().replace(/[;\t]+/g, ' ')
@@ -49,9 +82,73 @@ export function parseNodeText(text) {
     const id = parts[0].replace(/[^0-9A-Za-z_.-]/g, '')
     const x = num(parts[1]), y = num(parts[2]), z = num(parts[3])
     if (!id || !/^\d/.test(id) || x === null || y === null || z === null) continue
-    nodes.set(id, { x, y, z })
+    nodes.set(id, { x: x * factor, y: y * factor, z: z * factor })
   }
   return nodes
+}
+
+// ── Reporte "Datos de Geometría" completo (Nudos + Miembros + …) ──
+// RAM reimprime el título de la tabla en cada página, así que las secciones
+// se acumulan; cada fila se lee sólo dentro de su tabla y nunca se confunde
+// una fila de nudos con una de miembros.
+const SECCION_RE = /^(Nudos?|Joints?|Nodes?|Restricciones|Restraints|Miembros?|Members?|Placas?|Plates?|Diafragmas?|Resortes|Nomenclatura)\s*$/i
+const ALIAS = { nudo: 'nudos', nudos: 'nudos', joint: 'nudos', joints: 'nudos', node: 'nudos', nodes: 'nudos', miembro: 'miembros', miembros: 'miembros', member: 'miembros', members: 'miembros' }
+const UNIDAD_M = { m: 1, cm: 0.01, mm: 0.001, ft: 0.3048, in: 0.0254, pie: 0.3048, pies: 0.3048, pulg: 0.0254 }
+
+/** Parte un reporte de RAM en sus tablas: Map nombre → líneas */
+export function splitGeometryReport(text) {
+  const secs = new Map()
+  let cur = null
+  for (const raw of String(text || '').replace(/^﻿/, '').split(/\r?\n/)) {
+    const m = SECCION_RE.exec(raw.trim())
+    if (m) {
+      cur = ALIAS[m[1].toLowerCase()] || m[1].toLowerCase()
+      if (!secs.has(cur)) secs.set(cur, [])
+      continue
+    }
+    if (cur) secs.get(cur).push(raw)
+  }
+  return secs
+}
+
+/** Unidad de la tabla, leída del renglón «[m]  [m]  [m]» bajo el encabezado */
+function unidadDe(lines) {
+  for (const l of lines) {
+    const toks = l.trim().split(/\s+/)
+    if (toks.length >= 2 && toks.every((t) => /^\[[A-Za-z]+\]$/.test(t))) {
+      const u = toks[0].slice(1, -1).toLowerCase()
+      if (UNIDAD_M[u]) return { u, factor: UNIDAD_M[u] }
+    }
+  }
+  return { u: 'm', factor: 1 }
+}
+
+/**
+ * Lee cualquier .txt de geometría de RAM: el reporte completo (Nudos +
+ * Miembros), o una sola tabla exportada aparte.
+ * @returns { rows, nodes:Map, warnings, tablas:[nombres] }
+ */
+export function parseGeometryReport(text) {
+  const secs = splitGeometryReport(text)
+  const warnings = []
+  let rows = []
+  let nodes = new Map()
+  if (secs.size) {
+    const mi = secs.get('miembros')
+    if (mi) rows = parseMemberGeometry(mi.join('\n')).rows
+    const nu = secs.get('nudos')
+    if (nu) {
+      const { u, factor } = unidadDe(nu)
+      nodes = parseNodeText(nu.join('\n'), { factor })
+      if (factor !== 1) warnings.push(`Coordenadas en ${u} convertidas a m.`)
+    }
+  }
+  if (!secs.size) {
+    // tabla suelta, sin el título de la sección: se reconoce por su forma
+    rows = parseMemberGeometry(text).rows
+    if (!rows.length) nodes = parseNodeText(text)
+  }
+  return { rows, nodes, warnings, tablas: [...secs.keys()] }
 }
 
 /** Tabla de nudos en .xlsx (ArrayBuffer/Uint8Array/Buffer): primera hoja, columnas id, X, Y, Z */
@@ -84,6 +181,28 @@ export async function parseNodeXlsx(data) {
     nodes.set(id, { x, y, z })
   }
   return nodes
+}
+
+/**
+ * Une el perfil por estaciones de una trabe con la geometría del modelo:
+ * longitud y sección de cada miembro, y los tramos colineales encadenados
+ * en elementos. Las longitudes capturadas a mano mandan sobre las calculadas.
+ * Sin geometría (o sin reporte) devuelve el perfil tal cual.
+ */
+export function attachGeometry(perfil, model) {
+  if (!perfil?.members?.length || !model?.rows?.length || !model?.nodes) return perfil
+  const nodes = model.nodes instanceof Map ? model.nodes : new Map(Object.entries(model.nodes))
+  if (!nodes.size) return perfil
+  const ids = perfil.members.map((m) => m.id)
+  const enGrupo = new Set(ids.map(String))
+  const { Lpor, secPor } = memberLengths(model.rows.filter((r) => enGrupo.has(String(r.member))), nodes)
+  return {
+    ...perfil,
+    Lpor: { ...Lpor, ...(perfil.Lpor || {}) },
+    secPor,
+    geom: { rows: model.rows, nodes: model.nodes, chains: chainMembers(model.rows, nodes, ids) },
+    porElemento: perfil.porElemento ?? true,
+  }
 }
 
 /** Longitudes de los miembros del reporte de geometría a partir de los nudos */
