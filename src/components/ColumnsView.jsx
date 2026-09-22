@@ -15,9 +15,11 @@ export default function ColumnsView() {
   const selectColumn = useColumnStore((s) => s.selectColumn)
   const createColumn = useColumnStore((s) => s.createColumn)
   const removeColumn = useColumnStore((s) => s.removeColumn)
+  const moveColumn = useColumnStore((s) => s.moveColumn)
   const form = useColumnStore((s) => s.form)
   const setEnvelope = useColumnStore((s) => s.setEnvelope)
 
+  const [arrastre, setArrastre] = useState(null) // { from, over, lado }
   const [tab, setTab] = useState('diagrama')
   const [excelDir, setExcelDir] = useState('X')
   const [envMsg, setEnvMsg] = useState('')
@@ -82,13 +84,45 @@ export default function ColumnsView() {
         borderBottom: '1px solid var(--color-border)', background: 'var(--color-panel)',
         overflowX: 'auto', flexShrink: 0,
       }}>
-        {columns.map((c, i) => (
-          <span key={c.nombre + i} className={`chip ${i === selectedIdx ? 'active' : ''}`}
-            onClick={() => selectColumn(i)}>
-            {c.nombre || `C-${i + 1}`}
-            <span className="chip-x" onClick={(e) => { e.stopPropagation(); removeColumn(i) }}>&times;</span>
-          </span>
-        ))}
+        {columns.map((c, i) => {
+          const marca = arrastre && arrastre.from !== i && arrastre.over === i ? (arrastre.lado === 'izq' ? ' drop-left' : ' drop-right') : ''
+          return (
+            <span key={c.uid || c.nombre + i} data-testid={`chip-col-${i}`}
+              className={`chip ${i === selectedIdx ? 'active' : ''}${arrastre?.from === i ? ' dragging' : ''}${marca}`}
+              onClick={() => selectColumn(i)}
+              draggable
+              tabIndex={0}
+              title="Arrástralo para cambiarlo de lugar (Alt + ← / → con el teclado). El orden es el del tablero y el del DXF"
+              onDragStart={(e) => { setArrastre({ from: i, over: i, lado: 'der' }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)) }}
+              onDragEnd={() => setArrastre(null)}
+              onDragOver={(e) => {
+                if (!arrastre) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                const r = e.currentTarget.getBoundingClientRect()
+                const lado = e.clientX < r.left + r.width / 2 ? 'izq' : 'der'
+                if (arrastre.over !== i || arrastre.lado !== lado) setArrastre({ ...arrastre, over: i, lado })
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const from = arrastre?.from ?? +e.dataTransfer.getData('text/plain')
+                if (Number.isInteger(from)) {
+                  let to = arrastre?.lado === 'der' ? i + 1 : i
+                  if (from < to) to -= 1
+                  moveColumn(from, Math.max(0, Math.min(columns.length - 1, to)))
+                }
+                setArrastre(null)
+              }}
+              onKeyDown={(e) => {
+                if (!e.altKey) return
+                if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); moveColumn(i, i - 1) }
+                if (e.key === 'ArrowRight' && i < columns.length - 1) { e.preventDefault(); moveColumn(i, i + 1) }
+              }}>
+              {c.nombre || `C-${i + 1}`}
+              <span className="chip-x" onClick={(e) => { e.stopPropagation(); removeColumn(i) }}>&times;</span>
+            </span>
+          )
+        })}
         <button className="btn btn-primary" onClick={createColumn} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99 }}>
           + Nueva
         </button>
