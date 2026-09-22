@@ -9,15 +9,26 @@ const KEY = 'iv_autosave_v1'
 const RECENTS = 'iv_recents_v1'
 const MAX_RECENTS = 6
 
-export const PROJECT_VERSION = 3
+export const PROJECT_VERSION = 4
+
+/** Bajada de cargas vacía: la forma que toma un proyecto sin nada capturado */
+export const emptyCargas = () => ({ losas: [], muros: [], tableros: [], unidad: 'kg' })
+
+export function hasCargas(c) {
+  return !!c && ((c.losas?.length || 0) + (c.muros?.length || 0) + (c.tableros?.length || 0)) > 0
+}
 
 /** Empaqueta el estado del proyecto tal como se guarda en el .json */
-export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [] }) {
-  return { version: PROJECT_VERSION, projectName, dxfScale, sections, columns, savedAt: new Date().toISOString() }
+export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null }) {
+  return {
+    version: PROJECT_VERSION, projectName, dxfScale, sections, columns,
+    cargas: cargas || emptyCargas(),
+    savedAt: new Date().toISOString(),
+  }
 }
 
 export function isEmptyProject(p) {
-  return !p || ((p.sections?.length || 0) === 0 && (p.columns?.length || 0) === 0)
+  return !p || ((p.sections?.length || 0) === 0 && (p.columns?.length || 0) === 0 && !hasCargas(p.cargas))
 }
 
 export function saveSnapshot(project) {
@@ -48,7 +59,8 @@ export function pushRecent(project) {
     const name = (project.projectName || '').trim() || 'Sin nombre'
     const list = listRecents().filter((r) => r.name !== name)
     list.unshift({ name, savedAt: project.savedAt || new Date().toISOString(),
-      trabes: project.sections?.length || 0, columnas: project.columns?.length || 0, project })
+      trabes: project.sections?.length || 0, columnas: project.columns?.length || 0,
+      losas: project.cargas?.losas?.length || 0, project })
     localStorage.setItem(RECENTS, JSON.stringify(list.slice(0, MAX_RECENTS)))
   } catch { /* cuota — silencioso */ }
 }
