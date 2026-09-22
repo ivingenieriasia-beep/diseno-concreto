@@ -79,9 +79,11 @@ export function sectionSvgString(t, opts = {}) {
   // ── Callouts ──
   // Top steel (upper-left)
   // corridas y bastones SIEMPRE por separado: en el corte se distinguen por el
-  // círculo relleno (corrida) y el hueco (bastón), y el rótulo debe decir lo mismo
+  // círculo relleno (corrida) y el hueco (bastón), y el rótulo debe decir lo mismo.
+  // En el corte sólo caben los bastones corridos (los puntuales no se dibujan
+  // aquí), así que basta con «bastón»: el apellido «corrido» sobra.
   const topLbl = cantBSup > 0
-    ? `${t.cantSup}Ø#${t.calSup} corridas + ${cantBSup}Ø#${t.calBastonSup} bastón corrido`
+    ? `${t.cantSup}Ø#${t.calSup} corridas + ${cantBSup}Ø#${t.calBastonSup} bastón`
     : `${t.cantSup}Ø#${t.calSup} corridas`
   if (supBars.length) {
     const b0 = supBars[0]
@@ -91,7 +93,7 @@ export function sectionSvgString(t, opts = {}) {
   }
   // Bottom steel (lower-right)
   const botLbl = cantBInf > 0
-    ? `${t.cantInf}Ø#${t.calInf} corridas + ${cantBInf}Ø#${t.calBastonInf} bastón corrido`
+    ? `${t.cantInf}Ø#${t.calInf} corridas + ${cantBInf}Ø#${t.calBastonInf} bastón`
     : `${t.cantInf}Ø#${t.calInf} corridas`
   if (infBars.length) {
     const bl = infBars[infBars.length - 1]

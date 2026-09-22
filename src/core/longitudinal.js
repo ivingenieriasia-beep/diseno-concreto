@@ -29,6 +29,18 @@ const KG_PER_M_PER_CM2 = 0.785 // acero 7850 kg/m³ → 0.785 kg por metro por c
 export const fmt2 = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
 /** Etiqueta de una unidad de análisis: miembro de RAM o elemento (cadena de miembros) */
 export const unitLabel = (r) => (r?.isElement ? `E ${r.id}` : `M-${r?.id}`)
+/**
+ * Cómo nombrar lo que se analizó: si la geometría unió los tramos, son
+ * elementos (trabes físicas) y conviene decir cuántos miembros de RAM llevan
+ * dentro; si no, son miembros sueltos. Así el informe y el módulo hablan igual.
+ */
+export const unidadesTexto = (G, { largo = true } = {}) => {
+  const res = G?.results || []
+  if (!res.length) return '0 miembros'
+  const nM = res.reduce((s, r) => s + (r.members?.length || 1), 0)
+  if (!res.some((r) => r.isElement)) return `${res.length} miembro${res.length !== 1 ? 's' : ''}`
+  return `${res.length} elemento${res.length !== 1 ? 's' : ''}` + (largo ? ` (${nM} miembros de RAM unidos por la geometría)` : ` / ${nM} miembros`)
+}
 
 // ── 1. Parser del reporte por estaciones ─────────────────────
 /**

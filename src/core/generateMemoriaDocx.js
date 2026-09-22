@@ -283,7 +283,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
       trabeBlocks.push(para([
         run(`Se revisaron ${G.n} ${G.results.some((r) => r.isElement) ? 'elementos (miembros de RAM unidos en su longitud real)' : 'miembros'} de este tipo de trabe con la envolvente por estaciones del modelo${t.perfil.combo ? ` (${t.perfil.combo})` : ''}. `),
         run(`Con el armado que recorre toda la trabe (corridas${(G.caps.kCorrInf || G.caps.kCorrSup) ? ` + ${G.caps.kCorrInf}/${G.caps.kCorrSup} bastón corrido` : ''}: MR+ = ${fmt(G.caps.MRP)} t·m, MR− = ${fmt(G.caps.MRN)} t·m) `),
-        run(`${G.nOk} miembro(s) quedan cubiertos y ${G.nBast} requieren bastón sólo en la zona donde el momento rebasa esa resistencia`, { bold: true }),
+        run(`${G.nOk} quedan cubiertos y ${G.nBast} requieren bastón sólo en la zona donde el momento rebasa esa resistencia`, { bold: true }),
         run(G.nInsuf ? `; ${G.nInsuf} resultan insuficientes aun con un bastón por varilla` : ''),
         run(G.nShear ? `; ${G.nShear} no cumplen por cortante con la separación de estribos propuesta` : ''),
         run(`. Los bastones se prolongan al menos máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm más allá del punto teórico de corte y desarrollan Ld = ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm desde el punto de momento máximo (NTC-2017 §5.1 y §6.1.2); los que llegan a un apoyo se anclan en él. La envolvente de resistencia considera el acero del bastón desarrollado gradualmente a lo largo de Ld desde cada extremo, y se verificó que el momento actuante queda por debajo de ella en toda la longitud del elemento. `),

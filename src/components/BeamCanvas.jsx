@@ -115,13 +115,13 @@ function SectionGroup({ t, ox, oy }) {
       {/* Top steel label */}
       <text x={bpx / 2} y={-fs * 0.3} fontSize={Math.round(fs * 0.88)} fill="#c94f2a" textAnchor="middle">
         {cantBSup > 0
-          ? `${t.cantSup}\u00D8#${t.calSup} corridas + ${cantBSup}\u00D8#${t.calBastonSup} bastón corrido`
+          ? `${t.cantSup}\u00D8#${t.calSup} corridas + ${cantBSup}\u00D8#${t.calBastonSup} bastón`
           : `${t.cantSup}\u00D8#${t.calSup} corridas`}
       </text>
       {/* Bottom steel label */}
       <text x={bpx / 2} y={hpx + fs * 1.2} fontSize={Math.round(fs * 0.88)} fill="#2563a8" textAnchor="middle">
         {cantBInf > 0
-          ? `${t.cantInf}\u00D8#${t.calInf} corridas + ${cantBInf}\u00D8#${t.calBastonInf} bastón corrido`
+          ? `${t.cantInf}\u00D8#${t.calInf} corridas + ${cantBInf}\u00D8#${t.calBastonInf} bastón`
           : `${t.cantInf}\u00D8#${t.calInf} corridas`}
       </text>
 

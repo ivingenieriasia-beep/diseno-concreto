@@ -5,7 +5,7 @@ import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, calcEstribos, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
-import { analyzeGroup } from './longitudinal'
+import { analyzeGroup, unidadesTexto } from './longitudinal'
 
 
 // ── Colors ──────────────────────────────────────────────────
@@ -667,7 +667,7 @@ export function generateReport(sections, projectName = '', columns = []) {
         setColor(doc, bad ? COL.warn : COL.ok)
         const ah = G.acero.ahorro != null ? ` | ${G.acero.ahorro >= 0 ? 'ahorro' : 'exceso'} ${Math.abs(G.acero.ahorro).toFixed(0)} kg vs uniforme` : ''
         doc.text(
-          `Longitudinal: ${G.n} miembros - ${G.nOk} con corridas, ${G.nBast} con baston` +
+          `Longitudinal: ${unidadesTexto(G, { largo: false })} - ${G.nOk} con corridas, ${G.nBast} con baston` +
           (G.nInsuf ? `, ${G.nInsuf} insuficientes` : '') + (G.nShear ? `, ${G.nShear} cortante` : '') +
           ` | acero ${G.acero.total.toFixed(0)} kg${ah}` + (!G.caps.okBase ? ' | corridas no cumplen As min/b min' : ''),
           tblX, cardY + cardH - 9.5,

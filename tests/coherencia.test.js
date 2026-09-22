@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseRamStations, memberProfile, analyzeGroup, refDeUnidad, miembrosCompartidos, compartidosCon } from '../src/core/longitudinal.js'
 import { beamEnvelopeByMember, parseRamEnvelope } from '../src/core/ramParser.js'
+import { attachGeometry } from '../src/core/geometry.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -145,5 +146,64 @@ describe('miembros que aparecen en dos trabes', () => {
     expect(miembrosCompartidos([])).toEqual([])
     expect(miembrosCompartidos(null)).toEqual([])
     expect(miembrosCompartidos([{ nombre: 'X' }])).toEqual([])
+  })
+})
+
+// ── Las juntas entre tramos no son apoyos ──
+// Analizando cada tramo por separado, la junta con el siguiente se toma como
+// extremo y le toca la separación de los cuartos extremos; dentro del elemento
+// completo ese punto cae en el centro del claro. Con @12 en extremos y @6 al
+// centro (como la T-2A del proyecto) eso hace que un miembro «falle por
+// cortante» cuando el elemento no falla.
+describe('cortante: por tramo suelto vs por elemento completo', () => {
+  const est = (v, n = 9) => Array.from({ length: n }, (_, i) => ({
+    pos: i / (n - 1),
+    m33: { max: 0.1, min: -0.1 },
+    v2: { max: v(i / (n - 1)), min: -v(i / (n - 1)) },
+  }))
+  // dos tramos de 4 m: el cortante es máximo junto a la junta (x = 4 m)
+  const m1 = { id: '1', Lreport: 4, stations: est((p) => 1 + 6 * p) }        // 1 → 7 t
+  const m2 = { id: '2', Lreport: 4, stations: est((p) => 7 - 6 * p) }        // 7 → 1 t
+  const nodos = { A: { x: 0, y: 0, z: 0 }, B: { x: 4, y: 0, z: 0 }, C: { x: 8, y: 0, z: 0 } }
+  const model = {
+    rows: [{ member: '1', nj: 'A', nk: 'B', seccion: '15 x 25' }, { member: '2', nj: 'B', nk: 'C', seccion: '15 x 25' }],
+    nodes: nodos,
+  }
+  const secc = {
+    nombre: 'T-2A', ancho: 15, peralte: 25, recub: 3, fc: 250,
+    calSup: '3', cantSup: 4, calInf: '3', cantInf: 2, calBastonSup: '3', cantBastonSup: 3,
+    calBastonInf: '3', cantBastonInf: 0, calEst: '2', sepLcuarto: 12, sepRest: 6,
+    calc: { fy: 4200, varEstNum: 2, nramas: 2 },
+  }
+  const base = { members: [m1, m2], L: 4, minLen: 0.6 }
+
+  it('los dos tramos se unen en un solo elemento de 8 m', () => {
+    const p = attachGeometry(base, model)
+    expect(p.geom.chains).toHaveLength(1)
+    expect(p.geom.chains[0].members).toHaveLength(2)
+    expect(p.geom.chains[0].L).toBeCloseTo(8, 6)
+  })
+
+  it('por tramo suelto sale un fallo de cortante que el elemento no tiene', () => {
+    const porTramo = analyzeGroup(secc, base)
+    const porElemento = analyzeGroup(secc, attachGeometry(base, model))
+    expect(porTramo.n).toBe(2)
+    expect(porElemento.n).toBe(1)
+    // cada tramo ve su pico pegado a una punta, donde la separación es la
+    // ancha (@12): los dos «fallan». Unidos, ese pico cae al centro del claro
+    // real, donde va la cerrada (@6), y no falla ninguno.
+    expect(porTramo.nShear).toBe(2)
+    expect(porElemento.nShear).toBe(0)
+    // y es el mismo cortante en los dos casos: cambia sólo la zona de estribos
+    expect(porElemento.results[0].profile.vuMax).toBeCloseTo(7, 6)
+    expect(Math.max(...porTramo.results.map((r) => r.profile.vuMax))).toBeCloseTo(7, 6)
+  })
+
+  it('el informe y el módulo coinciden cuando los dos ven la geometría', () => {
+    const conGeo = attachGeometry(base, model)
+    const delModulo = analyzeGroup(secc, conGeo)
+    const delInforme = analyzeGroup(secc, conGeo)   // así los llama App tras pegar la geometría
+    expect(delInforme.nShear).toBe(delModulo.nShear)
+    expect(delInforme.n).toBe(delModulo.n)
   })
 })

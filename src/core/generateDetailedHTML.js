@@ -8,7 +8,7 @@ import { CAL_TO_NUM } from './constants'
 import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
-import { analyzeGroup, unitLabel } from './longitudinal'
+import { analyzeGroup, unitLabel, unidadesTexto } from './longitudinal'
 import { elevationSvg, diagramSvg } from './longitudinalSvg'
 import { interactionSvgString } from './columnsSvg'
 
@@ -400,7 +400,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
   const summaryRows = []
   // Estadísticas de ejemplares (miembros de las envolventes cargadas)
   const envStats = { elementos: 0, total: 0, pasan: 0, sinEnv: 0 }
-  const longStats = { trabes: 0, miembros: 0, ok: 0, insuf: 0 }
+  const longStats = { trabes: 0, unidades: 0, miembros: 0, ok: 0, insuf: 0, elementos: false }
 
   let sectionsHTML = ''
   sections.forEach((t, idx) => {
@@ -492,7 +492,9 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
       let G = null
       try { G = analyzeGroup(t, t.perfil) } catch { /* sin L o datos incompletos */ }
       if (G) {
-        longStats.trabes++; longStats.miembros += G.n; longStats.ok += G.nOk + G.nBast; longStats.insuf += G.nInsuf + G.nShear
+        longStats.trabes++; longStats.unidades += G.n; longStats.ok += G.nOk + G.nBast; longStats.insuf += G.nInsuf + G.nShear
+        longStats.miembros += G.results.reduce((s, r) => s + (r.members?.length || 1), 0)
+        if (G.results.some((r) => r.isElement)) longStats.elementos = true
         const bars = (arr, cal) => arr.length ? arr.map((b) => `${b.k}#${cal} L=${fmt(b.len, 2)} @${fmt(b.x0, 2)}${b.ancla ? ` ⟂${b.ancla}` : ''}`).join(' · ') : '—'
         const est = (r) => r.status === 'insuficiente' ? '<span style="color:#dc2626;font-weight:700">✗ insuficiente</span>'
           : r.shearFail ? '<span style="color:#dc2626;font-weight:700">✗ cortante</span>'
@@ -513,7 +515,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
             Análisis longitudinal — bastones donde hacen falta
           </div>
           <div class="nota" style="background:#f5f3ff;border-color:#ddd6fe;color:#3b0764">
-            ${G.n} miembros del reporte «${esc0(t.perfil.archivo || '')}»${t.perfil.combo ? ` (${esc0(t.perfil.combo)})` : ''}:
+            ${unidadesTexto(G)} del reporte «${esc0(t.perfil.archivo || '')}»${t.perfil.combo ? ` (${esc0(t.perfil.combo)})` : ''}:
             <b>${G.nOk}</b> pasan con las corridas, <b>${G.nBast}</b> requieren bastón${G.nInsuf ? `, <b style="color:#dc2626">${G.nInsuf} insuficientes</b>` : ''}${G.nShear ? `, <b style="color:#dc2626">${G.nShear} fallan por cortante</b>` : ''}.
             MR+ base ${fmt(G.caps.MRP, 2)} · MR− base ${fmt(G.caps.MRN, 2)} t·m (corridas${(G.caps.kCorrInf || G.caps.kCorrSup) ? ` + ${G.caps.kCorrInf}/${G.caps.kCorrSup} bastón corrido` : ''}) · Ld bastón ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm · prolongación ≥ máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm.
             Acero: <b>${fmt(G.acero.total, 0)} kg</b> (${fmt(G.acero.base, 0)} corridas + ${fmt(G.acero.bastones, 0)} bastones puntuales). ${ahorro}
@@ -582,7 +584,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     leyenda = `⚠ Revisar diseño: ${partes.join(' · ')}.`
   }
   if (longStats.trabes > 0) {
-    leyenda += ` Análisis longitudinal: ${longStats.miembros} miembros de ${longStats.trabes} trabe(s), ${longStats.ok} cubiertos con corridas o bastones${longStats.insuf ? `, ${longStats.insuf} insuficientes` : ''}.`
+    leyenda += ` Análisis longitudinal: ${longStats.unidades} ${longStats.elementos ? `elemento(s) — ${longStats.miembros} miembros de RAM unidos por la geometría —` : 'miembro(s)'} de ${longStats.trabes} trabe(s), ${longStats.ok} cubiertos con corridas o bastones${longStats.insuf ? `, ${longStats.insuf} insuficientes` : ''}.`
   }
   const leyendaHTML = `<div class="vfinal ${todoOk ? 'vfinal-ok' : 'vfinal-fail'}" style="margin-top:20px">${leyenda}</div>`
 

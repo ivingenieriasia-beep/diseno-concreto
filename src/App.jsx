@@ -191,16 +191,24 @@ export default function App() {
     setRecents(listRecents())
   }, [projectName, dxfScale, sections, columns, packCargas, fileName])
 
+  // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
+  // geometría pegada, el análisis va por elemento completo (y las zonas de
+  // estribos se miden sobre el claro real, no sobre cada tramo suelto).
+  const seccionesConGeometria = useMemo(
+    () => sections.map((s) => (s.perfil?.members?.length ? { ...s, perfil: attachGeometry(s.perfil, model) } : s)),
+    [sections, model],
+  )
+
   const handleVerifyResumido = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
-    const doc = generateReport(sections, projectName, columns)
+    const doc = generateReport(seccionesConGeometria, projectName, columns)
     doc.save(`${fileName}-verificacion.pdf`)
-  }, [sections, columns, projectName, fileName])
+  }, [seccionesConGeometria, sections.length, columns, projectName, fileName])
 
   const handleVerifyDetallado = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
-    generateDetailedReport(sections, projectName, columns)
-  }, [sections, columns, projectName])
+    generateDetailedReport(seccionesConGeometria, projectName, columns)
+  }, [seccionesConGeometria, sections.length, columns, projectName])
 
   // Double Check prellenado (nombres, resistencias y demandas); sólo faltan las capturas
   const handleExportDcheck = useCallback(() => {
@@ -335,7 +343,7 @@ export default function App() {
       <MemoriaDialog
         open={memoriaOpen}
         onClose={() => setMemoriaOpen(false)}
-        sections={sections}
+        sections={seccionesConGeometria}
         projectName={projectName}
       />
       <div role="tablist" className="flex items-center gap-1 px-4 pt-2" style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
