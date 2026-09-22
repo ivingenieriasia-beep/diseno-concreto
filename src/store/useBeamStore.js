@@ -177,6 +177,15 @@ const useBeamStore = create((set, get) => ({
   // Pide abrir Longitudinal centrado en un miembro (lo dispara la envolvente)
   setLongFocus: (v) => set({ longFocus: v ? { ...v, ts: Date.now() } : null }),
 
+  // Perfil de cualquier sección por índice (carga masiva de reportes)
+  setPerfilAt: (idx, perfil) => set((s) => {
+    if (idx < 0 || idx >= s.sections.length) return {}
+    const updated = [...s.sections]
+    updated[idx] = { ...updated[idx], perfil }
+    const form = idx === s.selectedIdx ? { ...s.form, perfil } : s.form
+    return { sections: updated, form }
+  }),
+
   // Perfil por estaciones de la sección activa (análisis longitudinal)
   setPerfil: (perfil) => set((s) => {
     const newForm = { ...s.form, perfil }

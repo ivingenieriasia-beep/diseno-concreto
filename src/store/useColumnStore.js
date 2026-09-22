@@ -74,7 +74,7 @@ const useColumnStore = create((set, get) => ({
     return { form: newForm }
   }),
 
-  // Envolvente de cualquier columna por índice (la usa la pestaña Modelo)
+  // Envolvente de cualquier columna por índice (pestaña Modelo y carga masiva)
   setEnvelopeAt: (idx, env) => set((s) => {
     if (idx < 0 || idx >= s.columns.length) return {}
     const updated = [...s.columns]

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { timeAgo } from '../core/autosave'
+import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 
 const SCALE_PRESETS = [
   { label: '50:1', value: 0.02 },
@@ -13,17 +14,41 @@ const SCALE_PRESETS = [
   { label: '1:50', value: 50 },
 ]
 
-export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew, recents = [], onOpenRecent, onVerifyResumido, onVerifyDetallado, onMemoria, onExportDcheck, onModulos, dxfScale, setDxfScale, projectName, setProjectName }) {
+export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew, recents = [], onOpenRecent, onVerifyResumido, onVerifyDetallado, onMemoria, onExportDcheck, onModulos, onToast, dxfScale, setDxfScale, projectName, setProjectName }) {
   const sections = useBeamStore((s) => s.sections)
   const selectedIdx = useBeamStore((s) => s.selectedIdx)
   const selectSection = useBeamStore((s) => s.selectSection)
   const removeSection = useBeamStore((s) => s.removeSection)
   const createSection = useBeamStore((s) => s.createSection)
   const moveSection = useBeamStore((s) => s.moveSection)
-  const columnsCount = useColumnStore((s) => s.columns.length)
+  const setEnvelopeAt = useBeamStore((s) => s.setEnvelopeAt)
+  const setPerfilAt = useBeamStore((s) => s.setPerfilAt)
+  const columns = useColumnStore((s) => s.columns)
+  const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
+  const columnsCount = columns.length
   const hasContent = sections.length > 0 || columnsCount > 0
 
   const [arrastre, setArrastre] = useState(null) // { from, over, lado }
+  const envRef = useRef(null)
+  // Reparte por nombre de archivo los reportes de RAM entre trabes y columnas
+  async function cargarEnvolventes(e) {
+    const files = [...(e.target.files || [])]
+    e.target.value = ''
+    if (!files.length) return
+    const archivos = []
+    for (const f of files) {
+      try { archivos.push({ nombre: f.name, texto: await f.text() }) } catch { /* ignora el ilegible */ }
+    }
+    const r = repartirEnvolventes(archivos, { trabes: sections, columnas: columns })
+    for (const a of r.asignados) {
+      if (a.tipo === 'trabe') {
+        setEnvelopeAt(a.idx, a.env)
+        if (a.perfil) setPerfilAt(a.idx, a.perfil)
+      } else setColEnvelopeAt(a.idx, a.env)
+    }
+    onToast?.(resumenReparto(r), r.asignados.length ? (r.sinDestino.length || r.ilegibles.length ? 'warn' : 'ok') : 'warn')
+  }
+
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState('')
   const [verifyOpen, setVerifyOpen] = useState(false)
@@ -214,6 +239,16 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
 
       <div style={{ width: 1, height: 24, background: 'var(--color-border)', flexShrink: 0 }} />
 
+      <input
+        ref={envRef}
+        data-testid="env-files"
+        type="file"
+        multiple
+        accept=".txt,.csv,text/plain"
+        style={{ display: 'none' }}
+        onChange={cargarEnvolventes}
+      />
+
       {/* Section chips */}
       <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
         {sections.map((s, i) => {
@@ -275,6 +310,18 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
           + Nueva
         </button>
       </div>
+
+        {(sections.length > 0 || columns.length > 0) && (
+          <button
+            className="btn btn-secondary"
+            data-testid="cargar-envolventes"
+            onClick={() => envRef.current?.click()}
+            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99, flexShrink: 0 }}
+            title="Carga de golpe los reportes de RAM guardados con el nombre de su sección (T-4.txt → chip T-4, C-1.txt → columna C-1). Sirven tanto la envolvente por miembro como el reporte por estaciones."
+          >
+            📥 Envolventes
+          </button>
+        )}
 
       {/* File + Export buttons */}
       <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>

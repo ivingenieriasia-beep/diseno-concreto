@@ -324,6 +324,7 @@ export default function App() {
         onVerifyResumido={handleVerifyResumido} onVerifyDetallado={handleVerifyDetallado}
         onMemoria={() => setMemoriaOpen(true)} onExportDcheck={handleExportDcheck}
         onModulos={() => setLauncher(true)}
+        onToast={showToast}
         dxfScale={dxfScale} setDxfScale={setDxfScale}
         projectName={projectName} setProjectName={setProjectName}
       />
