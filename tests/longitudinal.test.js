@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseRamStations, looksLikeStations, memberProfile, profileAt, exceedZones, developmentLength, sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign, capacityAt, capacityProfile, capacityViolations, mrForAs, bastonesDe, bastonesDeVarios, extraDe } from '../src/core/longitudinal.js'
+import { parseRamStations, looksLikeStations, memberProfile, buildElement, profileAt, exceedZones, developmentLength, sectionCapacities, bastonesForLecho, analyzeMember, analyzeGroup, optimizeBase, applyBase, barWeight, uniformDesign, capacityAt, capacityProfile, capacityViolations, mrForAs, bastonesDe, bastonesDeVarios, extraDe } from '../src/core/longitudinal.js'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../src/core/longitudinalSvg.js'
 import { calcFlexion } from '../src/core/sectionCalculator.js'
 
@@ -50,11 +50,14 @@ describe('parseRamStations — reporte real de RAM por estaciones', () => {
     expect(m9.stations[0].v2.max).toBe(3.38)
     expect(m9.Lreport).toBeNull()
   })
-  it('los puntos Max/Min por miembro son compatibles con la envolvente de sección', () => {
+  it('los puntos Max/Min por miembro toman la envolvente que reporta RAM, no sólo las estaciones', () => {
     const mx = P.points.find((p) => p.id === '9-Max'), mn = P.points.find((p) => p.id === '9-Min')
-    expect(mx.m33).toBe(1.4); expect(mn.m33).toBe(-1.24)
     const m9 = P.members.find((m) => m.id === '9')
-    expect(mx.v2).toBe(3.38); expect(mn.v2).toBe(Math.min(...m9.stations.map((s) => s.v2.min)))
+    // las estaciones impresas llegan a 1.40; RAM reporta 1.43 para el miembro
+    expect(Math.max(...m9.stations.map((s) => s.m33.max))).toBe(1.4)
+    expect(m9.repMax.m33).toBe(1.43)
+    expect(mx.m33).toBe(1.43); expect(mn.m33).toBe(-1.24)
+    expect(mx.v2).toBe(Math.max(m9.repMax.v2, ...m9.stations.map((s) => s.v2.max)))
     expect(mx.P).toBeCloseTo(-0.23, 12) // axial +0.23 (tensión) → P = −0.23
   })
   it('reporte en distancia (no %): usa la longitud del reporte', () => {
@@ -180,14 +183,14 @@ describe('grupo completo con el T-4 real', () => {
     expect(G.acero.bastones).toBe(0)
     expect(G.acero.uniforme).toBeCloseTo(G.acero.base, 6)
   })
-  it('con 2#3 corridas: 8 miembros necesitan bastón, el armado corrido no cumple As mín y se avisa', () => {
+  it('con 2#3 corridas: 9 miembros necesitan bastón, el armado corrido no cumple As mín y se avisa', () => {
     const t = secc({ calSup: '3', cantSup: 2, calBastonSup: '3', calInf: '3', cantInf: 2, calBastonInf: '3' })
     const G = analyzeGroup(t, { members: P.members, L: 4, minLen: 0.6 })
     expect(G.caps.okBase).toBe(false) // 2#3 = 1.42 cm² < As mín 1.423
-    expect(G.nBast).toBe(8); expect(G.nInsuf).toBe(0)
+    expect(G.nBast).toBe(9); expect(G.nInsuf).toBe(0)   // 9, no 8: uno sólo aparece al respetar el máximo reportado
     expect(G.kMaxInf).toBe(1); expect(G.kMaxSup).toBe(1)
     expect(G.patterns.length).toBeGreaterThan(1)
-    expect(G.patterns[0].signature).toBe('base'); expect(G.patterns[0].members).toHaveLength(90)
+    expect(G.patterns[0].signature).toBe('base'); expect(G.patterns[0].members).toHaveLength(89)
     const m1107 = G.results.find((r) => r.id === '1107')
     expect(m1107.status).toBe('baston')
     expect(m1107.sup.bars[0]).toMatchObject({ x0: 0, k: 1, ancla: 'I' })
@@ -317,6 +320,60 @@ describe('envolvente de resistencia desarrollada (rampas de Ld)', () => {
     const d = diagramSvg(r, G.caps)
     expect(d).toMatch(/envolvente desarrollada \(Ld/)
     expect(d).toMatch(/stroke-width="2.2"/)
+  })
+})
+
+describe('máximos reportados por RAM vs estaciones impresas', () => {
+  const P = parseRamStations(T4)
+  const m = (id) => P.members.find((x) => x.id === id)
+  it('lee el bloque «Máximos esfuerzos en miembros» del mismo .txt y lo pega a su miembro', () => {
+    expect(P.members.every((x) => x.repMax && x.repMin)).toBe(true)
+    expect(m('1173').repMax.m33).toBe(0.95)
+    expect(m('1173').repMin.m33).toBe(-1.04)
+    // …y las estaciones impresas se quedan cortas: sólo llegan a −0.70
+    expect(Math.min(...m('1173').stations.map((s) => s.m33.min))).toBe(-0.7)
+  })
+  it('el perfil se escala para no subestimar el momento con el que se diseña', () => {
+    const prof = memberProfile(m('1173'), 4)
+    expect(prof.muNmax).toBeCloseTo(1.04, 9)     // cubre el máximo reportado
+    expect(prof.muPmax).toBeCloseTo(0.95, 9)
+    expect(prof.ajuste.kN).toBeCloseTo(1.04 / 0.7, 2)
+    expect(prof.ajuste.rep.muN).toBe(1.04)
+    // la forma se conserva: cada estación sube en la misma proporción
+    const crudo = memberProfile(m('1173'), 4, false, { ajustar: false })
+    expect(crudo.muNmax).toBeCloseTo(0.7, 9)
+    expect(crudo.ajuste).toBeNull()
+    for (let i = 0; i < prof.stations.length; i++) {
+      if (crudo.stations[i].muN > 0) expect(prof.stations[i].muN / crudo.stations[i].muN).toBeCloseTo(1.04 / 0.7, 9)
+    }
+  })
+  it('no toca el perfil cuando las estaciones ya cubren lo reportado', () => {
+    const iguales = P.members.filter((x) => {
+      const mx = Math.max(...x.stations.map((s) => s.m33.max)), mn = Math.min(...x.stations.map((s) => s.m33.min))
+      return x.repMax.m33 <= mx + 1e-9 && x.repMin.m33 >= mn - 1e-9
+    })
+    expect(iguales.length).toBeGreaterThan(50)      // la mayoría del reporte ya venía bien
+    for (const x of iguales.slice(0, 20)) {
+      const prof = memberProfile(x, 4)
+      const crudo = memberProfile(x, 4, false, { ajustar: false })
+      expect(prof.ajuste === null || (prof.ajuste.kV !== 1 && prof.ajuste.kP === 1 && prof.ajuste.kN === 1)).toBe(true)
+      expect(prof.muPmax).toBeCloseTo(crudo.muPmax, 9)
+      expect(prof.muNmax).toBeCloseTo(crudo.muNmax, 9)
+    }
+  })
+  it('en el grupo, respetar los máximos saca a la luz miembros que se quedaban cortos', () => {
+    const t = { nombre: 'T-4', ancho: 20, peralte: 30, recub: 3, fc: 250, calSup: '4', cantSup: 2, calInf: '4', cantInf: 2, calBastonSup: '4', cantBastonSup: 0, calBastonInf: '4', cantBastonInf: 0, calEst: '2.5', sepLcuarto: 8, sepRest: 16, calc: { fy: 4200, varEstNum: 2.5, nramas: 2 } }
+    const conAjuste = analyzeGroup(t, { members: P.members, L: 4, minLen: 0.6 })
+    const sinAjuste = analyzeGroup(t, { members: P.members, L: 4, minLen: 0.6, ajustarAMaximos: false })
+    expect(conAjuste.nBast).toBeGreaterThanOrEqual(sinAjuste.nBast)
+    expect(conAjuste.results.filter((r) => r.profile.ajuste).length).toBeGreaterThan(0)
+  })
+  it('un elemento hereda la envolvente reportada de todos sus tramos', () => {
+    const byId = new Map(P.members.map((x) => [String(x.id), x]))
+    const chain = { id: 'E', members: [{ id: '1173', x0: 0, L: 4, reversed: false }, { id: '1172', x0: 4, L: 4, reversed: false }], nodes: [] }
+    const el = buildElement(chain, byId)
+    expect(el.repMin.m33).toBe(Math.min(m('1173').repMin.m33, m('1172').repMin.m33))
+    expect(el.repMax.m33).toBe(Math.max(m('1173').repMax.m33, m('1172').repMax.m33))
   })
 })
 

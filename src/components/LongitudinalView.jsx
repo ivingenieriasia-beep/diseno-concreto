@@ -123,6 +123,36 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     return <Pill tone="ok">✓ con el diseño</Pill>
   }
 
+  // ── La envolvente de la sección contra el reporte por estaciones ──
+  // Pueden venir de archivos distintos (o de combinaciones distintas): si la
+  // envolvente reporta más momento que el perfil, el diseño a lo largo se
+  // quedaría corto y hay que decirlo.
+  const desfase = useMemo(() => {
+    const pts = form.envelope?.points
+    if (!group || !pts?.length) return null
+    const inv = !!form.envelope.invertir
+    const porMiembro = new Map()
+    for (const p of pts) {
+      const k = String(p.member)
+      const a = porMiembro.get(k) || { P: 0, N: 0 }
+      const mx = inv ? -p.m33 : p.m33
+      a.P = Math.max(a.P, mx); a.N = Math.max(a.N, -mx)
+      porMiembro.set(k, a)
+    }
+    const casos = []
+    for (const r of group.results) {
+      const ids = r.isElement ? r.members.map((m) => String(m.id)) : [String(r.id)]
+      let eP = 0, eN = 0, hay = false
+      for (const id of ids) { const a = porMiembro.get(id); if (a) { hay = true; eP = Math.max(eP, a.P); eN = Math.max(eN, a.N) } }
+      if (!hay) continue
+      const d = Math.max(eP - r.profile.muPmax, eN - r.profile.muNmax)
+      if (d > 0.02) casos.push({ r, eP, eN, d })
+    }
+    if (!casos.length) return null
+    casos.sort((a, b) => b.d - a.d)
+    return { casos, peor: casos[0], env: form.envelope.archivo, perfil: perfilFull.archivo }
+  }, [group, form.envelope, perfilFull])
+
   const mismatch = useMemo(() => {
     if (!perfilFull?.secPor) return null
     const ids = perfilFull.members.map((m) => m.id)
@@ -426,6 +456,47 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 {excluidos.size > 0 && <span style={{ color: 'var(--color-tx3)' }}>excluidos: {[...excluidos].join(', ')} <button style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', color: 'var(--color-tx3)' }} onClick={() => patchPerfil({ excluir: [] })}>restaurar</button></span>}
               </div>
             )}
+            {(() => {
+              const aj = group.results.filter((r) => r.profile.ajuste)
+              if (!aj.length) return null
+              const peor = aj.reduce((a, b) => {
+                const f = (r) => Math.max(r.profile.ajuste.kP || 1, r.profile.ajuste.kN || 1)
+                return f(b) > f(a) ? b : a
+              })
+              const k = Math.max(peor.profile.ajuste.kP || 1, peor.profile.ajuste.kN || 1)
+              return (
+                <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>
+                    <b>{aj.length}</b> {aj.length === 1 ? 'elemento tiene' : 'elementos tienen'} el perfil ajustado a los máximos que reporta RAM:
+                    las estaciones impresas del reporte se quedaban cortas (el mayor ajuste es ×{fmt(k)} en {unitLabel(peor)},
+                    Mu− {fmt(peor.profile.ajuste.rep.muN)} reportado). Sin este ajuste los bastones se diseñarían con un momento menor que el real.
+                  </span>
+                  <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid="toggle-ajuste"
+                    onClick={() => patchPerfil({ ajustarAMaximos: false })}
+                    title="Usar sólo los valores de las estaciones impresas (no recomendado: subestima el momento)">
+                    usar sólo las estaciones
+                  </button>
+                </div>
+              )
+            })()}
+            {perfilFull.ajustarAMaximos === false && (
+              <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>Se están usando <b>sólo las estaciones impresas</b>: donde RAM reporte un máximo mayor, el momento de diseño queda por debajo del real.</span>
+                <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid="toggle-ajuste"
+                  onClick={() => patchPerfil({ ajustarAMaximos: true })}>respetar los máximos del reporte</button>
+              </div>
+            )}
+            {desfase && (
+              <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
+                <b>La envolvente de la sección pide más que este reporte</b> en {desfase.casos.length} elemento(s).
+                El mayor: <b>{unitLabel(desfase.peor.r)}</b> — la envolvente reporta Mu+ {fmt(desfase.peor.eP)} · Mu− {fmt(desfase.peor.eN)} t·m
+                y aquí el perfil llega a Mu+ {fmt(desfase.peor.r.profile.muPmax)} · Mu− {fmt(desfase.peor.r.profile.muNmax)}.
+                {desfase.env && desfase.perfil && desfase.env !== desfase.perfil
+                  ? <> Vienen de archivos distintos (<b>{desfase.env}</b> vs <b>{desfase.perfil}</b>): revisa que sean la misma combinación de carga y vuelve a exportar el de estaciones si hace falta.</>
+                  : <> Revisa que el reporte por estaciones cubra las mismas combinaciones que la envolvente.</>}
+                {' '}Mientras no coincidan, los bastones se están diseñando con el momento menor.
+              </div>
+            )}
             {!capsOk && <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
               El armado corrido no cumple por sí solo (As mín, As máx o b mín): MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m. Sube el armado corrido antes de repartir bastones.
             </div>}
@@ -645,6 +716,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, fontFamily: 'var(--font-mono)' }}>
                   <b>{unitLabel(selected)}</b> {pillDe(selected)}
                   {smaxWarn(selected) && <Pill tone="warn">⚠ s máx {fmt(selected.shear.extremos.sMax, 1)} cm (NTC d/2 ó d/4)</Pill>}
+                  {selected.profile.ajuste && (
+                    <Pill tone="warn">
+                      ⚠ perfil ajustado ×{fmt(Math.max(selected.profile.ajuste.kP || 1, selected.profile.ajuste.kN || 1))} a los máximos de RAM
+                      (Mu+ {fmt(selected.profile.ajuste.rep.muP)} · Mu− {fmt(selected.profile.ajuste.rep.muN)})
+                    </Pill>
+                  )}
                   <span>Mu+ {fmt(selected.profile.muPmax)} / MR+ {fmt(group.caps.MRP)}</span>
                   <span>Mu− {fmt(selected.profile.muNmax)} / MR− {fmt(group.caps.MRN)}</span>
                   <span>Vu {fmt(selected.profile.vuMax)} / Vr L4 {fmt(selected.shear.extremos.Vr)} · centro {fmt(selected.shear.centro.Vr)}</span>

@@ -22,6 +22,8 @@ import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { CAL_TO_NUM } from './constants'
 
 const NUM = /(-?\d+(?:[.,]\d+)?)\s+([A-Za-z0-9+*_.-]+)/g
+// El bloque "Máximos esfuerzos en miembros" no lleva la columna del caso (ec)
+const NUMS = /[-+]?\d+(?:[.,]\d+)?/g
 const KG_PER_M_PER_CM2 = 0.785 // acero 7850 kg/m³ → 0.785 kg por metro por cm²
 
 export const fmt2 = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
@@ -69,6 +71,17 @@ export function parseRamStations(text) {
       lastStation = st
       continue
     }
+    // Filas del bloque "Máximos esfuerzos en miembros": Max/Min sin estación.
+    // Es la envolvente REAL del miembro (RAM la calcula en todas las secciones
+    // que evalúa, no sólo en las que imprime), así que se guarda aparte.
+    if ((m = /^(Max|Min)\b(.*)$/i.exec(line)) && !lastStation) {
+      const vals = [...m[2].matchAll(NUMS)].map((x) => parseFloat(x[0].replace(',', '.')))
+      if (vals.length >= 6) {
+        const fila = { axial: vals[0], v2: vals[1], v3: vals[2], tors: vals[3], m22: vals[4], m33: vals[5] }
+        if (/max/i.test(m[1])) cur.repMax = fila; else cur.repMin = fila
+      }
+      continue
+    }
     if ((m = /^Min\b(.*)$/i.exec(line)) && lastStation) {
       const vals = [...m[1].matchAll(NUM)].map((x) => parseFloat(x[1].replace(',', '.')))
       if (vals.length < 6) { warnings.push(`Miembro ${cur.id}: fila Min con ${vals.length} valores.`); continue }
@@ -101,19 +114,36 @@ export function parseRamStations(text) {
   const byId = new Map()
   for (const mb of members) {
     const prev = byId.get(mb.id)
-    if (!prev || (prev.stations.length < 2 && mb.stations.length >= 2)) byId.set(mb.id, mb)
+    if (!prev) { byId.set(mb.id, mb); continue }
+    // se conserva la entrada con estaciones, pero heredando los máximos del
+    // otro bloque: son el mismo miembro visto de dos maneras
+    const ganador = prev.stations.length >= 2 || mb.stations.length < 2 ? prev : mb
+    const otro = ganador === prev ? mb : prev
+    ganador.repMax = ganador.repMax || otro.repMax
+    ganador.repMin = ganador.repMin || otro.repMin
+    byId.set(mb.id, ganador)
   }
   const unique = [...byId.values()]
   const valid = unique.filter((mb) => mb.stations.length >= 2)
   if (unique.length && valid.length < unique.length) warnings.push(`${unique.length - valid.length} miembro(s) sin estaciones legibles se omitieron.`)
   if (!valid.length) warnings.push('No se encontraron miembros con estaciones. Exporta en RAM el reporte «Envolvente de esfuerzos» (por estaciones).')
 
-  // Envolvente compatible (Max/Min por miembro) para la revisión de sección existente
+  // Envolvente compatible (Max/Min por miembro) para la revisión de sección.
+  // Si el .txt trae el bloque "Máximos esfuerzos en miembros", manda ése: es
+  // la envolvente que RAM calcula en todas las secciones, no sólo en las
+  // estaciones impresas. Así este panel y el análisis a lo largo coinciden.
   const points = []
+  const KEYS = ['axial', 'v2', 'v3', 'tors', 'm22', 'm33']
   for (const mb of valid) {
     const agg = (k, f) => f(...mb.stations.map((s) => s[k].max), ...mb.stations.map((s) => s[k].min))
     const mx = { axial: agg('axial', Math.max), v2: agg('v2', Math.max), v3: agg('v3', Math.max), tors: agg('tors', Math.max), m22: agg('m22', Math.max), m33: agg('m33', Math.max) }
     const mn = { axial: agg('axial', Math.min), v2: agg('v2', Math.min), v3: agg('v3', Math.min), tors: agg('tors', Math.min), m22: agg('m22', Math.min), m33: agg('m33', Math.min) }
+    if (mb.repMax && mb.repMin) {
+      for (const k of KEYS) {
+        mx[k] = Math.max(mx[k], mb.repMax[k], mb.repMin[k])
+        mn[k] = Math.min(mn[k], mb.repMax[k], mb.repMin[k])
+      }
+    }
     points.push({ id: `${mb.id}-Max`, member: mb.id, tipo: 'Max', ...mx, P: -mx.axial, combo })
     points.push({ id: `${mb.id}-Min`, member: mb.id, tipo: 'Min', ...mn, P: -mn.axial, combo })
   }
@@ -140,6 +170,13 @@ export function looksLikeStations(text) {
  */
 export function buildElement(chain, byId) {
   const stations = []
+  // la envolvente reportada del elemento es la de sus tramos, componente a componente
+  let repMax = null, repMin = null
+  for (const m of chain.members) {
+    const mb = byId.get(String(m.id))
+    if (mb?.repMax) repMax = repMax ? Object.fromEntries(Object.keys(repMax).map((k) => [k, Math.max(repMax[k], mb.repMax[k])])) : { ...mb.repMax }
+    if (mb?.repMin) repMin = repMin ? Object.fromEntries(Object.keys(repMin).map((k) => [k, Math.min(repMin[k], mb.repMin[k])])) : { ...mb.repMin }
+  }
   for (const m of chain.members) {
     const src = byId.get(String(m.id))
     if (!src) continue
@@ -155,7 +192,7 @@ export function buildElement(chain, byId) {
   }
   const L = chain.L
   for (const s of stations) s.pos = L > 0 ? s.raw / L : 0
-  return { id: chain.id, stations, Lreport: L, members: chain.members, nodes: chain.nodes, isElement: true }
+  return { id: chain.id, stations, Lreport: L, members: chain.members, nodes: chain.nodes, isElement: true, repMax, repMin }
 }
 
 /**
@@ -187,7 +224,7 @@ export function detectSupports(element, { minJump = 0.15 } = {}) {
  * @param invertir  true si en el modelo el M33 positivo va al revés
  * @returns { L, x:[m], muP:[t·m], muN:[t·m], vu:[t], stations:[{x, muP, muN, vu}] }
  */
-export function memberProfile(member, L, invertir = false) {
+export function memberProfile(member, L, invertir = false, { ajustar = true } = {}) {
   const len = member.Lreport || +L || 0
   const st = member.stations.map((s) => {
     const mx = invertir ? -s.m33.min : s.m33.max
@@ -200,8 +237,47 @@ export function memberProfile(member, L, invertir = false) {
       m33max: mx, m33min: mn,
     }
   })
+
+  // ── Envolvente reportada por RAM para el miembro ──
+  // El bloque "Máximos esfuerzos en miembros" trae el máximo en TODAS las
+  // secciones que RAM evalúa; las estaciones impresas son sólo una muestra
+  // (10 puntos) y se pueden quedar cortas. Si es así, el perfil se escala por
+  // rama para no subestimar el momento con el que se diseñan los bastones.
+  const rep = member.repMax && member.repMin ? {
+    muP: Math.max(0, invertir ? -member.repMin.m33 : member.repMax.m33),
+    muN: Math.max(0, invertir ? member.repMax.m33 : -member.repMin.m33),
+    vu: Math.max(Math.abs(member.repMax.v2 ?? 0), Math.abs(member.repMin.v2 ?? 0)),
+  } : null
+
+  let ajuste = null
+  if (ajustar && rep) {
+    const pico = (k) => Math.max(0, ...st.map((s) => s[k]))
+    const factor = (k, objetivo) => {
+      const p = pico(k)
+      if (!(objetivo > p + 1e-9)) return 1
+      return p > 1e-9 ? objetivo / p : Infinity   // perfil plano en cero: se sube entero
+    }
+    const kP = factor('muP', rep.muP), kN = factor('muN', rep.muN), kV = factor('vu', rep.vu)
+    if (kP !== 1 || kN !== 1 || kV !== 1) {
+      const aplica = (v, k, objetivo) => (k === Infinity ? objetivo : v * k)
+      for (const s of st) {
+        s.muP = aplica(s.muP, kP, rep.muP)
+        s.muN = aplica(s.muN, kN, rep.muN)
+        s.vu = aplica(s.vu, kV, rep.vu)
+        s.m33max = s.muP
+        s.m33min = -s.muN
+      }
+      ajuste = {
+        kP: kP === Infinity ? null : +kP.toFixed(3),
+        kN: kN === Infinity ? null : +kN.toFixed(3),
+        kV: kV === Infinity ? null : +kV.toFixed(3),
+        rep,
+      }
+    }
+  }
+
   return {
-    L: len, stations: st,
+    L: len, stations: st, rep, ajuste,
     muPmax: Math.max(0, ...st.map((s) => s.muP)),
     muNmax: Math.max(0, ...st.map((s) => s.muN)),
     vuMax: Math.max(0, ...st.map((s) => s.vu)),
@@ -544,8 +620,8 @@ export function shearZones(profile, caps, supports = null) {
  * Análisis completo de un miembro contra la sección.
  * @returns { id, L, profile, inf, sup, shear, status:'ok'|'baston'|'insuficiente', signature }
  */
-export function analyzeMember(member, caps, { L, invertir = false, minLen } = {}) {
-  const profile = memberProfile(member, L, invertir)
+export function analyzeMember(member, caps, { L, invertir = false, minLen, ajustar = true } = {}) {
+  const profile = memberProfile(member, L, invertir, { ajustar })
   const inf = bastonesForLecho(profile, caps.inf, 'muP', { minLen, caps })
   const sup = bastonesForLecho(profile, caps.sup, 'muN', { minLen, caps })
   const supports = member.isElement ? detectSupports(member) : [0, profile.L]
@@ -613,7 +689,7 @@ export function analyzeGroup(t, perfil) {
   const Ldef = +perfil?.L || 0
   const results = unitsFor(perfil).map((mb) => {
     const L = mb.Lreport || +(perfil?.Lpor?.[mb.id]) || Ldef
-    return analyzeMember(mb, caps, { L, invertir: !!perfil?.invertir, minLen: perfil?.minLen })
+    return analyzeMember(mb, caps, { L, invertir: !!perfil?.invertir, minLen: perfil?.minLen, ajustar: perfil?.ajustarAMaximos !== false })
   })
 
   // Patrones (misma firma de bastones) → un dibujo por patrón
@@ -699,7 +775,7 @@ export function optimizeBase(t, perfil, { calibres = ['3', '4', '5', '6'], nMax 
     let kgBase = 0, kgBast = 0, nBast = 0, nInsuf = 0
     for (const mb of units) {
       const L = mb.Lreport || +(perfil?.Lpor?.[mb.id]) || +perfil.L || 0
-      const profile = memberProfile(mb, L, !!perfil.invertir)
+      const profile = memberProfile(mb, L, !!perfil.invertir, { ajustar: perfil?.ajustarAMaximos !== false })
       const res = bastonesForLecho(profile, lecho, lechoKey === 'inf' ? 'muP' : 'muN', { minLen: perfil?.minLen, caps })
       kgBase += L * n * w
       kgBast += res.bars.reduce((s, b) => s + b.k * b.len * w, 0)
