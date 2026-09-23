@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // Escala de aprovechamiento: una fila por grupo, un punto por trabe en el
 // aprovechamiento de la sección de su grupo (100 % = justo). Como la escala
-// de momentos de Detalle, pero para toda la agrupación.
+// de momentos de Secciones, pero para toda la agrupación.
 //
 //   · clic en un punto: esa trabe · Mayús/Ctrl+clic: suma o quita
 //   · arrastrar en un hueco: selección por ventana

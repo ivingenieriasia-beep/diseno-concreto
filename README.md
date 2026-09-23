@@ -7,7 +7,7 @@ Herramientas de cálculo y detallado estructural en una sola app.
 El header sólo lleva lo del proyecto (nuevo, nombre, verificar, abrir, guardar y
 exportar). Las herramientas viven detrás del botón **Módulos** (o con `⌘K` /
 `Ctrl+K`): se busca por nombre, se abre con `↵` y el módulo queda como una
-pestaña cerrable junto a las fijas — Detalle, Cálculo y Columnas.
+pestaña cerrable junto a las fijas — Secciones, Cálculo y Columnas.
 
 Un módulo abierto sigue montado aunque cambies de pestaña, así que no se pierde
 nada al ir y venir. Las pestañas abiertas se recuerdan para la próxima sesión, y

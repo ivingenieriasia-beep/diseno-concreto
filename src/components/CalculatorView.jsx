@@ -479,7 +479,7 @@ export default function CalculatorView() {
             }}>
               b={b} h={h} r={r} cm — f'c={fc} kg/cm²
               <div style={{ fontSize: 10, marginTop: 2, color: 'var(--color-accent2)' }}>
-                ↑ Editables desde la pestaña Detalle
+                ↑ Editables desde la pestaña Secciones
               </div>
             </div>
             <CInput label="fy" value={fy} onChange={(v) => setCalc({ fy: +v || 0 })} unit="kg/cm²" min={0} />

@@ -360,7 +360,7 @@ export default function App() {
         projectName={projectName}
       />
       <div role="tablist" className="flex items-center gap-1 px-4 pt-2" style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
-        {tabBtn('detalle', 'Detalle')}
+        {tabBtn('detalle', 'Secciones')}
         {tabBtn('calculo', 'Calculo', calcAlert && (
           <span style={{
             position: 'absolute', top: 2, right: 2,
