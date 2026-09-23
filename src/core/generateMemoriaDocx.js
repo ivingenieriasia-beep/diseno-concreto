@@ -13,7 +13,7 @@ import { LOGO_SVG } from './generateDetailedHTML'
 import { computeSectionResults } from './sectionResults'
 import { sectionSvgString } from './sectionSvg'
 import { svgToPng, normalizeMeta } from './generateMemoria'
-import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
+import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { columnDemand, demandCase } from './columnDemand'
 import { columnSectionSvgString, interactionSvgString } from './columnsSvg'
 import { analyzeGroup, unitLabel } from './longitudinal'
@@ -344,6 +344,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
       const Pu = caso.Pu, MuX = caso.Mux, MuY = caso.Muy
       const cx = caso.cx, cy = caso.cy, bi = caso.bi
       const est = calcEstribos({ estriboNum: col.estriboNum, longNum: col.lechos?.[0]?.num || 3, h: +col.h, b: +col.b })
+      const ez = estribosDe(col)
       const ex = excentricidad(MuX, Pu, +col.b, +col.h)
       const ok = D.ok
       const arm = (col.lechos || []).map((L, i) => `L${i + 1}:${L.n}#${L.num}`).join(' ')
@@ -351,7 +352,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
       cRows.push([
         col.nombre || '—', `${col.b}×${col.h}`, arm, fmt(an.dirX.params.Ast),
         fmt(Pu), `${fmt(MuX)} / ${fmt(cx.MR)}`, `${fmt(MuY)} / ${fmt(cy.MR)}`,
-        `E#${col.estriboNum}@${est.s}`,
+        ez.corto.replace(' ', ''),
         [run(!D.evaluado ? 'SIN DEMANDA' : ok ? 'VERIFICADO' : 'NO PASA',
           { size: 14, bold: true, color: !D.evaluado ? 'B45309' : ok ? OKC : BADC })],
       ])
@@ -377,7 +378,9 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
           ? [run(`Revisados los ${D.env.total} ejemplares del reporte, ${D.env.passing} quedan dentro del diagrama${D.env.allOk ? '' : ` y ${D.env.failing} lo rebasan`}. `,
             { color: D.env.allOk ? OKC : BADC })]
           : []),
-        run(`Acero transversal: E#${col.estriboNum} @ ${est.s} cm (s1=${fmt(est.s1)}, s2=${fmt(est.s2)}, s3=${fmt(est.s3, 0)}).`),
+        run(ez.zonas
+          ? `Acero transversal: ${ez.texto}.`
+          : `Acero transversal: E#${col.estriboNum} @ ${est.s} cm (s1=${fmt(est.s1)}, s2=${fmt(est.s2)}, s3=${fmt(est.s3, 0)}).`),
       ], { align: AlignmentType.JUSTIFIED }))
       if (secImg) perCol.push(imgPara(secImg))
       if (dxImg) perCol.push(imgPara(dxImg))

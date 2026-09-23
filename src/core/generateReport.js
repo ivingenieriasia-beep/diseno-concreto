@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
 import { calcFlexion, calcCortante } from './sectionCalculator'
-import { analyzeColumn, calcEstribos, barGrid, bdLookup } from './columnCalculator'
+import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
 import { resistenciasConPuntual } from './sectionResults'
 import { columnDemand, demandCase } from './columnDemand'
@@ -376,8 +376,8 @@ function drawColumnCard(doc, col, y, marginL, contentW) {
   doc.text(`${col.b}x${col.h} cm   f'c=${col.fc}   ${arm}`, tx, ty)
   if (an) {
     ty += 3.6
-    const est = calcEstribos({ estriboNum: col.estriboNum, longNum: col.lechos?.[0]?.num || 3, h: +col.h, b: +col.b })
-    doc.text(`Ast = ${an.dirX.params.Ast.toFixed(2)} cm2   E#${col.estriboNum} @ ${est.s} cm`, tx, ty)
+    const ez = estribosDe(col)
+    doc.text(`Ast = ${an.dirX.params.Ast.toFixed(2)} cm2   ${ez.zonas ? `E#${col.estriboNum} @ ${ez.sExt} extremos / @ ${ez.sCen} centro cm` : `E#${col.estriboNum} @ ${ez.s} cm`}`, tx, ty)
   }
 
   let ok = true

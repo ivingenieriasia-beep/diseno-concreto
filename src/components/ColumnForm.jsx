@@ -1,5 +1,5 @@
 import useColumnStore from '../store/useColumnStore'
-import { BD_VARILLAS, bdLookup } from '../core/columnCalculator'
+import { BD_VARILLAS, bdLookup, estribosColumna, estribosDe } from '../core/columnCalculator'
 
 const NUM_OPTS = BD_VARILLAS.filter((v) => v.num >= 3).map((v) => v.num)
 const EST_OPTS = [2, 2.5, 3, 4]
@@ -23,6 +23,8 @@ export default function ColumnForm() {
 
   const hasSel = selectedIdx >= 0 && selectedIdx < columns.length
   const num = (k) => (e) => set({ [k]: e.target.value === '' ? '' : Number(e.target.value) })
+  const zonas = estribosDe(form)
+  const ntc = estribosColumna({ b: form.b, h: form.h, estriboNum: form.estriboNum, lechos: form.lechos, fy: +form.fy || 4200, H: +form.altura || null })
 
   if (!hasSel) {
     return (
@@ -130,6 +132,35 @@ export default function ColumnForm() {
               {EST_OPTS.map((n) => <option key={n} value={n}>#{n}</option>)}
             </select>
           </Field>
+        </div>
+        {/* Por zonas, como en las trabes: más juntos arriba y abajo de cada unión */}
+        <div className="mt-2">
+          <Row>
+            <Field label="Sep. extremos (cm)">
+              <input className="field-input" type="number" step="1" data-testid="col-sep-ext" value={form.sepExt ?? ''} onChange={num('sepExt')} placeholder={String(zonas.legado.s)} />
+            </Field>
+            <Field label="Sep. centro (cm)">
+              <input className="field-input" type="number" step="1" data-testid="col-sep-cen" value={form.sepCen ?? ''} onChange={num('sepCen')} placeholder={String(zonas.legado.s)} />
+            </Field>
+          </Row>
+          <Row>
+            <Field label="Long. extremo (cm)">
+              <input className="field-input" type="number" step="5" value={form.longExt ?? ''} onChange={num('longExt')} placeholder={String(ntc.lExt)} />
+            </Field>
+            <Field label="Altura H (m)">
+              <input className="field-input" type="number" step="0.05" value={form.altura ?? ''} onChange={num('altura')} placeholder="—" />
+            </Field>
+          </Row>
+          <button className="btn btn-secondary" data-testid="col-estribos-ntc" style={{ fontSize: 10.5, marginTop: 6, width: '100%' }}
+            onClick={() => set({ sepExt: ntc.sExt, sepCen: ntc.sCen, longExt: ntc.lExt })}
+            title={ntc.reglas.join(' · ')}>
+            {ntc.castillo ? 'Según NTC-Mampostería (castillo)' : 'Según NTC'}: @{ntc.sExt} / @{ntc.sCen} · {ntc.lExt} cm
+          </button>
+          <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 4, lineHeight: 1.5 }}>
+            {zonas.zonas
+              ? <>{zonas.texto}</>
+              : <>Sin zonas: separación única de la hoja, @{zonas.legado.s} cm.</>}
+          </div>
         </div>
       </div>
     </div>

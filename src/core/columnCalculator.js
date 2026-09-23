@@ -267,3 +267,64 @@ export function calcEstribos({ estriboNum, longNum, h, b }) {
   const s = Math.floor(Math.min(s1, s2, s3))
   return { s1, s2, s3, s }
 }
+
+/**
+ * Estribos de columna por zonas: extremos (arriba y abajo de cada unión) y
+ * centro, como en las trabes.
+ *
+ *  · Columna (lado menor ≥ 20 cm) — NTC-Concreto, marcos no dúctiles:
+ *      centro   s ≤ 850/√fy · db de la barra longitudinal más delgada,
+ *               48 · db del estribo, y la mitad del lado menor;
+ *      extremos la mitad, en una longitud no menor que el lado mayor,
+ *               H/6 y 60 cm.
+ *  · Castillo (lado menor < 20 cm) — NTC-Mampostería: centro s ≤ 1.5·t y
+ *      20 cm. En los extremos se toma también la mitad: es criterio, no
+ *      requisito de esa norma.
+ *
+ * La fórmula de la hoja (calcEstribos) no se toca: los proyectos que ya
+ * existen conservan su separación única (ver estribosDe).
+ * @param H  altura de la columna, m (del modelo); sin ella no entra H/6
+ */
+export function estribosColumna({ b, h, estriboNum, lechos, fy = 4200, H = null }) {
+  b = +b; h = +h
+  const t = Math.min(b, h)
+  const castillo = t < 20
+  let sMax, reglas
+  if (castillo) {
+    sMax = Math.min(1.5 * t, 20)
+    reglas = [`1.5·t = ${(1.5 * t).toFixed(1)}`, '20 cm']
+  } else {
+    const nums = (lechos || []).filter((L) => +L.n > 0).map((L) => L.num)
+    const dbL = Math.min(...(nums.length ? nums : [3]).map((n) => bdLookup(n).diam))
+    const s1 = (850 / Math.sqrt(fy)) * dbL
+    const s2 = 48 * bdLookup(estriboNum).diam
+    const s3 = t / 2
+    sMax = Math.min(s1, s2, s3)
+    reglas = [`850/√fy·db = ${s1.toFixed(1)}`, `48·dbe = ${s2.toFixed(1)}`, `t/2 = ${s3.toFixed(1)}`]
+  }
+  const sCen = Math.floor(sMax)
+  const sExt = Math.floor(sMax / 2)
+  // longitud de la zona de extremo, a múltiplos de 5 cm hacia arriba
+  const lExt = Math.ceil(Math.max(b, h, H ? (H * 100) / 6 : 0, 60) / 5) * 5
+  return { sCen, sExt, lExt, castillo, reglas, conH: !!H }
+}
+
+/**
+ * Cómo van los estribos de UNA columna: por zonas si las tiene capturadas
+ * (sepExt / sepCen) y, si no, la separación única de siempre. Así un proyecto
+ * viejo no cambia de estribos al abrirlo.
+ */
+export function estribosDe(col) {
+  const legado = calcEstribos({ estriboNum: col.estriboNum, longNum: col.lechos?.[0]?.num || 3, h: +col.h, b: +col.b })
+  const sExt = +col.sepExt || 0, sCen = +col.sepCen || 0
+  const e = `E#${col.estriboNum}`
+  if (!(sExt > 0 && sCen > 0)) {
+    return { zonas: false, s: legado.s, legado, texto: `${e} @ ${legado.s} cm`, corto: `${e} @${legado.s}` }
+  }
+  const lExt = +col.longExt || null
+  return {
+    zonas: true, sExt, sCen, lExt, legado,
+    texto: `${e} @ ${sExt} cm en extremos${lExt ? ` (${lExt} cm)` : ''} · @ ${sCen} cm al centro`,
+    corto: `${e} @${sExt}/${sCen}`,
+  }
+}

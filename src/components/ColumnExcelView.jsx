@@ -1,4 +1,4 @@
-import { calcEstribos, excentricidad } from '../core/columnCalculator'
+import { calcEstribos, estribosDe, excentricidad } from '../core/columnCalculator'
 
 const fmt = (v, d = 4) => (v === null || v === undefined || isNaN(v) ? '—' : Number(v).toFixed(d))
 
@@ -59,6 +59,8 @@ export default function ColumnExcelView({ col, analysis, dirLabel, accent, Mu })
     estriboNum: col.estriboNum, longNum: (col.lechos?.[0]?.num) || 3,
     h: +col.h, b: +col.b,
   })
+  // si la columna trae estribos por zonas, ésos mandan y la fórmula de la hoja queda de referencia
+  const zonas = estribosDe(col)
 
   return (
     <div style={{ fontSize: 12 }}>
@@ -92,9 +94,14 @@ export default function ColumnExcelView({ col, analysis, dirLabel, accent, Mu })
           <span>s1 (por estribos, #{col.estriboNum}) = {fmt(est.s1, 2)} cm</span>
           <span>s2 (por acero longitudinal, #{col.lechos?.[0]?.num}) = {fmt(est.s2, 2)} cm</span>
           <span>s3 (por dimensiones) = {fmt(est.s3, 0)} cm</span>
-          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-accent2)' }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: zonas.zonas ? 'var(--color-tx3)' : 'var(--color-accent2)', textDecoration: zonas.zonas ? 'line-through' : 'none' }}>
             s propuesta = E#{col.estriboNum} @ {est.s} cm
           </span>
+          {zonas.zonas && (
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-accent2)' }}>
+              Por zonas = {zonas.texto}
+            </span>
+          )}
         </div>
       </div>
     </div>

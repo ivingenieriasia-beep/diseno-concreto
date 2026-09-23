@@ -10,7 +10,7 @@ import {
   computeSectionResults, renderFlexion, renderCortante,
 } from './generateDetailedHTML'
 import { sectionSvgString } from './sectionSvg'
-import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
+import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { columnDemand, demandCase } from './columnDemand'
 import { columnSectionSvgString, interactionSvgString } from './columnsSvg'
 import { analyzeGroup, unitLabel } from './longitudinal'
@@ -227,6 +227,7 @@ function columnasHTML(columnsArr, M) {
     const Pu = caso.Pu, MuX = caso.Mux, MuY = caso.Muy
     const cx = caso.cx, cy = caso.cy, bi = caso.bi
     const est = calcEstribos({ estriboNum: col.estriboNum, longNum: col.lechos?.[0]?.num || 3, h: +col.h, b: +col.b })
+    const ez = estribosDe(col)
     const ex = excentricidad(MuX, Pu, +col.b, +col.h)
     const arm = (col.lechos || []).map((L, i) => `L${i + 1}: ${L.n}#${L.num}`).join(' · ')
     const ok = D.ok
@@ -239,7 +240,7 @@ function columnasHTML(columnsArr, M) {
       <td class="num">${fmt(Pu, 2)}</td>
       <td class="num">${fmt(MuX, 2)} / ${fmt(cx.MR, 2)}</td>
       <td class="num">${fmt(MuY, 2)} / ${fmt(cy.MR, 2)}</td>
-      <td>E#${esc(col.estriboNum)}@${est.s}</td>
+      <td>${esc(ez.corto.replace(' ', ''))}</td>
       <td style="text-align:center"><span class="mark-pill" style="background:${!D.evaluado ? '#fffbeb' : ok ? '#f0fdf4' : '#fef2f2'};color:${!D.evaluado ? '#92400e' : ok ? '#15803d' : '#b91c1c'};border:1px solid ${!D.evaluado ? '#fcd34d' : ok ? '#86efac' : '#fca5a5'}">${!D.evaluado ? 'SIN DEMANDA' : ok ? 'VERIFICADO' : 'NO PASA'}</span></td>
     </tr>`)
 
@@ -262,8 +263,10 @@ function columnasHTML(columnsArr, M) {
       ${D.fuente === 'envolvente'
         ? `Revisados los ${D.env.total} ejemplares del reporte, ${D.env.passing} quedan dentro del diagrama${D.env.allOk ? '' : ` y ${D.env.failing} lo rebasan`}.`
         : ''}
-      Acero transversal: <b>E#${esc(col.estriboNum)} @ ${est.s} cm</b>
-      (s1 = ${fmt(est.s1, 2)}, s2 = ${fmt(est.s2, 2)}, s3 = ${fmt(est.s3, 0)} cm).</p>
+      Acero transversal: ${ez.zonas
+        ? `<b>${esc(ez.texto)}</b>.`
+        : `<b>E#${esc(col.estriboNum)} @ ${est.s} cm</b>
+      (s1 = ${fmt(est.s1, 2)}, s2 = ${fmt(est.s2, 2)}, s3 = ${fmt(est.s3, 0)} cm).`}</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;justify-content:center">
         <div class="sec-svg">${columnSectionSvgString(col)}</div>
         ${interactionSvgString(an.dirX, { Mu: MuX, Pu, check: cx, color: '#2563a8', title: `Dirección X — P–Mx (h=${col.h})` })}

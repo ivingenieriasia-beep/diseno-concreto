@@ -28,7 +28,7 @@ const defaultColumn = (nombre = '') => ({
 
 // El armado que propone la app queda marcado hasta que el ingeniero lo toca
 // (el catálogo de criterio sólo aprende de decisiones, no de propuestas).
-const armadoDe = (c) => JSON.stringify([c?.nLechos, (c?.lechos || []).map((L) => [+L.n || 0, String(L.num)]), c?.estriboNum])
+const armadoDe = (c) => JSON.stringify([c?.nLechos, (c?.lechos || []).map((L) => [+L.n || 0, String(L.num)]), c?.estriboNum, +c?.sepExt || 0, +c?.sepCen || 0, +c?.longExt || 0])
 const revisado = (antes, despues) => {
   if (despues.armadoPropuesto && armadoDe(antes) !== armadoDe(despues)) despues.armadoPropuesto = false
   return despues

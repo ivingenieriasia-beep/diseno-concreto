@@ -15,7 +15,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { analyzeGroup, optimizeBase, applyBase, perfilCompleto } from './longitudinal'
-import { analyzeColumn, calcEstribos, bdLookup } from './columnCalculator'
+import { analyzeColumn, bdLookup, estribosColumna, estribosDe } from './columnCalculator'
 import { evaluateEnvelope } from './ramParser'
 
 // ── Criterio de obra ─────────────────────────────────────────
@@ -164,9 +164,13 @@ export function textoArmadoColumna(col) {
   const barras = [...porCal].map(([num, n]) => `${n}#${num}`).join(' + ')
   const As = (col.lechos || []).reduce((s, L) => s + (+L.n || 0) * bdLookup(L.num).area, 0)
   const rho = As / ((+col.b || 1) * (+col.h || 1))
-  const longNum = col.lechos?.[0]?.num
-  const s = calcEstribos({ estriboNum: col.estriboNum, longNum, h: col.h, b: col.b }).s
-  return `${barras} (ρ ${(rho * 100).toFixed(2)} %) · E#${col.estriboNum} @${s}`
+  return `${barras} (ρ ${(rho * 100).toFixed(2)} %) · ${estribosDe(col).texto}`
+}
+
+/** Las separaciones por zona para un armado dado, listas para guardar en la columna */
+function zonasDe(col, lechos, H) {
+  const e = estribosColumna({ b: col.b, h: col.h, estriboNum: col.estriboNum || '2.5', lechos, fy: +col.fy || 4200, H })
+  return { sepExt: e.sExt, sepCen: e.sCen, longExt: e.lExt, ...(H ? { altura: H } : {}) }
 }
 
 /**
@@ -175,8 +179,9 @@ export function textoArmadoColumna(col) {
  * se arma, se amarra y se revisa en obra.
  * @param rhoMin  cuantía mínima de la propuesta (1 % por omisión: el criterio
  *                conservador; el reglamento permite menos en marcos ordinarios)
+ * @param H       altura de la columna, m — para la zona de extremo de estribos
  */
-export function proponerColumna(col, { calibres, rhoMin = 0.01, rhoMax = 0.04 } = {}) {
+export function proponerColumna(col, { calibres, rhoMin = 0.01, rhoMax = 0.04, H = null } = {}) {
   const pts = col?.envelope?.points
   if (!pts?.length) return null
   const b = +col.b, h = +col.h, r = +col.r || 3
@@ -194,7 +199,7 @@ export function proponerColumna(col, { calibres, rhoMin = 0.01, rhoMax = 0.04 } 
   for (const c of cands) {
     const ev = probar(c)
     if (!ev.allOk) continue
-    const patch = { nLechos: c.nh, lechos: c.lechos, armadoPropuesto: true }
+    const patch = { nLechos: c.nh, lechos: c.lechos, ...zonasDe(col, c.lechos, H), armadoPropuesto: true }
     return { patch, estado: 'ok', motivos: [], avisos: [], n: ev.total, texto: textoArmadoColumna({ ...col, ...patch }) }
   }
   // Nada pasa: se entrega el más fuerte que cabe, con el aviso de que es la sección
@@ -203,7 +208,7 @@ export function proponerColumna(col, { calibres, rhoMin = 0.01, rhoMax = 0.04 } 
     return { patch: {}, estado: 'revisar', n: 0, texto: '—', avisos: [], motivos: [`en ${b}×${h} no cabe un armado entre ρ ${rhoMin * 100} % y ${rhoMax * 100} %`] }
   }
   const ev = probar(fuerte)
-  const patch = { nLechos: fuerte.nh, lechos: fuerte.lechos, armadoPropuesto: true }
+  const patch = { nLechos: fuerte.nh, lechos: fuerte.lechos, ...zonasDe(col, fuerte.lechos, H), armadoPropuesto: true }
   return {
     patch, estado: 'revisar', n: ev.total, avisos: [],
     motivos: [`ni con ρ ${(fuerte.As / Ag * 100).toFixed(1)} % pasa (${ev.failing} de ${ev.total} puntos fuera): la sección no alcanza`],

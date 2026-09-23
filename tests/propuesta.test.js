@@ -147,3 +147,16 @@ describe('el armado escrito por índice no deja atrás a su gemelo de calc', () 
     expect(useBeamStore.getState().sections[idx].armadoPropuesto).toBe(false)
   })
 })
+
+describe('estribos de la columna propuesta, por zonas', () => {
+  it('C1 sale con extremos y centro, y la zona de extremo sabe la altura', () => {
+    const col = columnaDe('C1')
+    const H = Math.max(...R.grupos.find((x) => x.nombre === 'C1').perfil.members.map((m) => m.Lreport))
+    const p = proponerColumna(col, { H })
+    expect(p.patch.sepExt).toBeGreaterThan(0)
+    expect(p.patch.sepCen).toBe(2 * p.patch.sepExt + (p.patch.sepCen % 2))
+    expect(p.patch.longExt).toBeGreaterThanOrEqual(Math.max(60, (H * 100) / 6))
+    expect(p.patch.altura).toBe(H)
+    expect(p.texto).toMatch(/en extremos \(\d+ cm\) · @ \d+ cm al centro/)
+  })
+})

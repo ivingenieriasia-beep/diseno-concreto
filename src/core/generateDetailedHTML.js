@@ -5,7 +5,7 @@
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
-import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
+import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
 import { analyzeGroup, unitLabel, unidadesTexto } from './longitudinal'
@@ -272,6 +272,7 @@ function renderColumnas(columnsArr, envStats = null) {
     const Pu = caso.Pu, MuX = caso.Mux, MuY = caso.Muy
     const cx = caso.cx, cy = caso.cy, bi = caso.bi
     const est = calcEstribos({ estriboNum: col.estriboNum, longNum: col.lechos?.[0]?.num || 3, h: +col.h, b: +col.b })
+    const ez = estribosDe(col)
     const ex = excentricidad(MuX, Pu, +col.b, +col.h)
     const P = an.dirX.params
     const allOk = D.ok
@@ -364,7 +365,9 @@ function renderColumnas(columnsArr, envStats = null) {
         <tr><td>Por estribos</td><td>A(#${esc(col.estriboNum)}) × 16</td><td>${fmt(est.s1, 2)} cm</td></tr>
         <tr><td>Por acero longitudinal</td><td>A(#${esc(col.lechos?.[0]?.num)}) × 48</td><td>${fmt(est.s2, 2)} cm</td></tr>
         <tr><td>Por dimensiones</td><td>mín(b, h)</td><td>${fmt(est.s3, 0)} cm</td></tr>
-        <tr><td><b>Separación propuesta</b></td><td>⌊mín(s1, s2, s3)⌋</td><td><b>E#${esc(col.estriboNum)} @ ${est.s} cm</b></td></tr>
+        <tr><td>${ez.zonas ? 'Separación de la hoja (referencia)' : '<b>Separación propuesta</b>'}</td><td>⌊mín(s1, s2, s3)⌋</td><td>${ez.zonas ? `E#${esc(col.estriboNum)} @ ${est.s} cm` : `<b>E#${esc(col.estriboNum)} @ ${est.s} cm</b>`}</td></tr>
+        ${ez.zonas ? `<tr><td><b>Extremos</b></td><td>arriba y abajo de cada unión${ez.lExt ? `, en ${ez.lExt} cm` : ''}</td><td><b>E#${esc(col.estriboNum)} @ ${ez.sExt} cm</b></td></tr>
+        <tr><td><b>Centro</b></td><td>resto de la altura</td><td><b>E#${esc(col.estriboNum)} @ ${ez.sCen} cm</b></td></tr>` : ''}
       </table>
 
       ${envHtml}

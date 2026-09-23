@@ -6,7 +6,7 @@
 //   grises → COTAS
 // ══════════════════════════════════════════════════════════════
 
-import { barGrid, bdLookup, calcEstribos, lechoDepths } from './columnCalculator'
+import { barGrid, bdLookup, estribosDe, lechoDepths } from './columnCalculator'
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -29,11 +29,7 @@ export function columnSectionGroup(col, ox, oy, scale = 14) {
   const fs = Math.max(10, scale * 1.1)
 
   const est = bdLookup(col.estriboNum || 2.5)
-  const sEst = calcEstribos({
-    estriboNum: col.estriboNum || 2.5,
-    longNum: lechos[0]?.num || 3,
-    h, b,
-  })
+  const sEst = estribosDe({ ...col, estriboNum: col.estriboNum || 2.5, lechos, h, b })
 
   const bars = barGrid({ h, b, r, lechos })
   const dps = lechoDepths(h, r, lechos.length)
@@ -107,7 +103,7 @@ export function columnSectionGroup(col, ox, oy, scale = 14) {
 
   // ── Etiquetas ──
   // Estribos arriba (verde, como vigas)
-  P(`<text x="${X(bpx / 2)}" y="${Y(-fs * 0.5)}" font-size="${Math.round(fs * 0.88)}" fill="#1a7a5e" text-anchor="middle">E #${esc(col.estriboNum)} @ ${sEst.s} cm</text>`)
+  P(`<text x="${X(bpx / 2)}" y="${Y(-fs * 0.5)}" font-size="${Math.round(fs * 0.88)}" fill="#1a7a5e" text-anchor="middle">${esc(sEst.zonas ? `E #${col.estriboNum} @ ${sEst.sExt} / ${sEst.sCen} cm` : `E #${col.estriboNum} @ ${sEst.s} cm`)}</text>`)
   // Lechos a la derecha (naranja)
   lechos.forEach((Le, i) => {
     if (!(+Le.n > 0)) return

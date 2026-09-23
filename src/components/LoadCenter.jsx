@@ -299,7 +299,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
       if (s.esColumna) {
         const idx = addColumn({ nombre: s.nombre, ...(s.ancho ? { b: s.ancho, h: s.peralte } : {}) })
         setColEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, mapping: 'M33X', points: g.points })
-        try { p = proponerColumna(useColumnStore.getState().columns[idx]) } catch (e) { console.error(e) }
+        // la altura (para la zona de estribos de los extremos): el tramo más largo del grupo
+        const H = Math.max(0, ...g.perfil.members.map((m) => +m.Lreport || 0)) || null
+        try { p = proponerColumna(useColumnStore.getState().columns[idx], { H }) } catch (e) { console.error(e) }
         if (p && Object.keys(p.patch).length) patchColumnAt(idx, p.patch)
       } else {
         const idx = addSection({ nombre: s.nombre, ...(s.ancho ? { ancho: s.ancho, peralte: s.peralte } : {}) })

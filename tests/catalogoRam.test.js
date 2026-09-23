@@ -2,23 +2,34 @@ import { describe, it, expect } from 'vitest'
 import { SECCIONES_RAM, MATERIALES_RAM, materialRam, enCatalogo, nombreSeccionRam, RECUB_RAM } from '../src/core/catalogoRam.js'
 
 describe('catálogo de secciones para RAM', () => {
-  it('las 20 de uso corriente, sin repetidas y con s = 3 cm', () => {
-    expect(SECCIONES_RAM).toHaveLength(20)
-    const claves = SECCIONES_RAM.map((s) => `${s.b}x${s.h}`)
-    expect(new Set(claves).size).toBe(20)
+  it('21 vigas (con la nervadura) y 3 columnas, sin repetidas y con s = 3 cm', () => {
+    const vigas = SECCIONES_RAM.filter((s) => s.tipo === 'viga')
+    const cols = SECCIONES_RAM.filter((s) => s.tipo === 'columna')
+    expect(vigas).toHaveLength(21)
+    expect(cols.map((s) => s.nombre)).toEqual(['15 X 15', '25 X 10', '36 X 36'])
+    const claves = SECCIONES_RAM.map((s) => `${s.tipo}${s.b}x${s.h}`)
+    expect(new Set(claves).size).toBe(24)
     expect(SECCIONES_RAM.every((s) => s.s === 3)).toBe(true)
     expect(RECUB_RAM).toBe(3)
   })
 
-  it('se nombran como en RAM', () => {
-    expect(nombreSeccionRam(15, 15)).toBe('15 X 15')
-    expect(SECCIONES_RAM[0].nombre).toBe('15 X 20')
+  it('cada una sabe en qué tabla de RAM va', () => {
+    expect(SECCIONES_RAM.find((s) => s.nombre === '10 X 25').tabla).toBe('Vigas de Concreto')
+    expect(SECCIONES_RAM.find((s) => s.nombre === '36 X 36').tabla).toBe('Columnas de Concreto')
   })
 
-  it('sabe qué hay y qué no', () => {
+  it('se nombran como en RAM', () => {
+    expect(nombreSeccionRam(15, 15)).toBe('15 X 15')
+    expect(SECCIONES_RAM[0].nombre).toBe('10 X 25')
+  })
+
+  it('sabe qué hay y qué no, y en qué tabla', () => {
     expect(enCatalogo(15, 25)).toBe(true)
     expect(enCatalogo('25', '50')).toBe(true)
-    expect(enCatalogo(36, 36)).toBe(false)
+    expect(enCatalogo(36, 36)).toBe(true)
+    expect(enCatalogo(36, 36, 'viga')).toBe(false)
+    expect(enCatalogo(36, 36, 'columna')).toBe(true)
+    expect(enCatalogo(40, 40)).toBe(false)
   })
 })
 

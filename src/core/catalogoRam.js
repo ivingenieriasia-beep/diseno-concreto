@@ -15,20 +15,37 @@
 /** s: recubrimiento mecánico que se da de alta en RAM, siempre el mismo */
 export const RECUB_RAM = 3
 
+// RAM guarda cada tipo en su tabla —un archivo por tabla dentro de la carpeta
+// del grupo—, así que cada sección sabe a cuál va:
+//   …\Database\Sections\Personales\Vigas de Concreto.sec
+//   …\Database\Sections\Personales\Columnas de Concreto.sec
+export const TABLA_VIGAS = 'Vigas de Concreto'
+export const TABLA_COLUMNAS = 'Columnas de Concreto'
+
 // b × h en cm. La lista de uso corriente; 25×50 en lugar de un segundo 20×50.
-const MEDIDAS = [
+const VIGAS = [
+  [10, 25],                                                   // nervadura
   [15, 20], [15, 25], [15, 30], [15, 35], [15, 40], [15, 45],
   [20, 20], [20, 25], [20, 30], [20, 35], [20, 40], [20, 45], [20, 50],
   [25, 20], [25, 25], [25, 30], [25, 35], [25, 40], [25, 45], [25, 50],
 ]
+const COLUMNAS = [[15, 15], [25, 10], [36, 36]]
 
 /** Como las nombra RAM en el grupo: «15 X 15» */
 export const nombreSeccionRam = (b, h) => `${b} X ${h}`
 
-export const SECCIONES_RAM = MEDIDAS.map(([b, h]) => ({ b, h, s: RECUB_RAM, nombre: nombreSeccionRam(b, h) }))
+const alta = (tipo, tabla) => ([b, h]) => ({ b, h, s: RECUB_RAM, nombre: nombreSeccionRam(b, h), tipo, tabla })
+export const SECCIONES_RAM = [
+  ...VIGAS.map(alta('viga', TABLA_VIGAS)),
+  ...COLUMNAS.map(alta('columna', TABLA_COLUMNAS)),
+]
 
-/** ¿Está esta sección en el catálogo? (la agrupación sólo propone éstas) */
-export const enCatalogo = (b, h) => SECCIONES_RAM.some((x) => x.b === +b && x.h === +h)
+/**
+ * ¿Está esta sección en el catálogo? (la agrupación sólo propone éstas)
+ * @param tipo 'viga' | 'columna' — sin él, cualquiera de las dos tablas
+ */
+export const enCatalogo = (b, h, tipo = null) =>
+  SECCIONES_RAM.some((x) => x.b === +b && x.h === +h && (!tipo || x.tipo === tipo))
 
 // ── Materiales ───────────────────────────────────────────────
 // NTC-Concreto:
