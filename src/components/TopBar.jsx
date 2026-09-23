@@ -20,6 +20,13 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
   const selectedIdx = useBeamStore((s) => s.selectedIdx)
   const selectSection = useBeamStore((s) => s.selectSection)
   const removeSection = useBeamStore((s) => s.removeSection)
+  // un clic que empieza en el tache no arrastra el chip, y borrar pide confirmación
+  const desdeTache = useRef(false)
+  const borrarSeccion = (i, nombre) => {
+    desdeTache.current = false
+    if (!window.confirm(`¿Seguro que quieres eliminar la sección «${nombre}»? Se pierden su armado y sus demandas (lo guardado en proyecto.json no se toca).`)) return
+    removeSection(i)
+  }
   const createSection = useBeamStore((s) => s.createSection)
   const moveSection = useBeamStore((s) => s.moveSection)
   const setEnvelopeAt = useBeamStore((s) => s.setEnvelopeAt)
@@ -265,6 +272,7 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
               tabIndex={0}
               title="Arrástralo para cambiarlo de lugar en el tablero (Alt + ← / → con el teclado)"
               onDragStart={(e) => {
+                if (desdeTache.current) { e.preventDefault(); desdeTache.current = false; return }
                 setArrastre({ from: i, over: i, lado: 'der' })
                 e.dataTransfer.effectAllowed = 'move'
                 e.dataTransfer.setData('text/plain', String(i))   // Firefox necesita datos
@@ -298,7 +306,11 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
               {s.nombre || `S-${i + 1}`}
               <span
                 className="chip-x"
-                onClick={(e) => { e.stopPropagation(); removeSection(i) }}
+                data-testid={`chip-x-${i}`}
+                title="Eliminar la sección"
+                onMouseDown={() => { desdeTache.current = true }}
+                onMouseUp={() => { desdeTache.current = false }}
+                onClick={(e) => { e.stopPropagation(); borrarSeccion(i, s.nombre || `S-${i + 1}`) }}
               >&times;</span>
             </span>
           )

@@ -117,7 +117,11 @@ const BLOQUE_AGRUPACION = /^AGRUPACION = \{[\s\S]*?\n\}\n/m
  * El aplicar_agrupacion.py con la propuesta elegida dentro.
  * @param propuesta  { nombre, grupos:[{ nombre, sec:{nombre}, miembros:[ids] }] }
  */
-export function generarAplicarAgrupacion(propuesta) {
+/**
+ * @param propuesta          una propuesta (o el acomodo manual)
+ * @param opts.carpetaDeshacer  ruta de Windows donde el script deja su «Deshacer» (1 Agrupación del proyecto)
+ */
+export function generarAplicarAgrupacion(propuesta, { carpetaDeshacer = '' } = {}) {
   if (!BLOQUE_AGRUPACION.test(APLICAR)) {
     return { ok: false, aviso: 'La plantilla de aplicar_agrupacion.py ya no trae el bloque AGRUPACION.' }
   }
@@ -130,6 +134,10 @@ export function generarAplicarAgrupacion(propuesta) {
       miembros: g.miembros.map((id) => Number(id)).filter((n) => Number.isFinite(n)),
     })),
   }
-  const texto = APLICAR.replace(BLOQUE_AGRUPACION, `AGRUPACION = ${JSON.stringify(datos, null, 1)}\n`)
+  let texto = APLICAR.replace(BLOQUE_AGRUPACION, `AGRUPACION = ${JSON.stringify(datos, null, 1)}\n`)
+  const destino = normalizarRuta(carpetaDeshacer || '').replace(/\\/g, '/')
+  if (destino && esRutaWindows(destino.replace(/\//g, '\\')) && !destino.includes("'")) {
+    texto = texto.replace(/^CARPETA_DESHACER = None$/m, `CARPETA_DESHACER = u'${destino}'`)
+  }
   return { ok: true, nombre: 'aplicar_agrupacion.py', texto }
 }

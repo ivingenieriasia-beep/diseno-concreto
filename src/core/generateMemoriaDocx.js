@@ -18,6 +18,7 @@ import { columnDemand, demandCase } from './columnDemand'
 import { columnSectionSvgString, interactionSvgString } from './columnsSvg'
 import { analyzeGroup, unitLabel } from './longitudinal'
 import { elevationSvg, diagramSvg } from './longitudinalSvg'
+import { guardarSalida } from './carpeta'
 
 // ── palette ──
 const TEAL = '4ECAC4', INK = '0F172A', GREY = '6B7280', SUB = '334155'
@@ -498,9 +499,6 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
 
   const blob = await Packer.toBlob(doc)
   const name = (M.proyecto || 'memoria').trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '') || 'memoria'
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `MEMORIA-${name}.docx`
-  a.click()
-  URL.revokeObjectURL(a.href)
+  // en 2 Salidas\Memoria si la carpeta de la obra está conectada; si no, se descarga
+  return guardarSalida(`MEMORIA-${name}.docx`, blob, { sub: 'memoria', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
 }

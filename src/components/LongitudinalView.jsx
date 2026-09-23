@@ -3,6 +3,7 @@ import useBeamStore from '../store/useBeamStore'
 import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios, extraDe, compartidosCon, perfilCompleto } from '../core/longitudinal'
 import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches } from '../core/geometry'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
+import { guardarSalida, dondeQuedo } from '../core/carpeta'
 import { svgToDxf } from '../core/svgToDxf'
 import { parseRamEnvelope } from '../core/ramParser'
 import { parseRamActions, looksLikeActions } from '../core/ramActions'
@@ -277,13 +278,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '', onAbr
   }
 
   // ── DXF de alzados (aparte del DXF de secciones de la barra) ──
-  function download(content, filename, mime = 'text/plain') {
-    const blob = new Blob([content], { type: mime })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
-    URL.revokeObjectURL(url)
-  }
-  function exportElevations(scope) {
+  async function exportElevations(scope) {
     const list = scope === 'all' ? sections.filter((t) => t.perfil?.members?.length) : [form]
     let inner = '', W = 0, H = 0, n = 0
     for (const t of list) {
@@ -298,8 +293,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '', onAbr
     const wCm = (W / 14).toFixed(4), hCm = (H / 14).toFixed(4)
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${wCm}cm" height="${hCm}cm" data-real-width-cm="${wCm}" data-real-height-cm="${hCm}" style="font-family:'DM Mono',monospace">${inner}</svg>`
     const base = (projectName.trim() ? `alzados-${projectName.trim().replace(/\s+/g, '-')}` : 'alzados') + (scope === 'all' ? '' : `-${(form.nombre || 'trabe').replace(/\s+/g, '-')}`)
-    download(svgToDxf(svg, { scaleFactor: dxfScale }), `${base}.dxf`, 'application/dxf')
-    setMsg(`DXF de alzados generado: ${n} patrón(es) de ${list.length} trabe(s), a escala real (1 unidad = 1 cm${dxfScale !== 1 ? `, factor ${dxfScale}` : ''}).`)
+    const g = await guardarSalida(`${base}.dxf`, svgToDxf(svg, { scaleFactor: dxfScale }), { sub: 'planos', mime: 'application/dxf' })
+    setMsg(`DXF de alzados ${dondeQuedo(g)}: ${n} patrón(es) de ${list.length} trabe(s), a escala real (1 unidad = 1 cm${dxfScale !== 1 ? `, factor ${dxfScale}` : ''}).`)
   }
 
   // Anota en la trabe los bastones PUNTUALES que reparte el análisis. No van al

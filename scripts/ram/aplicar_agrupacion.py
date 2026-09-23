@@ -7,7 +7,8 @@ Pone a cada miembro su descripción (T1, T2…) y su sección del catálogo.
 Antes de tocar nada:
   · comprueba que TODAS las secciones existen en la base de datos de RAM;
     si falta una, no cambia ningún miembro (corre antes instalar_catalogo.py);
-  · deja en el Escritorio un «Deshacer agrupación ….py» que devuelve cada
+  · deja en la carpeta «1 Agrupación» del proyecto (o, si no la hay, en el
+    Escritorio) un «Deshacer agrupación ….py» que devuelve cada
     miembro a la descripción y la sección que tenía.
 
 Después: vuelve a correr el análisis y sincroniza. Las secciones nuevas
@@ -28,6 +29,9 @@ AGRUPACION = {
  "grupos": []
 }
 # ── fin de la agrupación
+
+# Dónde dejar el «Deshacer» (lo pone la app: PROCESO\Auxiliar IV\1 Agrupación)
+CARPETA_DESHACER = None
 
 
 def log(*a):
@@ -114,7 +118,8 @@ def principal():
                 continue
             antes[str(i)] = [u'%s' % (mb.description or u''), u'%s' % (mb.section or u'')]
     fecha = time.strftime('%Y-%m-%d %H.%M')
-    ruta = os.path.join(escritorio(), u'Deshacer agrupación %s.py' % fecha)
+    donde = CARPETA_DESHACER if CARPETA_DESHACER and os.path.isdir(CARPETA_DESHACER) else escritorio()
+    ruta = os.path.join(donde, u'Deshacer agrupación %s.py' % fecha)
     with open(ruta, 'wb') as f:
         f.write((DESHACER % {'fecha': fecha, 'antes': json.dumps(antes, ensure_ascii=False, indent=0)}).encode('utf-8'))
     log(u'Para deshacerlo: %s' % ruta)

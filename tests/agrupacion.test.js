@@ -107,6 +107,14 @@ describe('las tres propuestas', () => {
     }
   })
 
+  it('el «Deshacer» va a la carpeta 1 Agrupación de la obra si la app la conoce; si no, al Escritorio', () => {
+    const P = A.propuestas[1]
+    expect(generarAplicarAgrupacion(P).texto).toMatch(/^CARPETA_DESHACER = None$/m)
+    const r = generarAplicarAgrupacion(P, { carpetaDeshacer: 'C:\\Obras\\RS-Acacia\\PROCESO\\Auxiliar IV\\1 Agrupación' })
+    expect(r.texto).toMatch(/^CARPETA_DESHACER = u'C:\/Obras\/RS-Acacia\/PROCESO\/Auxiliar IV\/1 Agrupación'$/m)
+    expect(generarAplicarAgrupacion(P, { carpetaDeshacer: "C:\\x\\l'obra" }).texto).toMatch(/^CARPETA_DESHACER = None$/m)
+  })
+
   it('el aplicar_agrupacion.py lleva cada miembro, con ids enteros y secciones del catálogo', () => {
     const P = A.propuestas[1]
     const r = generarAplicarAgrupacion(P)

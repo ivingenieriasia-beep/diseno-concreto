@@ -9,9 +9,10 @@ import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta, generar
 import { SECCIONES_RAM, MATERIALES_RAM } from '../core/catalogoRam'
 import { proponerTrabe, proponerColumna } from '../core/propuesta'
 import {
-  puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta,
+  puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta, guardarCarpeta, modeloGuardado,
   guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
 } from '../core/ramSync'
+import { setCarpetaActiva, asegurarArbol, escribir, respaldarModelo, rutaLegible } from '../core/carpeta'
 
 // Centro de carga: un solo lugar para meter todo lo que sale de RAM, con el
 // manual al lado — qué reporte pedir, con qué parámetros y qué llena cada uno.
@@ -94,7 +95,15 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const [configAbierta, setConfigAbierta] = useState(!useBeamStore.getState().rutaRam)
 
   // La carpeta se eligió una vez y el navegador la recuerda entre sesiones
-  useEffect(() => { carpetaGuardada().then(setCarpeta) }, [])
+  // …y se recuerda por proyecto: la llave es la ruta de Windows de la obra
+  useEffect(() => { carpetaGuardada(rutaRam || '').then(setCarpeta) }, [rutaRam])
+  const [escribible, setEscribible] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    if (!carpeta) { setEscribible(false); return }
+    permisoDe(carpeta, false, 'readwrite').then((p) => { if (vivo) setEscribible(p === 'granted') })
+    return () => { vivo = false }
+  }, [carpeta])
   useEffect(() => { setRuta(rutaRam || '') }, [rutaRam])
 
   const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
@@ -260,11 +269,32 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   // porque va en caja de arena. Así que la ruta se pega aquí una vez por
   // proyecto: aquí es natural pegarla, y aquí la escribimos nosotros en el
   // .py sin que se pueda romper.
-  function generarScript() {
+  // Con la carpeta: se elige una vez (aquí mismo), se le hace su árbol y el
+  // script queda dentro. Sin la API de carpetas, se descarga como siempre.
+  async function generarScript() {
     const r = generarScriptRam(ruta, { proyecto: projectName })
     if (!r.ok) { setAvisoRuta(r.aviso); return }
     setAvisoRuta('')
+    let h = carpeta
+    try {
+      if (!h && puedeRecordar()) h = (await elegirCarpeta(r.ruta)).handle
+      else if (h) await guardarCarpeta(h, r.ruta)       // la misma carpeta, ahora con la ruta del proyecto
+    } catch (e) {
+      if (e?.name !== 'AbortError') setMsg(`No se pudo usar la carpeta: ${e.message}`)
+      h = null
+    }
+    if (h) setCarpeta(h)
     setRutaRam(r.ruta)
+    if (h && (await permisoDe(h, true, 'readwrite')) === 'granted') {
+      try {
+        await asegurarArbol(h)
+        await escribir(h, [], r.nombre, r.texto)
+        setCarpetaActiva(h, r.ruta)
+        setEscribible(true)
+        setMsg(`${r.nombre} guardado en ${rutaLegible(h, [], r.nombre)}, con su árbol (1 Agrupación, 2 Salidas, 3 Respaldos). En RAM: Abrir Script… → Ctrl+R.`)
+        return
+      } catch (e) { setMsg(`No se pudo escribir en la carpeta (${e.message}); se descarga.`) }
+    }
     descargar(r)
     setMsg(`${r.nombre} descargado. Déjalo en «${nombreCarpeta(r.ruta)}» y ábrelo en la consola de Python de RAM.`)
   }
@@ -349,21 +379,35 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
     setOcupado('Leyendo la carpeta…')
     try {
       let h = carpeta
-      if (!h) { h = await elegirCarpeta(); setCarpeta(h) }
-      const permiso = await permisoDe(h, true)
+      if (!h) { h = (await elegirCarpeta(rutaRam || '')).handle; setCarpeta(h) }
+      // con permiso de edición la app también guarda ahí; si no, basta con leer
+      let permiso = await permisoDe(h, true, 'readwrite')
+      const puedeEscribirAqui = permiso === 'granted'
+      if (!puedeEscribirAqui) permiso = await permisoDe(h, true, 'read')
       if (permiso !== 'granted') {
         setOcupado('')
         setMsg('El navegador no dio permiso para leer la carpeta. Vuelve a elegirla.')
         return
       }
+      setEscribible(puedeEscribirAqui)
+      if (puedeEscribirAqui) {
+        setCarpetaActiva(h, rutaRam || '')
+        try { await asegurarArbol(h) } catch { /* el árbol no es indispensable para leer */ }
+      }
       const archivos = await recorrerCarpeta(h)
       if (!archivos.length) {
         setOcupado(''); setMsg(`No hay archivos legibles en «${h.name}».`); return
       }
+      const previo = await modeloGuardado()
       const c = cambios(archivos)
       await cargar(archivos, resumenSync(c, archivos.length))
       guardarSync(h.name, archivos)
       setSync(ultimaSync())
+      // el modelo que se acaba de reemplazar, a 3 Respaldos
+      const nuevo = archivos.find((a) => !a.carpeta && a.nombre.toLowerCase() === 'modelo.json')
+      if (puedeEscribirAqui && previo?.datos && nuevo) {
+        try { if ((await nuevo.file.text()) !== previo.datos) await respaldarModelo(previo.datos, previo.at) } catch { /* nunca estorba */ }
+      }
     } catch (e) {
       if (e?.name !== 'AbortError') setMsg(`No se pudo sincronizar: ${e.message}`)
     } finally { setOcupado('') }
@@ -471,12 +515,15 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               )}
             <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
               {carpeta
-                ? <>Carpeta recordada: <b>{carpeta.name}</b>{sync?.at ? ` · sincronizada ${hace(sync.at)}` : ''}. Corre el script en RAM y dale a sincronizar.</>
+                ? <>Carpeta recordada: <b>{carpeta.name}</b>{sync?.at ? ` · sincronizada ${hace(sync.at)}` : ''}. Corre el script en RAM y dale a sincronizar.
+                    <span data-testid="carpeta-escribible" style={{ color: escribible ? '#15803d' : 'var(--color-tx3)' }}>
+                      {escribible ? ' ✓ La app guarda aquí el proyecto, las salidas y los respaldos.' : ' (La app sólo la lee: al sincronizar, acepta el permiso de edición para que guarde aquí.)'}
+                    </span></>
                 : <>Corre <b>sincronizar.py</b> en la consola de Python de RAM y elige aquí la carpeta: se recuerda, y a partir de entonces es un clic.</>}
             </span>
             {carpeta && (
               <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: 'var(--color-tx3)', textDecoration: 'underline' }}
-                data-testid="olvidar-carpeta" onClick={() => { olvidarCarpeta(); setCarpeta(null); setSync(null) }}>
+                data-testid="olvidar-carpeta" onClick={() => { olvidarCarpeta(rutaRam || ''); setCarpeta(null); setSync(null); setCarpetaActiva(null) }}>
                 olvidar
               </button>
             )}
@@ -493,8 +540,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 : <span style={{ fontWeight: 400, color: '#92400e', marginLeft: 8, fontSize: 10.5 }}>sin configurar</span>}
             </summary>
             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-tx2)', lineHeight: 1.6 }}>
-              Pega aquí la ruta de la carpeta del proyecto y la app te arma el <b>sincronizar.py</b> con esa
-              ruta ya dentro. Se guarda con el proyecto, así que al cambiar de obra cambia sola.
+              Pega aquí la ruta de la carpeta <b>Auxiliar IV</b> de la obra (<code>PROCESO\Auxiliar IV</code>) y dale a
+              Generar: eliges esa misma carpeta una vez, la app le hace su árbol (1 Agrupación, 2 Salidas, 3 Respaldos) y deja
+              ahí el <b>sincronizar.py</b> con la ruta ya dentro. Se guarda con el proyecto, así que al cambiar de obra cambia sola.
               <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 4, lineHeight: 1.65 }}>
                 <b>Es la misma carpeta que eliges arriba, pero no es el mismo gesto</b>, y por eso hay que
                 hacer los dos: el botón de arriba le da al <b>navegador</b> permiso para <b>leer</b> ahí
@@ -505,7 +553,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
                 <input data-testid="ruta-ram" value={ruta} onChange={(e) => { setRuta(e.target.value); setAvisoRuta('') }}
-                  placeholder="C:\\Users\\...\\PROCESO\\Reportes de Secciones RAM"
+                  placeholder="C:\\Users\\...\\PROCESO\\Auxiliar IV"
                   style={{
                     flex: '1 1 340px', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '5px 8px',
                     borderRadius: 5, border: `1px solid ${avisoRuta ? '#ef9a9a' : 'var(--color-border)'}`,
@@ -513,7 +561,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                   }} />
                 <button className="btn btn-primary" style={{ fontSize: 10.5 }} data-testid="generar-script"
                   disabled={!esRutaWindows(ruta)} onClick={() => generarScript()}>
-                  ⬇ Generar sincronizar.py
+                  {carpeta || puedeRecordar() ? '⬇ Generar sincronizar.py en la carpeta' : '⬇ Generar sincronizar.py'}
                 </button>
               </div>
               {avisoRuta && <div data-testid="aviso-ruta" style={{ color: '#c62828', fontSize: 10.5, marginTop: 5 }}>{avisoRuta}</div>}

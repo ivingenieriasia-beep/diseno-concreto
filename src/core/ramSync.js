@@ -74,42 +74,74 @@ export async function olvidarModelo() {
   try { await idb('readwrite', (s) => s.delete(CLAVE_MODELO), DATOS) } catch { /* da igual */ }
 }
 
-export async function guardarCarpeta(handle) {
-  try { await idb('readwrite', (s) => s.put(handle, CLAVE)); return true } catch { return false }
+// La carpeta se recuerda POR PROYECTO, con la ruta de Windows del proyecto
+// como llave: así, al cambiar de obra, la app no escribe en la carpeta de otra.
+// Sin ruta configurada queda la llave de siempre.
+const claveDe = (ruta) => {
+  const r = String(ruta || '').trim().replace(/[\\/]+/g, '\\').replace(/\\$/, '').toLowerCase()
+  return r ? `${CLAVE}::${r}` : CLAVE
 }
 
-export async function carpetaGuardada() {
-  try { return (await idb('readonly', (s) => s.get(CLAVE))) || null } catch { return null }
+// Si el navegador no deja guardarla (ventana privada…), al menos se recuerda en la sesión
+const enSesion = new Map()
+
+export async function guardarCarpeta(handle, ruta = '') {
+  enSesion.set(claveDe(ruta), handle)
+  try { await idb('readwrite', (s) => s.put(handle, claveDe(ruta))); return true } catch { return false }
 }
 
-export async function olvidarCarpeta() {
-  try { await idb('readwrite', (s) => s.delete(CLAVE)) } catch { /* da igual */ }
+export async function carpetaGuardada(ruta = '') {
+  try {
+    const h = await idb('readonly', (s) => s.get(claveDe(ruta)))
+    if (h) return h
+  } catch { /* se busca en la sesión */ }
+  return enSesion.get(claveDe(ruta)) || null
+}
+
+export async function olvidarCarpeta(ruta = '') {
+  enSesion.delete(claveDe(ruta))
+  try { await idb('readwrite', (s) => s.delete(claveDe(ruta))) } catch { /* da igual */ }
   try { localStorage.removeItem(META) } catch { /* da igual */ }
 }
 
 /**
- * Permiso de lectura sobre la carpeta. `pedir` sólo puede ir en true dentro de
- * un gesto del usuario (el clic en Sincronizar), que es cuando el navegador
- * deja mostrar el diálogo.
+ * Permiso sobre la carpeta: 'read' para sincronizar, 'readwrite' para guardar
+ * en ella. `pedir` sólo puede ir en true dentro de un gesto del usuario (un
+ * clic), que es cuando el navegador deja mostrar el diálogo.
  * @returns 'granted' | 'prompt' | 'denied'
  */
-export async function permisoDe(handle, pedir = false) {
+export async function permisoDe(handle, pedir = false, mode = 'read') {
   if (!handle?.queryPermission) return 'granted'          // navegador viejo: que lo intente
   try {
-    const q = await handle.queryPermission({ mode: 'read' })
+    const q = await handle.queryPermission({ mode })
     if (q === 'granted' || !pedir) return q
-    return await handle.requestPermission({ mode: 'read' })
+    return await handle.requestPermission({ mode })
   } catch { return 'denied' }
 }
 
-/** Pide la carpeta al usuario y la recuerda */
-export async function elegirCarpeta() {
-  const handle = await window.showDirectoryPicker({ id: 'reportes-ram', mode: 'read' })
-  await guardarCarpeta(handle)
-  return handle
+/** El nombre de la carpeta de la app dentro de PROCESO */
+export const CARPETA_APP = 'Auxiliar IV'
+
+/**
+ * Pide la carpeta al usuario (con permiso de escritura) y la recuerda para
+ * este proyecto. Si eligió PROCESO, se usa (o se crea) «Auxiliar IV» adentro.
+ * @returns { handle, creada:boolean, deProceso:boolean }
+ */
+export async function elegirCarpeta(ruta = '') {
+  let handle = await window.showDirectoryPicker({ id: 'auxiliar-iv', mode: 'readwrite' })
+  let deProceso = false
+  if (handle.name.toUpperCase() === 'PROCESO') {
+    handle = await handle.getDirectoryHandle(CARPETA_APP, { create: true })
+    deProceso = true
+  }
+  await guardarCarpeta(handle, ruta)
+  return { handle, deProceso }
 }
 
 const LEIBLE = /\.(json|txt|csv|xlsx)$/i
+// Lo que la app misma escribe en la carpeta no son reportes de RAM
+const NO_SINCRONIZAR = new Set(['1 agrupación', '1 agrupacion', '2 salidas', '3 respaldos'])
+const NO_ES_REPORTE = new Set(['proyecto.json'])
 
 /**
  * Recorre la carpeta y sus subcarpetas (COLUMNAS / LONGITUDINAL / MAXIMOS…).
@@ -120,8 +152,12 @@ export async function recorrerCarpeta(dir, { profundidad = 4 } = {}) {
   const bajar = async (h, carpeta, nivel) => {
     if (nivel > profundidad) return
     for await (const entry of h.values()) {
-      if (entry.kind === 'directory') { await bajar(entry, entry.name, nivel + 1); continue }
+      if (entry.kind === 'directory') {
+        if (nivel === 0 && NO_SINCRONIZAR.has(entry.name.toLowerCase())) continue
+        await bajar(entry, entry.name, nivel + 1); continue
+      }
       if (!LEIBLE.test(entry.name)) continue
+      if (nivel === 0 && NO_ES_REPORTE.has(entry.name.toLowerCase())) continue
       try { out.push({ nombre: entry.name, carpeta, file: await entry.getFile() }) } catch { /* archivo en la nube */ }
     }
   }

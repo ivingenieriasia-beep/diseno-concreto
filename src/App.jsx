@@ -26,16 +26,8 @@ import { initGlobalDB, getDB, getStats, onDBChange } from './core/globalDB'
 import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, listRecents, timeAgo, debounce, isEmptyProject } from './core/autosave'
 import { buildDcheck } from './core/dcheckExport'
 import { analyzeGroup, perfilCompleto } from './core/longitudinal'
-
-function download(content, filename, mime = 'text/plain') {
-  const blob = new Blob([content], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
+import { carpetaGuardada } from './core/ramSync'
+import { setCarpetaActiva, guardarSalida, guardarProyecto, dondeQuedo } from './core/carpeta'
 
 // Guardar en localStorage con un pequeño retraso para no escribir en cada tecla
 const autosave = debounce((p) => saveSnapshot(p), 600)
@@ -175,25 +167,37 @@ export default function App() {
     ? `secciones-${projectName.trim().replace(/\s+/g, '-')}`
     : 'secciones'
 
-  const handleExportSvg = useCallback(() => {
+  // La carpeta de la obra (PROCESO\Auxiliar IV) se recuerda con la ruta del
+  // proyecto: al abrir otra obra, se conecta la suya o ninguna.
+  useEffect(() => {
+    let vivo = true
+    carpetaGuardada(rutaRam || '').then((h) => { if (vivo) setCarpetaActiva(rutaRam ? h : null, rutaRam || '') })
+    return () => { vivo = false }
+  }, [rutaRam])
+
+  const handleExportSvg = useCallback(async () => {
     const str = getSvgString(false)
     if (!str) return
-    download(str, `${fileName}.svg`, 'image/svg+xml')
-  }, [getSvgString, fileName])
+    const r = await guardarSalida(`${fileName}.svg`, str, { sub: 'planos', mime: 'image/svg+xml' })
+    if (r.donde === 'carpeta') showToast(`SVG ${dondeQuedo(r)}`)
+  }, [getSvgString, fileName, showToast])
 
-  const handleExportDxf = useCallback(() => {
+  const handleExportDxf = useCallback(async () => {
     const str = getSvgString(true)
     if (!str) return
     const dxf = svgToDxf(str, { scaleFactor: dxfScale })
-    download(dxf, `${fileName}.dxf`, 'application/dxf')
-  }, [getSvgString, dxfScale, fileName])
+    const r = await guardarSalida(`${fileName}.dxf`, dxf, { sub: 'planos', mime: 'application/dxf' })
+    if (r.donde === 'carpeta') showToast(`DXF ${dondeQuedo(r)}`)
+  }, [getSvgString, dxfScale, fileName, showToast])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam })
-    download(JSON.stringify(data, null, 2), `${fileName}.json`, 'application/json')
+    const r = await guardarProyecto(data, `${fileName}.json`)
+    if (r.cancelado) { showToast('No se guardó: la carpeta tiene otro proyecto', 'warn'); return }
     pushRecent(data)
     setRecents(listRecents())
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, fileName])
+    if (r.donde === 'carpeta') showToast(`Proyecto ${dondeQuedo(r)} · el anterior quedó en 3 Respaldos`)
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, fileName, showToast])
 
   // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
   // geometría pegada el análisis va por elemento completo (y las zonas de
@@ -207,8 +211,9 @@ export default function App() {
   const handleVerifyResumido = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
     const doc = generateReport(seccionesConGeometria, projectName, columns)
-    doc.save(`${fileName}-verificacion.pdf`)
-  }, [seccionesConGeometria, sections.length, columns, projectName, fileName])
+    guardarSalida(`${fileName}-verificacion.pdf`, doc.output('blob'), { sub: 'memoria', mime: 'application/pdf' })
+      .then((r) => { if (r.donde === 'carpeta') showToast(`Verificación ${dondeQuedo(r)}`) })
+  }, [seccionesConGeometria, sections.length, columns, projectName, fileName, showToast])
 
   const handleVerifyDetallado = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
@@ -220,8 +225,9 @@ export default function App() {
     if (sections.length === 0 && columns.length === 0) return
     const data = buildDcheck({ projectName, sections, columns })
     const stamp = (projectName.trim() || 'proyecto').replace(/\s+/g, '_')
-    download(JSON.stringify(data), `DoubleCheck_${stamp}.dcheck`, 'application/json')
-    showToast(`Double Check exportado · ${data.sections.length} elemento(s) prellenados; falta añadir las capturas`)
+    guardarSalida(`DoubleCheck_${stamp}.dcheck`, JSON.stringify(data), { sub: 'dcheck', mime: 'application/json' }).then((r) => {
+      showToast(`Double Check ${r.donde === 'carpeta' ? dondeQuedo(r) : 'exportado'} · ${data.sections.length} elemento(s) prellenados; falta añadir las capturas`)
+    })
   }, [sections, columns, projectName, showToast])
 
   const handleOpen = useCallback(() => {

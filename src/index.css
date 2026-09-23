@@ -164,8 +164,10 @@ input[type="number"] { -moz-appearance: textfield; }
   line-height: 1;
   opacity: 0.6;
   margin-left: 2px;
+  padding: 0 2px;
+  cursor: default;            /* el chip se arrastra (mano); el tache borra (flecha) */
 }
-.chip .chip-x:hover { opacity: 1; }
+.chip .chip-x:hover { opacity: 1; color: #c62828; }
 .chip[draggable='true'] { cursor: grab; }
 .chip.dragging { opacity: 0.4; cursor: grabbing; }
 .chip.drop-left { box-shadow: -3px 0 0 0 var(--color-accent); }

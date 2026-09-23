@@ -6,6 +6,8 @@ import {
 } from '../core/agrupacion'
 import { generarAplicarAgrupacion } from '../core/ramScript'
 import AgrupacionManual from './AgrupacionManual'
+import useBeamStore from '../store/useBeamStore'
+import { guardarSalida, dondeQuedo, sello } from '../core/carpeta'
 
 // Agrupación: de un modelo sin agrupar a unas pocas T. Tres propuestas con su
 // sección, su armado verificado y el script para aplicarlas en RAM; o un
@@ -226,20 +228,19 @@ export default function AgrupacionView({ onToast }) {
     if (f) usar(await f.text(), f.name, f.lastModified)
   }
 
-  const bajar = () => {
+  const rutaRam = useBeamStore((s) => s.rutaRam)
+  const bajar = async () => {
     const P = mostrada
     if (!P) return
     if (!P.grupos.length) { setAviso('El acomodo no tiene ningún grupo con trabes.'); return }
     if (problemas.length) { setAviso(problemas.join(' ')); return }
     setAviso('')
-    const r = generarAplicarAgrupacion(P)
+    // el «Deshacer» que deja el script va a la carpeta 1 Agrupación de la obra
+    const r = generarAplicarAgrupacion(P, { carpetaDeshacer: rutaRam ? `${rutaRam}\\1 Agrupación` : '' })
     if (!r.ok) { setAviso(r.aviso); return }
-    const url = URL.createObjectURL(new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = r.nombre
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    onToast?.(`${r.nombre} descargado: en RAM, Abrir Script… → Ctrl+R`, 'ok')
+    const nombre = `aplicar_agrupacion ${sello()}.py`
+    const g = await guardarSalida(nombre, new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }), { sub: 'agrupacion' })
+    onToast?.(`${nombre} ${dondeQuedo(g)}: en RAM, Abrir Script… → Ctrl+R`, 'ok')
   }
 
   const conmuta = (set, v) => { const s = new Set(set); if (s.has(v)) s.delete(v); else s.add(v); return s }

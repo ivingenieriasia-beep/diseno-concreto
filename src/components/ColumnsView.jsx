@@ -15,6 +15,12 @@ export default function ColumnsView() {
   const selectColumn = useColumnStore((s) => s.selectColumn)
   const createColumn = useColumnStore((s) => s.createColumn)
   const removeColumn = useColumnStore((s) => s.removeColumn)
+  const desdeTache = useRef(false)
+  const borrarColumna = (i, nombre) => {
+    desdeTache.current = false
+    if (!window.confirm(`¿Seguro que quieres eliminar la columna «${nombre}»? Se pierden su armado y sus demandas (lo guardado en proyecto.json no se toca).`)) return
+    removeColumn(i)
+  }
   const moveColumn = useColumnStore((s) => s.moveColumn)
   const form = useColumnStore((s) => s.form)
   const setEnvelope = useColumnStore((s) => s.setEnvelope)
@@ -93,7 +99,10 @@ export default function ColumnsView() {
               draggable
               tabIndex={0}
               title="Arrástralo para cambiarlo de lugar (Alt + ← / → con el teclado). El orden es el del tablero y el del DXF"
-              onDragStart={(e) => { setArrastre({ from: i, over: i, lado: 'der' }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)) }}
+              onDragStart={(e) => {
+                if (desdeTache.current) { e.preventDefault(); desdeTache.current = false; return }
+                setArrastre({ from: i, over: i, lado: 'der' }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i))
+              }}
               onDragEnd={() => setArrastre(null)}
               onDragOver={(e) => {
                 if (!arrastre) return
@@ -119,7 +128,9 @@ export default function ColumnsView() {
                 if (e.key === 'ArrowRight' && i < columns.length - 1) { e.preventDefault(); moveColumn(i, i + 1) }
               }}>
               {c.nombre || `C-${i + 1}`}
-              <span className="chip-x" onClick={(e) => { e.stopPropagation(); removeColumn(i) }}>&times;</span>
+              <span className="chip-x" data-testid={`col-chip-x-${i}`} title="Eliminar la columna"
+                onMouseDown={() => { desdeTache.current = true }} onMouseUp={() => { desdeTache.current = false }}
+                onClick={(e) => { e.stopPropagation(); borrarColumna(i, c.nombre || `C-${i + 1}`) }}>&times;</span>
             </span>
           )
         })}

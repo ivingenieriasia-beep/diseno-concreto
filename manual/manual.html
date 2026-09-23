@@ -107,6 +107,9 @@
   .indice li b { color: var(--verde); display: inline-block; width: 16pt; }
   .etiqueta { display: inline-block; font-size: 7.6pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1pt 5pt; border-radius: 3pt; background: var(--verde); color: #fff; vertical-align: 1pt; }
   .gris { color: var(--gris); }
+  .arbol { font-family: 'DM Mono', monospace; font-size: 8.6pt; line-height: 1.55; background: var(--fondo); border: 1px solid var(--linea); border-radius: 7px; padding: 9pt 12pt; margin: 8pt 0 12pt; white-space: pre; break-inside: avoid; }
+  .arbol .c { color: var(--gris); }
+  .arbol b { color: var(--verde-2); }
   .pequeno { font-size: 8.8pt; }
 </style>
 </head>
@@ -147,8 +150,8 @@
       <div class="cuando">Una vez por proyecto</div>
       <h4>Conectar la obra</h4>
       <ol>
-        <li>App: <b>⚙ Configurar RAM</b> → pega la ruta de la carpeta → <b>⬇ Generar sincronizar.py</b>.</li>
-        <li><b>🔄 Elegir la carpeta y sincronizar…</b> → la misma carpeta.</li>
+        <li><b>crear-proyectoiv.bat</b> arma la obra con <code>PROCESO\Auxiliar IV</code> y su árbol.</li>
+        <li>App: <b>⚙ Configurar RAM</b> → pega la ruta de <code>PROCESO\Auxiliar IV</code> → <b>⬇ Generar sincronizar.py en la carpeta</b> → elige esa carpeta.</li>
       </ol>
     </div>
     <div class="c ancho">
@@ -219,7 +222,7 @@
     <thead><tr><th style="width:24%">Script</th><th>Qué hace</th><th style="width:28%">Qué toca</th></tr></thead>
     <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM y los desplazamientos de las trabes para las flechas.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
     <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones y concretos en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
-    <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en el Escritorio.</td></tr>
+    <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en <code>1 Agrupación</code>.</td></tr>
     <tr><td><b>edificio_prueba.py</b></td><td>Construye y analiza un edificio de práctica.</td><td>Sólo un modelo nuevo y vacío.</td></tr>
   </table>
 
@@ -288,25 +291,50 @@
 <!-- ═════════════════════════ 3 ═════════════════════════ -->
 <section class="cap">
   <h2><span class="n">3</span>Preparar un proyecto</h2>
-  <p class="entrada">Una vez por obra. Se trata de que RAM sepa dónde escribir y de que la app tenga permiso para leer ahí: la misma carpeta, dos permisos.</p>
+  <p class="entrada">Una vez por obra. Todo lo de la app vive en una carpeta, <code>PROCESO\Auxiliar IV</code>, con nombres fijos: la app y los scripts saben dónde leer y dónde dejar cada cosa.</p>
+
+  <div class="arbol"><b>RS-Acacia</b>                   <span class="c">← crear-proyectoiv.bat (RS residencial, NI nave, MZ mezzanine)</span>
+├─ RECIBIDO · MONETARIA · ENTREGABLE
+└─ <b>PROCESO</b>
+   └─ <b>Auxiliar IV</b>
+      ├─ proyecto.json         <span class="c">← el proyecto de la app (Guardar)</span>
+      ├─ modelo.json           <span class="c">← lo escribe sincronizar.py</span>
+      ├─ sincronizar.py        <span class="c">← lo deja la app, con esta ruta dentro</span>
+      ├─ 1 Agrupación\         <span class="c">← aplicar_agrupacion y sus «Deshacer»</span>
+      ├─ 2 Salidas\
+      │   ├─ Memoria\          <span class="c">← memoria .docx, verificación PDF</span>
+      │   ├─ Planos\           <span class="c">← DXF, SVG, alzados</span>
+      │   └─ Double Check\     <span class="c">← .dcheck</span>
+      └─ 3 Respaldos\          <span class="c">← proyecto y modelo anteriores, con fecha</span></div>
 
   <ol class="pasos">
-    <li>Guarda el modelo de RAM en su carpeta de la obra; por costumbre, <code>…\PROCESO\Reportes de Secciones RAM</code>.</li>
-    <li>En la app abre el proyecto de la obra (o <b>+ Nueva</b>) → <b>📥 Reportes de RAM</b> → <b>⚡ Desde RAM</b> → <b>⚙ Configurar RAM para este proyecto</b>.</li>
-    <li>Copia la ruta de la carpeta: en el explorador de Windows, <kbd>Mayús</kbd> + clic derecho sobre la carpeta → <b>Copiar como ruta</b>. Pégala en el campo.</li>
-    <li><b>⬇ Generar sincronizar.py</b> y guárdalo en esa carpeta. Lleva la ruta dentro.</li>
-    <li>Arriba, <b>🔄 Elegir la carpeta y sincronizar…</b> → elige la misma carpeta. La app la recuerda; desde entonces sincronizar es un clic.</li>
+    <li>Crea la obra con <b>crear-proyectoiv.bat</b> (en <code>scripts</code> del repositorio de la app; se corre en la carpeta donde van las obras): elige el tipo, escribe el nombre y arma <code>RS-Nombre</code> con sus cuatro carpetas y el árbol de <code>PROCESO\Auxiliar IV</code>. El modelo de RAM (.retx) se queda donde lo guardan siempre.</li>
+    <li>En la app abre el proyecto de la obra (o uno nuevo) → <b>📥 Reportes de RAM</b> → <b>⚡ Desde RAM</b> → <b>⚙ Configurar RAM para este proyecto</b>.</li>
+    <li>Copia la ruta de <code>PROCESO\Auxiliar IV</code>: en el explorador, <kbd>Mayús</kbd> + clic derecho sobre la carpeta → <b>Copiar como ruta</b>. Pégala en el campo.</li>
+    <li><b>⬇ Generar sincronizar.py en la carpeta</b>: se abre el explorador; elige esa misma carpeta (o <code>PROCESO</code>: la app usa, o crea, <code>Auxiliar IV</code> adentro) y acepta que la app <b>edite</b> archivos ahí. Completa el árbol si falta algo y deja dentro el <code>sincronizar.py</code>.</li>
+    <li>Desde entonces la carpeta queda recordada para esta obra: sincronizar es un clic, y <b>Guardar</b>, las salidas y los respaldos van solos a su lugar.</li>
   </ol>
 
   <figure>
     <img src="img/configurar.png" alt="">
-    <figcaption><b>Reportes de RAM → Desde RAM.</b> Arriba el botón que da permiso al navegador; abajo la ruta que va dentro del script, y el instalador del catálogo.</figcaption>
+    <figcaption><b>Reportes de RAM → Desde RAM.</b> Arriba, sincronizar; abajo, la ruta que va dentro del script y el instalador del catálogo.</figcaption>
   </figure>
 
+  <h3>Qué hace la app con la carpeta</h3>
+  <table>
+    <thead><tr><th style="width:34%">Cuando…</th><th>Queda en</th></tr></thead>
+    <tr><td>💾 Guardar</td><td><code>proyecto.json</code>; el que había pasa a <code>3 Respaldos\proyecto &lt;fecha&gt;.json</code>. Si ése era de otra obra, pregunta antes de pisarlo.</td></tr>
+    <tr><td>🔄 Sincronizar con un modelo nuevo</td><td>El <code>modelo.json</code> anterior pasa a <code>3 Respaldos\modelo &lt;fecha&gt;.json</code>. Al sincronizar no se leen <code>1 Agrupación</code>, <code>2 Salidas</code> ni <code>3 Respaldos</code>.</td></tr>
+    <tr><td>⬇ aplicar_agrupacion.py</td><td><code>1 Agrupación\aplicar_agrupacion &lt;fecha&gt;.py</code>; su «Deshacer» también queda ahí.</td></tr>
+    <tr><td>Memoria, verificación, DXF, SVG, alzados, Double Check</td><td><code>2 Salidas\Memoria</code>, <code>\Planos</code> y <code>\Double Check</code>.</td></tr>
+  </table>
+  <p>Se guardan los 30 respaldos más recientes de cada tipo. Un proyecto sin carpeta configurada, o si el navegador no da permiso de edición, descarga como siempre.
+  Chrome o Edge a veces vuelven a pedir el permiso al abrir la app otro día: es un clic.</p>
+
   <div class="caja nota">
-    <span class="t">¿Por qué la carpeta se da dos veces?</span>
-    El botón <b>Elegir la carpeta</b> le da al <b>navegador</b> permiso para leer ahí, pero el navegador nunca le dice a la página la ruta real de lo que elegiste.
-    La ruta que pegas es el texto que va <b>dentro</b> del <code>sincronizar.py</code> para que <b>RAM</b> sepa dónde escribir, porque el Python de RAM no puede abrir un explorador para preguntarlo.
+    <span class="t">¿Por qué se pega la ruta y además se elige la carpeta?</span>
+    Elegirla le da al <b>navegador</b> permiso para leer y escribir ahí, pero el navegador nunca le dice a la página la ruta real.
+    La ruta pegada es el texto que va <b>dentro</b> del <code>sincronizar.py</code> para que <b>RAM</b> sepa dónde escribir, porque el Python de RAM no puede abrir un explorador para preguntarlo.
   </div>
 
   <h4>Cuándo volver a generar sincronizar.py</h4>
@@ -314,7 +342,7 @@
     <li>Si la obra cambia de carpeta (la ruta se guarda con el proyecto: al cambiar de proyecto cambia sola).</li>
     <li>Cuando la app se actualice: el script también mejora (por ejemplo, las medidas reales de las secciones vienen del script nuevo). Si la app dice «medidas deducidas de los nombres», es un script viejo.</li>
   </ul>
-  <p>Para apuntar la app a otra carpeta, usa <b>olvidar carpeta</b> junto al botón de sincronizar y vuelve a elegirla.</p>
+  <p>Para apuntar la obra a otra carpeta, usa <b>olvidar</b> junto al botón de sincronizar y vuelve a elegirla.</p>
 
   <div class="caja nota">
     <span class="t">Método manual</span>
@@ -406,7 +434,7 @@
   <ol class="pasos">
     <li><b>⬇ aplicar_agrupacion.py</b> baja el script con la propuesta elegida (o tu acomodo manual) dentro.</li>
     <li>En RAM, con el modelo abierto: <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b>. Primero comprueba que todas las secciones existan (si falta una no cambia nada y te pide el catálogo),
-    deja en el Escritorio un <code>Deshacer agrupación &lt;fecha&gt;.py</code> y luego pone a cada miembro su descripción y su sección.</li>
+    deja en <code>1 Agrupación</code> un <code>Deshacer agrupación &lt;fecha&gt;.py</code> (en el Escritorio si la obra no tiene carpeta) y luego pone a cada miembro su descripción y su sección.</li>
     <li><b>Reanaliza y sincroniza.</b> Ahora los miembros llegan con descripción: la app ofrece crear las T como secciones.</li>
   </ol>
   <div class="caja ojo">
@@ -414,7 +442,7 @@
     Las demandas son las del análisis con las secciones de <b>hoy</b>. Al cambiar secciones cambian las rigideces y con ellas los momentos. Aplica, reanaliza y
     vuelve a abrir Agrupación: si los grupos siguen pasando, listo; si no, ajusta. Normalmente bastan una o dos vueltas.
   </div>
-  <p><b>Si algo no convence:</b> cierra el modelo sin guardar y no pasó nada, o corre el <b>Deshacer</b> del Escritorio, que regresa cada miembro a la descripción y la sección que tenía.</p>
+  <p><b>Si algo no convence:</b> cierra el modelo sin guardar y no pasó nada, o corre el <b>Deshacer</b> de <code>1 Agrupación</code>, que regresa cada miembro a la descripción y la sección que tenía.</p>
 </section>
 
 <!-- ═════════════════════════ 6 ═════════════════════════ -->
@@ -648,6 +676,8 @@
     <tr><td>«Las demandas son de otra sección»</td><td>RAM analizó con otras medidas que las del proyecto.</td><td>Ver capítulo 4. Si dice «invertida», el error está en RAM.</td></tr>
     <tr><td>Una trabe continua sale partida</td><td>En RAM sus tramos no comparten nudo o no son colineales.</td><td>Revísalo en la vista del modelo (Longitudinal) y corrige la geometría en RAM.</td></tr>
     <tr><td>Un miembro que buscas en Agrupación no aparece</td><td>El buscador dice por qué: no existe, es columna, no es horizontal o su grupo no está marcado.</td><td>Si es su grupo, márcalo en <b>Qué agrupar</b>.</td></tr>
+    <tr><td>Guardar o exportar descargan en vez de ir a la carpeta</td><td>La obra no tiene carpeta configurada, o el navegador no dio permiso de edición.</td><td>Reportes de RAM → Sincronizar y acepta «editar archivos»; o genera el script otra vez eligiendo la carpeta.</td></tr>
+    <tr><td>«La carpeta ya tiene el proyecto X…»</td><td>Vas a guardar una obra encima de otra.</td><td>Cancela y revisa la ruta en Configurar RAM; si sí es la misma obra con otro nombre, acepta: la anterior queda en 3 Respaldos.</td></tr>
     <tr><td>Deflexiones: «este modelo.json no trae desplazamientos»</td><td>El <code>sincronizar.py</code> es de una versión anterior.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
     <tr><td>Deflexiones: «? sin armado»</td><td>El proyecto no tiene esa sección.</td><td>Créala desde <b>Reportes de RAM</b>; mientras, sólo se ve la elástica de RAM, que se queda corta.</td></tr>
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
@@ -690,8 +720,11 @@
     <tr><td>Catálogo de secciones</td><td class="mono pequeno">C:\ProgramData\Bentley\Engineering\RAM Elements\26.0.1\Database\Sections\Personales\Vigas de Concreto.sec y Columnas de Concreto.sec</td></tr>
     <tr><td>Catálogo de concretos</td><td class="mono pequeno">…\Database\Materials\Personales\Concreto.mat</td></tr>
     <tr><td>Respaldos del catálogo</td><td>Escritorio: <code>Respaldo RAM - …</code></td></tr>
-    <tr><td>Deshacer una agrupación</td><td>Escritorio: <code>Deshacer agrupación &lt;fecha&gt;.py</code></td></tr>
-    <tr><td>El modelo para la app</td><td>La carpeta de la obra: <code>modelo.json</code></td></tr>
+    <tr><td>La carpeta de la app en cada obra</td><td><code>PROCESO\Auxiliar IV</code> (la arma crear-proyectoiv.bat)</td></tr>
+    <tr><td>El proyecto y el modelo</td><td><code>Auxiliar IV\proyecto.json</code> y <code>Auxiliar IV\modelo.json</code></td></tr>
+    <tr><td>Deshacer una agrupación</td><td><code>Auxiliar IV\1 Agrupación\Deshacer agrupación &lt;fecha&gt;.py</code></td></tr>
+    <tr><td>Memoria, planos, Double Check</td><td><code>Auxiliar IV\2 Salidas\…</code></td></tr>
+    <tr><td>Versiones anteriores</td><td><code>Auxiliar IV\3 Respaldos</code></td></tr>
     <tr><td>Acomodo manual en curso</td><td>El navegador (se recupera al volver con el mismo modelo)</td></tr>
   </table>
 
