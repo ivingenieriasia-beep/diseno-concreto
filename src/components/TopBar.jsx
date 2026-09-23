@@ -312,17 +312,16 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
         </button>
       </div>
 
-        {(sections.length > 0 || columns.length > 0) && (
-          <button
-            className="btn btn-secondary"
-            data-testid="cargar-envolventes"
-            onClick={() => onAbrirCentro?.()}
-            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99, flexShrink: 0 }}
-            title="Centro de carga: todos los reportes de RAM que lee la app, qué pedir en cada uno y dónde cae"
-          >
-            📥 Reportes de RAM
-          </button>
-        )}
+        {/* Siempre a mano: un proyecto nuevo arranca justo aquí, sincronizando el modelo de RAM */}
+        <button
+          className="btn btn-secondary"
+          data-testid="cargar-envolventes"
+          onClick={() => onAbrirCentro?.()}
+          style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99, flexShrink: 0 }}
+          title="Centro de carga: sincronizar con RAM, configurar el proyecto y los reportes de texto"
+        >
+          📥 Reportes de RAM
+        </button>
 
       {/* File + Export buttons */}
       <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>

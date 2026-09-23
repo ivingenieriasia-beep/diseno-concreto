@@ -4,7 +4,7 @@ import useColumnStore from '../store/useColumnStore'
 import { REPORTES, clasificarLote } from '../core/ramReports'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
-import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../core/ramModel'
+import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida, SIN_NOMBRE } from '../core/ramModel'
 import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta, generarInstaladorCatalogo } from '../core/ramScript'
 import { SECCIONES_RAM, MATERIALES_RAM } from '../core/catalogoRam'
 import { proponerTrabe, proponerColumna } from '../core/propuesta'
@@ -81,6 +81,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const [sync, setSync] = useState(ultimaSync())
   const [ocupado, setOcupado] = useState('')
   const [faltan, setFaltan] = useState([])          // grupos del modelo sin chip
+  const [sinDescripcion, setSinDescripcion] = useState(0) // miembros que RAM trae sin descripción
   const [discrepan, setDiscrepan] = useState([])    // chips con otras medidas que RAM
   const [propuestas, setPropuestas] = useState([])  // armado propuesto a las secciones recién creadas
   const [ruta, setRuta] = useState('')              // la ruta de Windows, mientras se edita
@@ -240,7 +241,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
         setColEnvelopeAt(a.idx, { archivo: nombre, combo: a.grupo.perfil.combo, unidades: R.modelo.unidades, mapping: 'M33X', points: a.grupo.points })
       }
     }
-    setFaltan(sinChip)
+    // Los miembros sin descripción no son una sección: son lo que falta agrupar
+    setFaltan(sinChip.filter((g) => g.nombre !== SIN_NOMBRE))
+    setSinDescripcion(sinChip.filter((g) => g.nombre === SIN_NOMBRE).reduce((n, g) => n + g.n, 0))
     guardarModelo(texto, nombre)          // en IndexedDB: no cabe en el autoguardado
     const enChip = asignados.map((a) => a.grupo.nombre).join(', ')
     return {
@@ -596,6 +599,14 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               </button>
               <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: '#1e3a8a', textDecoration: 'underline' }}
                 onClick={() => setFaltan([])}>ahora no</button>
+            </div>
+          )}
+
+          {sinDescripcion > 0 && (
+            <div data-testid="sin-descripcion" style={{ padding: '9px 12px', borderRadius: 9, background: '#fffbeb', border: '1px solid #fcd34d', fontSize: 11.5, color: '#92400e' }}>
+              <b>{sinDescripcion} miembro(s) llegan sin descripción</b> — todavía no están agrupados, así que no se crea
+              una sección con ellos. Agrúpalos en <b>Módulos → Agrupación</b>: te propone las T con su sección, las aplicas en
+              RAM, reanalizas y al volver a sincronizar ya entran como secciones.
             </div>
           )}
 

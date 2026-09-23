@@ -31,6 +31,9 @@ export function looksLikeModeloRam(x) {
 
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : 0)
 
+/** Los miembros sin descripción en RAM caen aquí (el script usa el mismo nombre) */
+export const SIN_NOMBRE = '(sin nombre)'
+
 /**
  * @param entrada  el texto del .json o el objeto ya parseado
  * @param archivo  nombre para mostrar
@@ -75,7 +78,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
   // ── Un perfil por grupo ──────────────────────────────────
   const porGrupo = new Map()
   for (const m of d.miembros) {
-    const g = String(m.grupo || '(sin nombre)')
+    const g = String(m.grupo || SIN_NOMBRE)
     if (!porGrupo.has(g)) porGrupo.set(g, [])
     porGrupo.get(g).push(m)
   }
