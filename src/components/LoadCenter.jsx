@@ -5,6 +5,7 @@ import { REPORTES, clasificarLote } from '../core/ramReports'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
 import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../core/ramModel'
+import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta } from '../core/ramScript'
 import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta,
   guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
@@ -54,13 +55,15 @@ function Slot({ r, estado, onCargar }) {
   )
 }
 
-export default function LoadCenter({ onClose, onToast }) {
+export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const sections = useBeamStore((s) => s.sections)
   const setEnvelopeAt = useBeamStore((s) => s.setEnvelopeAt)
   const setPerfilAt = useBeamStore((s) => s.setPerfilAt)
   const model = useBeamStore((s) => s.model)
   const setModel = useBeamStore((s) => s.setModel)
   const setReacciones = useBeamStore((s) => s.setReacciones)
+  const rutaRam = useBeamStore((s) => s.rutaRam)
+  const setRutaRam = useBeamStore((s) => s.setRutaRam)
   const addSection = useBeamStore((s) => s.addSection)
   const patchSectionAt = useBeamStore((s) => s.patchSectionAt)
   const columns = useColumnStore((s) => s.columns)
@@ -77,9 +80,15 @@ export default function LoadCenter({ onClose, onToast }) {
   const [ocupado, setOcupado] = useState('')
   const [faltan, setFaltan] = useState([])          // grupos del modelo sin chip
   const [discrepan, setDiscrepan] = useState([])    // chips con otras medidas que RAM
+  const [ruta, setRuta] = useState('')              // la ruta de Windows, mientras se edita
+  const [avisoRuta, setAvisoRuta] = useState('')
+  // abierto es estado propio: si dependiera de rutaRam, el panel se plegaría
+  // solo en cuanto se guarda la ruta — justo mientras se está usando
+  const [configAbierta, setConfigAbierta] = useState(!useBeamStore.getState().rutaRam)
 
   // La carpeta se eligió una vez y el navegador la recuerda entre sesiones
   useEffect(() => { carpetaGuardada().then(setCarpeta) }, [])
+  useEffect(() => { setRuta(rutaRam || '') }, [rutaRam])
 
   const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
 
@@ -236,6 +245,51 @@ export default function LoadCenter({ onClose, onToast }) {
     }
   }
 
+  // ── El script de RAM, con la carpeta de ESTE proyecto dentro ──
+  // El navegador nunca revela la ruta absoluta de la carpeta que eliges (es
+  // una decisión de seguridad), y el Python de RAM no puede abrir un diálogo
+  // porque va en caja de arena. Así que la ruta se pega aquí una vez por
+  // proyecto: aquí es natural pegarla, y aquí la escribimos nosotros en el
+  // .py sin que se pueda romper.
+  function generarScript({ enCarpeta = false } = {}) {
+    const r = generarScriptRam(ruta, { proyecto: projectName })
+    if (!r.ok) { setAvisoRuta(r.aviso); return }
+    setAvisoRuta('')
+    setRutaRam(r.ruta)
+    if (enCarpeta) {
+      escribirEnCarpeta(r).catch((e) => {
+        if (e?.name !== 'AbortError') setAvisoRuta(`No se pudo escribir en la carpeta: ${e.message}`)
+      })
+      return
+    }
+    const url = URL.createObjectURL(new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = r.nombre
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setMsg(`${r.nombre} descargado. Déjalo en «${nombreCarpeta(r.ruta)}» y ábrelo en la consola de Python de RAM.`)
+  }
+
+  /** Si el navegador da permiso de escritura, lo deja en la carpeta y ya */
+  async function escribirEnCarpeta(r) {
+    // si todavía no hay carpeta elegida, se elige ahora: no hace falta haber
+    // sincronizado antes para poder dejar el script en su sitio
+    let h = carpeta
+    if (!h) { h = await elegirCarpeta(); setCarpeta(h) }
+    const permiso = await h.requestPermission?.({ mode: 'readwrite' })
+    if (permiso && permiso !== 'granted') {
+      setAvisoRuta('El navegador no dio permiso para escribir en la carpeta; usa «Generar» y muévelo tú.')
+      return
+    }
+    const fh = await h.getFileHandle(r.nombre, { create: true })
+    const w = await fh.createWritable()
+    await w.write(r.texto)
+    await w.close()
+    const texto = `${r.nombre} escrito en «${h.name}». Ábrelo en la consola de Python de RAM y Ctrl+R.`
+    setMsg(texto)
+    onToast?.(texto, 'ok')
+  }
+
   /** Adopta en los chips las medidas de la sección que RAM analizó */
   function usarMedidasDeRam() {
     for (const d of discrepan) {
@@ -379,6 +433,56 @@ export default function LoadCenter({ onClose, onToast }) {
               {sections.length} trabe(s) · {columns.length} columna(s)
             </span>
           </div>
+
+          {/* ── Configurar RAM: la carpeta de este proyecto ── */}
+          <details data-testid="config-ram" open={configAbierta}
+            onToggle={(e) => setConfigAbierta(e.currentTarget.open)}
+            style={{ border: '1px solid var(--color-border)', borderRadius: 9, background: 'var(--color-bg)', padding: '8px 12px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              ⚙ Configurar RAM para este proyecto
+              {rutaRam
+                ? <span style={{ fontWeight: 400, color: '#15803d', marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>✓ {nombreCarpeta(rutaRam)}</span>
+                : <span style={{ fontWeight: 400, color: '#92400e', marginLeft: 8, fontSize: 10.5 }}>sin configurar</span>}
+            </summary>
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-tx2)', lineHeight: 1.6 }}>
+              Pega aquí la ruta de la carpeta del proyecto —la misma que eliges arriba para sincronizar— y
+              la app te arma el <b>sincronizar.py</b> con esa ruta ya dentro. La ruta se guarda con el
+              proyecto, así que al cambiar de obra cambia sola.
+              <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 2 }}>
+                En el explorador: clic derecho sobre la carpeta con Mayús → <b>Copiar como ruta</b>.
+                (Hay que pegarla porque el navegador nunca revela la ruta real de lo que eliges, y el
+                Python de RAM no puede abrir un explorador.)
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <input data-testid="ruta-ram" value={ruta} onChange={(e) => { setRuta(e.target.value); setAvisoRuta('') }}
+                  placeholder="C:\\Users\\...\\PROCESO\\Reportes de Secciones RAM"
+                  style={{
+                    flex: '1 1 340px', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '5px 8px',
+                    borderRadius: 5, border: `1px solid ${avisoRuta ? '#ef9a9a' : 'var(--color-border)'}`,
+                    background: 'var(--color-panel)', color: 'var(--color-tx)',
+                  }} />
+                <button className="btn btn-primary" style={{ fontSize: 10.5 }} data-testid="generar-script"
+                  disabled={!esRutaWindows(ruta)} onClick={() => generarScript()}>
+                  ⬇ Generar sincronizar.py
+                </button>
+                {puedeRecordar() && (
+                  <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="generar-en-carpeta"
+                    disabled={!esRutaWindows(ruta)} onClick={() => generarScript({ enCarpeta: true })}
+                    title={carpeta ? `Lo escribe en «${carpeta.name}», sin pasar por Descargas` : 'Elige la carpeta y lo deja ahí, sin pasar por Descargas'}>
+                    …o dejarlo en {carpeta ? `«${carpeta.name}»` : 'la carpeta'}
+                  </button>
+                )}
+              </div>
+              {avisoRuta && <div data-testid="aviso-ruta" style={{ color: '#c62828', fontSize: 10.5, marginTop: 5 }}>{avisoRuta}</div>}
+              {esRutaWindows(ruta) && carpeta && nombreCarpeta(ruta) !== carpeta.name && (
+                <div style={{ color: '#92400e', fontSize: 10.5, marginTop: 5 }}>
+                  ⚠ La carpeta que elegiste arriba se llama <b>{carpeta.name}</b> y esta ruta acaba en
+                  <b> {nombreCarpeta(ruta)}</b>. Si no son la misma, el script dejará el modelo.json
+                  donde la app no lo va a buscar.
+                </div>
+              )}
+            </div>
+          </details>
 
           {discrepan.length > 0 && (
             <div data-testid="aviso-medidas" style={{ padding: '9px 12px', borderRadius: 9, background: '#fdecea', border: '1px solid #ef9a9a', fontSize: 11.5, color: '#7f1d1d', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

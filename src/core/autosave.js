@@ -19,11 +19,12 @@ export function hasCargas(c) {
 }
 
 /** Empaqueta el estado del proyecto tal como se guarda en el .json */
-export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null, model = null }) {
+export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null, model = null, rutaRam = '' }) {
   return {
     version: PROJECT_VERSION, projectName, dxfScale, sections, columns,
     cargas: cargas || emptyCargas(),
     model: model || null,   // geometría del modelo de RAM, común a todas las trabes
+    rutaRam,                // carpeta de Windows donde el script deja el modelo.json
     savedAt: new Date().toISOString(),
   }
 }

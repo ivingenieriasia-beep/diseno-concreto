@@ -44,6 +44,8 @@ export default function App() {
   const sections = useBeamStore((s) => s.sections)
   const loadProject = useBeamStore((s) => s.loadProject)
   const model = useBeamStore((s) => s.model)
+  const rutaRam = useBeamStore((s) => s.rutaRam)
+  const setRutaRam = useBeamStore((s) => s.setRutaRam)
   const longFocus = useBeamStore((s) => s.longFocus)
   const calcAlert = useBeamStore((s) => s.calcAlert)
   const columns = useColumnStore((s) => s.columns)
@@ -85,7 +87,8 @@ export default function App() {
     loadCargas(data.cargas || {})
     setProjectName(data.projectName !== undefined ? data.projectName : '')
     if (data.dxfScale !== undefined) setDxfScale(data.dxfScale)
-  }, [loadProject, loadColumns, loadCargas])
+    setRutaRam(data.rutaRam || '')
+  }, [loadProject, loadColumns, loadCargas, setRutaRam])
 
   // Recuperar la sesión anterior al arrancar
   useEffect(() => {
@@ -102,8 +105,8 @@ export default function App() {
   // Autoguardado en cada cambio
   useEffect(() => {
     if (!restored.current) return
-    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model }))
-  }, [projectName, dxfScale, sections, columns, model, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas])
+    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam }))
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas])
 
   // Las pestañas de módulos abiertas se recuerdan entre sesiones
   useEffect(() => { guardarAbiertos(modulos) }, [modulos])
@@ -184,11 +187,11 @@ export default function App() {
   }, [getSvgString, dxfScale, fileName])
 
   const handleSave = useCallback(() => {
-    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model })
+    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam })
     download(JSON.stringify(data, null, 2), `${fileName}.json`, 'application/json')
     pushRecent(data)
     setRecents(listRecents())
-  }, [projectName, dxfScale, sections, columns, packCargas, fileName])
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, fileName])
 
   // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
   // geometría pegada el análisis va por elemento completo (y las zonas de
@@ -254,13 +257,13 @@ export default function App() {
   }, [applyProject, showToast])
 
   const handleNew = useCallback(() => {
-    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model })
+    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam })
     if (!isEmptyProject(current) && !confirm('¿Empezar un proyecto nuevo? Lo que hay ahora queda en "Recientes" (y en tu último .json guardado).')) return
     if (!isEmptyProject(current)) { pushRecent(current); setRecents(listRecents()) }
     applyProject({ sections: [], columns: [], cargas: {}, projectName: '', dxfScale: 1 })
     clearSnapshot()
     setMainTab('detalle')
-  }, [projectName, dxfScale, sections, columns, packCargas, applyProject])
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, applyProject])
 
   // Una pestaña activa se dibuja como pestaña: contorno, barra de acento
   // arriba y el borde de abajo abierto hacia el contenido.
@@ -339,7 +342,7 @@ export default function App() {
         dxfScale={dxfScale} setDxfScale={setDxfScale}
         projectName={projectName} setProjectName={setProjectName}
       />
-      {centro && <LoadCenter onClose={() => setCentro(false)} onToast={showToast} />}
+      {centro && <LoadCenter onClose={() => setCentro(false)} onToast={showToast} projectName={projectName} />}
       <MemoriaDialog
         open={memoriaOpen}
         onClose={() => setMemoriaOpen(false)}

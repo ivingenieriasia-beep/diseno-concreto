@@ -73,6 +73,9 @@ const useBeamStore = create((set, get) => ({
   // Reacciones de los nudos con apoyo, del modelo de RAM. Todavía no las usa
   // nadie: son el insumo del módulo de cimentación.
   reacciones: [],
+  // Carpeta de Windows de ESTE proyecto, donde el script de RAM deja el
+  // modelo.json. Viaja con el proyecto, así que cambiar de obra la cambia.
+  rutaRam: '',
   longFocus: null, // { member, fallan:[ids], ts } — «bastonear» desde la envolvente
   form: defaultSection(),
   calcAlert: false,
@@ -177,6 +180,7 @@ const useBeamStore = create((set, get) => ({
   // trabe, así que se carga una vez y la usan todas las secciones.
   setModel: (model) => set({ model }),
   setReacciones: (reacciones) => set({ reacciones: reacciones || [] }),
+  setRutaRam: (rutaRam) => set({ rutaRam: rutaRam || '' }),
 
   // Pide abrir Longitudinal centrado en un miembro (lo dispara la envolvente)
   setLongFocus: (v) => set({ longFocus: v ? { ...v, ts: Date.now() } : null }),
