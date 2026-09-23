@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import { parseModeloRam } from '../core/ramModel'
 import { modeloGuardado, hace, EVENTO_MODELO } from '../core/ramSync'
-import { revisarModelo, rolesPorDefecto, ROLES } from '../core/deflexiones'
+import { revisarModelo, rolesPorDefecto, ROLES, formulaServicio } from '../core/deflexiones'
 import { leerMiembros } from '../core/agrupacion'
 import { claveNombre } from '../core/bulkEnvelopes'
 
@@ -10,7 +10,8 @@ import { claveNombre } from '../core/bulkEnvelopes'
 // de RAM, corregidas con la inercia agrietada del armado de cada sección,
 // más las diferidas, contra los límites de la NTC.
 
-const GUARDADO = 'auxiv.deflexiones.config'
+// v2: la sostenida pasó a ser CS completa (antes, CM + 40 % de CV)
+const GUARDADO = 'auxiv.deflexiones.config.v2'
 const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : '—')
 const pct = (v) => (Number.isFinite(v) ? `${Math.round(v * 100)} %` : '—')
 const rojo = '#c62828', verde = '#15803d', ambar = '#92400e'
@@ -56,7 +57,7 @@ export default function DeflexionesView() {
   const secciones = useBeamStore((s) => s.sections)
   const [fuente, setFuente] = useState(null)       // { archivo, at, R }
   const [aviso, setAviso] = useState('')
-  const [cfg, setCfg] = useState(() => ({ fSost: 0.4, post: true, roles: null, ...leerConfig() }))
+  const [cfg, setCfg] = useState(() => ({ fSost: 1, post: true, roles: null, ...leerConfig() }))
   const [soloMal, setSoloMal] = useState(false)
   const [grupo, setGrupo] = useState('')
   const [busca, setBusca] = useState('')
@@ -159,7 +160,13 @@ export default function DeflexionesView() {
             </div>
           )}
           <div style={caja}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Cargas de servicio</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 800 }}>Cargas de servicio</span>
+              <b data-testid="def-cs" style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--color-accent2)' }}>{formulaServicio(roles)}</b>
+              <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>
+                para la inmediata y, {hayMedia ? 'con la viva media,' : cfg.fSost >= 1 ? 'completa,' : `con el ${Math.round(cfg.fSost * 100)} % de la viva,`} como carga sostenida para la diferida
+              </span>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
               {casos.map((c) => (
                 <label key={c.id} data-testid={`def-caso-${c.id}`} style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--color-border)', borderRadius: 7, padding: '3px 8px', background: 'var(--color-bg)' }}>
@@ -174,8 +181,8 @@ export default function DeflexionesView() {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', fontSize: 11.5, marginTop: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: hayMedia ? 0.5 : 1 }}
-                title="La carga viva media de la NTC entre la máxima: habitación 80/190, oficinas 100/250 ≈ 40 %">
-                parte sostenida de la viva
+                title="Qué parte de la viva de CS se toma como sostenida para la diferida. 100 % = CS completa (el criterio de fábrica)">
+                viva sostenida en la diferida
                 <input data-testid="def-fsost" type="number" min={0} max={100} step={5} disabled={hayMedia} value={Math.round(cfg.fSost * 100)}
                   onChange={(e) => setCfg((c) => ({ ...c, fSost: Math.max(0, Math.min(100, +e.target.value || 0)) / 100 }))}
                   style={{ width: 54, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: 5, background: 'var(--color-bg)', color: 'inherit' }} /> %
@@ -185,7 +192,7 @@ export default function DeflexionesView() {
                 <input data-testid="def-post" type="checkbox" checked={cfg.post} onChange={() => setCfg((c) => ({ ...c, post: !c.post }))} />
                 revisar también L/480 + 0.3 cm (muros de mampostería u otros elementos que se dañan)
               </label>
-              <button className="btn btn-secondary" style={{ fontSize: 10.5, padding: '1px 8px' }} onClick={() => setCfg({ fSost: 0.4, post: true, roles: null })}>valores de fábrica</button>
+              <button className="btn btn-secondary" style={{ fontSize: 10.5, padding: '1px 8px' }} onClick={() => setCfg({ fSost: 1, post: true, roles: null })}>valores de fábrica</button>
             </div>
           </div>
 

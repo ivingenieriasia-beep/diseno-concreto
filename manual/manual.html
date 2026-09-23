@@ -566,28 +566,29 @@
   <ol class="pasos">
     <li>Sincroniza con un <code>sincronizar.py</code> actual: es el que lee los desplazamientos. Si la app dice que el <code>modelo.json</code> no los trae, genera el script otra vez (capítulo 3).</li>
     <li>Crea las secciones de las trabes (capítulo 7): sin armado no hay inercia agrietada, y esos tramos se muestran con la flecha elástica de RAM, marcados <b>? sin armado</b>.</li>
-    <li><b>Módulos → Deflexiones.</b> Revisa los papeles de los casos de carga y la parte sostenida de la viva; la tabla se ordena del tramo más comprometido al menos.</li>
+    <li><b>Módulos → Deflexiones.</b> Revisa que arriba diga <code>CS = 1·CM + 1·CV</code> (si tu modelo nombra distinto los casos, cambia su papel); la tabla se ordena del tramo más comprometido al menos.</li>
   </ol>
 
   <figure>
     <img src="img/deflexiones.png" alt="">
-    <figcaption><b>Deflexiones.</b> Los casos del modelo con su papel, los tramos de la trabe que tiene el miembro 49 y, abierto, el cálculo del claro de 6.50 m: elástica de RAM 0.43 cm, agrietada 0.76, diferida 0.99, total 1.75 de 3.21 cm; después de los muros 1.22 de 1.65 cm.</figcaption>
+    <figcaption><b>Deflexiones.</b> La carga de servicio CS = 1·CM + 1·CV, los tramos de la trabe que tiene el miembro 49 y, abierto, el cálculo del claro de 6.50 m: elástica de RAM 0.43 cm, agrietada 0.76, diferida 1.21, total 1.97 de 3.21 cm; después de los muros 1.44 de 1.65 cm.</figcaption>
   </figure>
 
   <h3>Qué hace</h3>
   <ul>
+    <li><b>Cargas:</b> las de servicio, <b>CS = 1·CM + 1·CV</b>, para la inmediata y también como carga sostenida para la diferida.</li>
     <li><b>Tramos:</b> cada trabe continua se parte entre apoyos (nudos con columna o con apoyo, y extremos que se conectan a algo). Un extremo libre es un <b>voladizo</b>.</li>
     <li><b>Flecha relativa:</b> contra la cuerda entre los apoyos del tramo (en voladizos, contra su apoyo). Lo que se acortan las columnas no es flecha de la trabe.</li>
-    <li><b>Inmediata:</b> la elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub>. I<sub>e</sub> de Branson con la sección agrietada y el armado del proyecto (corridas y puntuales: abajo al centro, arriba en los apoyos); en tramos continuos I<sub>e</sub> = (I<sub>e1</sub> + I<sub>e2</sub> + 2I<sub>e3</sub>)/4. Se calcula con la carga muerta, la sostenida y la total.</li>
-    <li><b>Diferida:</b> λ × inmediata de la carga sostenida, λ = 2/(1 + 50ρ′) en concreto clase 1 (4/(1 + 50ρ′) en clase 2).</li>
-    <li><b>Límites:</b> <b>L/240 + 0.5 cm</b> con todo (inmediata total + diferida) y, si hay muros de mampostería u otros elementos que se dañan, <b>L/480 + 0.3 cm</b> con lo que pasa después de colocarlos (inmediata de la viva + diferida). En voladizos, el doble.</li>
+    <li><b>Inmediata:</b> la elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub>. I<sub>e</sub> de Branson con la sección agrietada y el armado del proyecto (corridas y puntuales: abajo al centro, arriba en los apoyos); en tramos continuos I<sub>e</sub> = (I<sub>e1</sub> + I<sub>e2</sub> + 2I<sub>e3</sub>)/4. Se calcula con la carga muerta y con CS.</li>
+    <li><b>Diferida:</b> λ × inmediata de la carga sostenida (CS), λ = 2/(1 + 50ρ′) en concreto clase 1 (4/(1 + 50ρ′) en clase 2).</li>
+    <li><b>Límites:</b> <b>L/240 + 0.5 cm</b> con todo (inmediata con CS + diferida) y, si hay muros de mampostería u otros elementos que se dañan, <b>L/480 + 0.3 cm</b> con lo que pasa después de colocarlos (inmediata de la viva + diferida). En voladizos, el doble.</li>
   </ul>
 
   <h3>Qué configurar</h3>
   <table>
     <thead><tr><th style="width:30%">Opción</th><th>Qué es</th></tr></thead>
-    <tr><td>Papel de cada caso</td><td><b>muerta</b>, <b>viva</b>, <b>viva media</b> o <b>no usar</b>. Sale de la categoría del caso en RAM (CM muerta, CV viva, la accidental no); cámbialo si tu modelo los llama distinto.</td></tr>
-    <tr><td>Parte sostenida de la viva</td><td>Qué fracción de la viva actúa a largo plazo. 40 % de fábrica, la relación entre la carga viva media y la máxima de la NTC para habitación y oficinas. Si el modelo tiene un caso de viva media, se usa ése.</td></tr>
+    <tr><td>Papel de cada caso</td><td><b>muerta</b>, <b>viva</b>, <b>viva media</b> o <b>no usar</b>. Sale de la categoría del caso en RAM (CM muerta, CV viva; la accidental y la media no); cámbialo si tu modelo los llama distinto. Arriba se ve la combinación que resulta: <code>CS = 1·CM + 1·CV</code>.</td></tr>
+    <tr><td>Viva sostenida en la diferida</td><td>100 % de fábrica: la sostenida es CS completa. Se puede bajar, o marcar un caso como <b>viva media</b> para que la diferida use ése.</td></tr>
     <tr><td>Revisar L/480 + 0.3 cm</td><td>Activado de fábrica. Apágalo si las trabes no cargan elementos que se dañen con la flecha.</td></tr>
   </table>
   <p>Filtros: por sección (los botones con su peor porcentaje), <b>sólo los que no pasan</b> y por miembro de RAM. Clic en un tramo abre su cálculo completo: I<sub>g</sub>, I<sub>ag</sub>, M<sub>ag</sub>, los momentos de servicio, I<sub>e</sub>, ρ′, λ y la suma.</p>
@@ -613,7 +614,7 @@
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 8, con H del modelo.</td></tr>
-    <tr><td><b>Deflexiones</b></td><td>Elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 9).</td></tr>
+    <tr><td><b>Deflexiones</b></td><td>Con CS = 1·CM + 1·CV: elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) × inmediata de CS (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 9).</td></tr>
   </table>
 
   <div class="caja mal">

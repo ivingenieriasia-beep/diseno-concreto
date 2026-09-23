@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
-  tramosDeFlecha, flechaRelativa, revisarTramo, revisarModelo, rolesPorDefecto,
+  formulaServicio, tramosDeFlecha, flechaRelativa, revisarTramo, revisarModelo, rolesPorDefecto,
   inerciaAgrietada, inerciaEfectiva, aceroDe, EcNTC, ffNTC,
 } from '../src/core/deflexiones.js'
 import { parseModeloRam } from '../src/core/ramModel.js'
@@ -145,6 +145,14 @@ describe('la revisión', () => {
     expect(r.estado).toBe(r.u.total <= 1 && r.u.post <= 1 ? 'ok' : 'no')
   })
 
+  it('de fábrica, todo con la carga de servicio CS = 1·CM + 1·CV: también la sostenida', () => {
+    const r = revisarTramo(t, SEC, { b: 15, h: 20 }, { roles: ROLES })
+    expect(r.elastico.sost).toBeCloseTo(r.elastico.tot, 12)
+    expect(r.diferida).toBeCloseTo(r.lambda * r.inmediata.tot, 9)
+    expect(r.total).toBeCloseTo((1 + r.lambda) * r.inmediata.tot, 9)
+    expect(formulaServicio(ROLES)).toBe('CS = 1·CM + 1·CV')
+  })
+
   it('con un caso de viva media, ése es el sostenido', () => {
     const r = revisarTramo(t, SEC, { b: 15, h: 20 }, { roles: { CM: 'muerta', CV: 'viva-media' } })
     expect(r.elastico.sost).toBeCloseTo(r.elastico.tot, 9)
@@ -174,7 +182,7 @@ describe('los papeles de los casos', () => {
       { id: 'CM', categoria: 'DEAD' }, { id: 'CV', categoria: 'LIVE', descripcion: 'Carga viva máxima' },
       { id: 'CVA', categoria: 'LIVE', descripcion: 'Carga viva accidental' }, { id: 'CVM', categoria: 'LIVE', descripcion: 'Viva media' },
       { id: 'SX', categoria: 'EARTHQUAKE' }, { id: 'PP', categoria: '' },
-    ])).toEqual({ CM: 'muerta', CV: 'viva', CVA: 'no', CVM: 'viva-media', SX: 'no', PP: 'muerta' })
+    ])).toEqual({ CM: 'muerta', CV: 'viva', CVA: 'no', CVM: 'no', SX: 'no', PP: 'muerta' })
   })
 })
 

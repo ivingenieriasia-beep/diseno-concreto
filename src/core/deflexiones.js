@@ -17,6 +17,9 @@
 //          δi = δRAM · IRAM / Ie
 //   4. Diferida = inmediata de la carga sostenida × 2/(1 + 50ρ') (clase 1;
 //      4/(1 + 50ρ') clase 2), ρ' promedio (ρ'1 + ρ'2 + 2ρ'3)/4.
+//      Cargas: las de servicio, CS = 1·CM + 1·CV, para la inmediata y también
+//      como sostenida para la diferida (criterio de la oficina). Se puede
+//      bajar la parte sostenida de la viva o usar un caso de viva media.
 //   5. Límites: L/240 + 0.5 cm con todo (inmediata + diferida) y, si hay
 //      elementos no estructurales que se puedan dañar, L/480 + 0.3 cm con lo
 //      que ocurre después de colocarlos (inmediata de la viva + diferida).
@@ -39,6 +42,13 @@ export const claseDe = (fc) => (fc >= 250 ? 1 : 2)
 export const EcNTC = (fc) => (claseDe(fc) === 1 ? 14000 : 8000) * Math.sqrt(fc)   // kg/cm², agregado calizo
 export const ffNTC = (fc) => (claseDe(fc) === 1 ? 2 : 1.4) * Math.sqrt(fc)         // módulo de rotura, kg/cm²
 
+/** La combinación de servicio que resulta de los papeles: «CS = 1·CM + 1·CV» */
+export function formulaServicio(roles) {
+  const de = (rol) => Object.keys(roles || {}).filter((c) => roles[c] === rol)
+  const cm = de('muerta'), cv = de('viva').length ? de('viva') : de('viva-media')
+  return `CS = ${[...cm, ...cv].map((c) => `1·${c}`).join(' + ') || '—'}`
+}
+
 /** Papel de cada caso en la revisión: muerta, viva, viva media (sostenida) o no se usa */
 export const ROLES = [
   { id: 'muerta', nombre: 'muerta' },
@@ -53,7 +63,8 @@ export function rolesPorDefecto(casos) {
     const t = `${c.categoria || ''} ${c.id || ''} ${c.descripcion || ''}`.toUpperCase()
     if (/DEAD|MUERT|PERMAN|PESO PROPIO|SELF/.test(t) || /^(CM|PP|D|DL|SD|SDL)$/i.test(c.id)) out[c.id] = 'muerta'
     else if (/LIVE|VIVA/.test(t) || /^(CV|L|LL)\d*$/i.test(c.id)) {
-      if (/MEDIA|MEAN|SOSTEN/.test(t)) out[c.id] = 'viva-media'
+      // la de servicio es CS = CM + CV: una viva media sólo entra si se elige a mano
+      if (/MEDIA|MEAN|SOSTEN/.test(t)) out[c.id] = 'no'
       else if (/ACCID|INSTANT/.test(t) || /^CVA/i.test(c.id)) out[c.id] = 'no'
       else out[c.id] = 'viva'
     } else out[c.id] = 'no'
@@ -239,7 +250,7 @@ export function inerciaEfectiva({ Ig, Iag, Mag, Ma }) {
  * @param med    las medidas con que RAM lo analizó { b, h } (cm)
  * @param opts   { roles, fSost, post }
  */
-export function revisarTramo(t, sec, med, { roles = {}, fSost = 0.4, post = true } = {}) {
+export function revisarTramo(t, sec, med, { roles = {}, fSost = 1, post = true } = {}) {
   const n = t.s.length
   const coef = (rol) => Object.fromEntries(Object.entries(roles).filter(([, r]) => r === rol).map(([c]) => [c, 1]))
   const cm = coef('muerta'), cv = coef('viva'), cvm = coef('viva-media')
