@@ -75,6 +75,13 @@ const useColumnStore = create((set, get) => ({
   }),
 
   // Envolvente de cualquier columna por índice (pestaña Modelo y carga masiva)
+  /** Cambia campos de una columna por índice (sin tener que seleccionarla) */
+  patchColumnAt: (idx, patch) => set((s) => {
+    if (idx < 0 || idx >= s.columns.length) return {}
+    const columns = s.columns.map((x, i) => (i === idx ? { ...x, ...patch } : x))
+    return { columns, form: s.selectedIdx === idx ? { ...columns[idx] } : s.form }
+  }),
+
   setEnvelopeAt: (idx, env) => set((s) => {
     if (idx < 0 || idx >= s.columns.length) return {}
     const updated = [...s.columns]

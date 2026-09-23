@@ -27,7 +27,11 @@ Ajusta CARPETA para que apunte a donde la app va a leer.
 """
 
 # ── Ajustes ───────────────────────────────────────────────────
-CARPETA = None          # None = el Escritorio. Ej: r'C:\\Users\\Admin\\OneDrive\\PROCESO\\Reportes de Secciones RAM'
+# CARPETA manda sobre todo lo demás:
+#   None          la primera vez abre el explorador, y RECUERDA lo que elijas
+#   'preguntar'   vuelve a preguntar (para cambiarla)
+#   r'C:\\ruta'    esa y sin preguntar
+CARPETA = None
 ARCHIVO = 'modelo.json'
 PASO_M = 0.05           # una estación cada 5 cm
 MIN_EST = 21            # nunca menos de esto por miembro
@@ -53,6 +57,113 @@ VERSION = 1
 
 def log(*a):
     print(u' '.join(str(x) for x in a))
+
+
+# ── Dónde dejar el modelo.json ────────────────────────────────
+# Se pregunta una vez y se guarda en el perfil del usuario, para que a partir
+# de entonces correr el script sea de verdad un solo gesto.
+def _config():
+    base = os.environ.get('APPDATA') or os.path.expanduser('~')
+    return os.path.join(base, 'AuxiliarIV', 'ram_sync.json')
+
+
+def _leer_config():
+    try:
+        with open(_config(), 'rb') as f:
+            return json.loads(f.read().decode('utf-8'))
+    except Exception:
+        return {}
+
+
+def _guardar_config(d):
+    try:
+        carp = os.path.dirname(_config())
+        if not os.path.isdir(carp):
+            os.makedirs(carp)
+        with open(_config(), 'wb') as f:
+            f.write(json.dumps(d, ensure_ascii=False, indent=2).encode('utf-8'))
+        return True
+    except Exception:
+        return False
+
+
+def _pedir_tk(inicial):
+    u"""El explorador de siempre. `topmost` para que no se esconda tras RAM."""
+    import tkinter
+    from tkinter import filedialog
+    raiz = tkinter.Tk()
+    raiz.withdraw()
+    try:
+        raiz.attributes('-topmost', True)
+    except Exception:
+        pass
+    try:
+        d = filedialog.askdirectory(
+            title=u'Auxiliar IV — carpeta donde dejar modelo.json',
+            initialdir=inicial or os.path.expanduser('~'), mustexist=True)
+    finally:
+        raiz.destroy()
+    return d or None
+
+
+def _pedir_win32(inicial):
+    u"""Sin tkinter: el diálogo de carpetas de Windows, por ctypes."""
+    import ctypes
+    from ctypes import wintypes
+    shell32, ole32 = ctypes.windll.shell32, ctypes.windll.ole32
+    ole32.CoInitialize(None)
+
+    class BROWSEINFO(ctypes.Structure):
+        _fields_ = [('hwndOwner', wintypes.HWND), ('pidlRoot', ctypes.c_void_p),
+                    ('pszDisplayName', wintypes.LPWSTR), ('lpszTitle', wintypes.LPCWSTR),
+                    ('ulFlags', wintypes.UINT), ('lpfn', ctypes.c_void_p),
+                    ('lParam', wintypes.LPARAM), ('iImage', ctypes.c_int)]
+
+    buf = ctypes.create_unicode_buffer(260)
+    bi = BROWSEINFO()
+    bi.pszDisplayName = ctypes.cast(buf, wintypes.LPWSTR)
+    bi.lpszTitle = u'Auxiliar IV — carpeta donde dejar modelo.json'
+    bi.ulFlags = 0x0001 | 0x0040        # sólo carpetas reales · diálogo moderno
+    shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
+    pidl = shell32.SHBrowseForFolderW(ctypes.byref(bi))
+    if not pidl:
+        return None
+    ruta = ctypes.create_unicode_buffer(260)
+    shell32.SHGetPathFromIDListW(ctypes.c_void_p(pidl), ruta)
+    ole32.CoTaskMemFree(ctypes.c_void_p(pidl))
+    return ruta.value or None
+
+
+def elegir_carpeta(inicial=None):
+    for intentar in (_pedir_tk, _pedir_win32):
+        try:
+            d = intentar(inicial)
+            if d:
+                return os.path.normpath(d)
+            return None          # el usuario canceló: no se prueba el siguiente
+        except Exception as e:
+            log(u'  (%s no sirvió: %s)' % (intentar.__name__, e))
+    return None
+
+
+def resolver_carpeta():
+    u"""La carpeta de destino, preguntando sólo cuando hace falta."""
+    cfg = _leer_config()
+    guardada = cfg.get('carpeta')
+    if CARPETA and CARPETA != 'preguntar':
+        return CARPETA, u'fijada en el script'
+    if CARPETA != 'preguntar' and guardada and os.path.isdir(guardada):
+        return guardada, u'recordada'
+    log(u'Elige la carpeta donde la app va a buscar el modelo.json…')
+    d = elegir_carpeta(guardada)
+    if not d:
+        if guardada and os.path.isdir(guardada):
+            return guardada, u'recordada (no se eligió otra)'
+        d = os.path.join(os.path.expanduser('~'), 'Desktop')
+        return d, u'el Escritorio (no se pudo abrir el explorador)'
+    cfg['carpeta'] = d
+    _guardar_config(cfg)
+    return d, u'elegida ahora y recordada'
 
 
 # ── Compactar una curva sin perder los picos ──────────────────
@@ -142,6 +253,9 @@ def alrededor(xs, i, L, n=11):
 
 
 def main():
+    # Primero la carpeta: más vale preguntar antes de ponerse a calcular.
+    destino, comoSalio = resolver_carpeta()
+    log(u'Destino: %s  (%s)' % (destino, comoSalio))
     t0 = time.perf_counter()
     import ramelements
     m = ramelements.model()
@@ -318,7 +432,7 @@ def main():
         'saltados': {'sin_longitud': sin_largo, 'sin_resultados': sin_result, 'motivos': motivos},
     }
 
-    carpeta = CARPETA or os.path.join(os.path.expanduser('~'), 'Desktop')
+    carpeta = destino
     if not os.path.isdir(carpeta):
         os.makedirs(carpeta)
     ruta = os.path.join(carpeta, ARCHIVO)
@@ -350,6 +464,7 @@ def main():
     log(u'%.1f s · %.1f KB' % (dt, os.path.getsize(ruta) / 1024.0))
     log(u'')
     log(u'>>> %s' % ruta)
+    log(u'    (carpeta %s · para cambiarla, pon CARPETA = \'preguntar\' arriba)' % comoSalio)
     log(u'>>> En la app: Sincronizar con RAM')
 
 

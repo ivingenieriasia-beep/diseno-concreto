@@ -62,9 +62,11 @@ export default function LoadCenter({ onClose, onToast }) {
   const setModel = useBeamStore((s) => s.setModel)
   const setReacciones = useBeamStore((s) => s.setReacciones)
   const addSection = useBeamStore((s) => s.addSection)
+  const patchSectionAt = useBeamStore((s) => s.patchSectionAt)
   const columns = useColumnStore((s) => s.columns)
   const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
   const addColumn = useColumnStore((s) => s.addColumn)
+  const patchColumnAt = useColumnStore((s) => s.patchColumnAt)
   const inputRef = useRef(null)
   const dirRef = useRef(null)
   const [msg, setMsg] = useState('')
@@ -74,6 +76,7 @@ export default function LoadCenter({ onClose, onToast }) {
   const [sync, setSync] = useState(ultimaSync())
   const [ocupado, setOcupado] = useState('')
   const [faltan, setFaltan] = useState([])          // grupos del modelo sin chip
+  const [discrepan, setDiscrepan] = useState([])    // chips con otras medidas que RAM
 
   // La carpeta se eligió una vez y el navegador la recuerda entre sesiones
   useEffect(() => { carpetaGuardada().then(setCarpeta) }, [])
@@ -139,8 +142,10 @@ export default function LoadCenter({ onClose, onToast }) {
       const r = aplicarModelo(modelo.texto, modelo.nombre)
       notas.push(r.nota)
       if (r.discrepan?.length) {
-        notas.push(`⚠ MEDIDAS DISTINTAS a las analizadas: ${r.discrepan.join(' · ')}`)
+        notas.push('⚠ MEDIDAS DISTINTAS a las analizadas: '
+          + r.discrepan.map((d) => `${d.nombre} es ${d.b}×${d.h} y en RAM es ${d.ancho}×${d.peralte}`).join(' · '))
       }
+      setDiscrepan(r.discrepan || [])
       for (const w of r.R?.warnings || []) notas.push(w)
       const resto = archivos.filter((a) => a !== modelo && !/\.json$/i.test(a.nombre))
       if (resto.length) notas.push(`${resto.length} archivo(s) de texto ignorados: el modelo.json ya los cubre`)
@@ -209,7 +214,7 @@ export default function LoadCenter({ onClose, onToast }) {
       const b = +(a.tipo === 'trabe' ? chip.ancho : chip.b) || 0
       const h = +(a.tipo === 'trabe' ? chip.peralte : chip.h) || 0
       if (b !== su.ancho || h !== su.peralte) {
-        discrepan.push(`${chip.nombre} es ${b}×${h} y en RAM es ${su.ancho}×${su.peralte} (${su.seccion})`)
+        discrepan.push({ tipo: a.tipo, idx: a.idx, nombre: chip.nombre, b, h, ancho: su.ancho, peralte: su.peralte, seccion: su.seccion })
       }
     }
     for (const a of asignados) {
@@ -229,6 +234,18 @@ export default function LoadCenter({ onClose, onToast }) {
       nota: `${resumenModeloRam(R)} · aplicado a ${asignados.length} chip(s)${enChip ? `: ${enChip}` : ''}`
         + (sinChip.length ? ` · ${sinChip.length} grupo(s) sin sección en el proyecto` : ''),
     }
+  }
+
+  /** Adopta en los chips las medidas de la sección que RAM analizó */
+  function usarMedidasDeRam() {
+    for (const d of discrepan) {
+      if (d.tipo === 'trabe') patchSectionAt(d.idx, { ancho: d.ancho, peralte: d.peralte })
+      else patchColumnAt(d.idx, { b: d.ancho, h: d.peralte })
+    }
+    const texto = `Medidas puestas como en RAM: ${discrepan.map((d) => `${d.nombre} ${d.ancho}×${d.peralte}`).join(', ')}`
+    setDiscrepan([])
+    setMsg(texto)
+    onToast?.(texto, 'ok')
   }
 
   /** Crea de golpe las secciones que el modelo trae y el proyecto no */
@@ -362,6 +379,20 @@ export default function LoadCenter({ onClose, onToast }) {
               {sections.length} trabe(s) · {columns.length} columna(s)
             </span>
           </div>
+
+          {discrepan.length > 0 && (
+            <div data-testid="aviso-medidas" style={{ padding: '9px 12px', borderRadius: 9, background: '#fdecea', border: '1px solid #ef9a9a', fontSize: 11.5, color: '#7f1d1d', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>
+                <b>Las demandas que acaban de entrar son de otra sección.</b>{' '}
+                {discrepan.map((d) => `${d.nombre}: el proyecto dice ${d.b}×${d.h} y RAM analizó ${d.ancho}×${d.peralte} (${d.seccion})`).join(' · ')}.
+              </span>
+              <button className="btn btn-primary" style={{ fontSize: 10.5, marginLeft: 'auto' }} data-testid="usar-medidas-ram" onClick={usarMedidasDeRam}>
+                usar las medidas de RAM
+              </button>
+              <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: '#7f1d1d', textDecoration: 'underline' }}
+                onClick={() => setDiscrepan([])}>dejarlo como está</button>
+            </div>
+          )}
 
           {faltan.length > 0 && (
             <div data-testid="faltan-secciones" style={{ padding: '9px 12px', borderRadius: 9, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 11.5, color: '#1e3a8a', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

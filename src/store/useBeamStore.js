@@ -182,6 +182,13 @@ const useBeamStore = create((set, get) => ({
   setLongFocus: (v) => set({ longFocus: v ? { ...v, ts: Date.now() } : null }),
 
   // Perfil de cualquier sección por índice (carga masiva de reportes)
+  /** Cambia campos de una sección por índice (sin tener que seleccionarla) */
+  patchSectionAt: (idx, patch) => set((s) => {
+    if (idx < 0 || idx >= s.sections.length) return {}
+    const sections = s.sections.map((x, i) => (i === idx ? { ...x, ...patch } : x))
+    return { sections, form: s.selectedIdx === idx ? { ...sections[idx] } : s.form }
+  }),
+
   setPerfilAt: (idx, perfil) => set((s) => {
     if (idx < 0 || idx >= s.sections.length) return {}
     const updated = [...s.sections]
