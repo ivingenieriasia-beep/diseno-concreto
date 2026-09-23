@@ -67,6 +67,49 @@ def _config():
     return os.path.join(base, 'AuxiliarIV', 'ram_sync.json')
 
 
+def _ruta_txt():
+    u"""Un .txt con la ruta y nada más: sin comillas, sin escapes, sin JSON."""
+    base = os.environ.get('APPDATA') or os.path.expanduser('~')
+    return os.path.join(base, 'AuxiliarIV', 'carpeta.txt')
+
+
+def _leer_txt():
+    try:
+        with open(_ruta_txt(), 'rb') as f:
+            texto = f.read().decode('utf-8-sig', 'replace')
+    except Exception:
+        return None
+    for linea in texto.splitlines():
+        linea = linea.strip().strip('"').strip(u"'")
+        if linea and not linea.startswith('#'):
+            return os.path.normpath(linea)
+    return None
+
+
+def _plantilla_txt():
+    u"""Deja el archivo listo para pegar la ruta dentro."""
+    ruta = _ruta_txt()
+    if os.path.exists(ruta):
+        return ruta
+    try:
+        carp = os.path.dirname(ruta)
+        if not os.path.isdir(carp):
+            os.makedirs(carp)
+        with open(ruta, 'wb') as f:
+            f.write((
+                u'# Auxiliar IV — dónde dejar el modelo.json\n'
+                u'#\n'
+                u'# Pega abajo la ruta de la carpeta, tal cual la copias del\n'
+                u'# explorador de Windows. Sin comillas y sin tocar nada más.\n'
+                u'# Ejemplo:\n'
+                u'#   C:\\Users\\Admin\\OneDrive\\PROCESO\\Reportes de Secciones RAM\n'
+                u'\n'
+            ).encode('utf-8'))
+        return ruta
+    except Exception:
+        return None
+
+
 def _leer_config():
     try:
         with open(_config(), 'rb') as f:
@@ -140,7 +183,15 @@ def resolver_carpeta():
         if guardada != d:
             cfg['carpeta'] = d
             _guardar_config(cfg)
-        return d, u'la de CARPETA'
+        return d, u'la de CARPETA, en el script'
+    delTxt = _leer_txt()
+    if delTxt and os.path.isdir(delTxt):
+        if guardada != delTxt:
+            cfg['carpeta'] = delTxt
+            _guardar_config(cfg)
+        return delTxt, u'la de carpeta.txt'
+    if delTxt:
+        log(u'  (carpeta.txt apunta a %r, que no existe)' % delTxt)
     if guardada and os.path.isdir(guardada):
         return guardada, u'recordada de la vez anterior'
     delModelo = carpeta_del_modelo()
@@ -517,11 +568,13 @@ def exportar(destino, log=log):
 def main():
     destino, comoSalio = resolver_carpeta()
     log(u'Destino: %s  (%s)' % (destino, comoSalio))
-    if not (CARPETA and str(CARPETA).strip() and CARPETA != 'preguntar'):
+    if u'carpeta.txt' not in comoSalio and u'CARPETA' not in comoSalio:
+        ruta = _plantilla_txt()
         log(u'')
-        log(u'  ┌─ Para que caiga donde la app la busca, pon arriba del script:')
-        log(u"  │    CARPETA = r'C:\\ruta\\a\\tu\\carpeta'")
-        log(u'  │  Se pone una vez y ya. (Aquí no hay explorador: RAM no deja.)')
+        log(u'  ┌─ Para que caiga donde la app la busca, pega la ruta en:')
+        log(u'  │    %s' % (ruta or _ruta_txt()))
+        log(u'  │  Tal cual la copias del explorador, sin comillas. Se hace')
+        log(u'  │  una vez. (Aquí no hay explorador: RAM no lo permite.)')
         log(u'  └─')
         log(u'')
     exportar(destino)
