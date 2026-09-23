@@ -29,12 +29,19 @@ const VIGAS = [
   [20, 20], [20, 25], [20, 30], [20, 35], [20, 40], [20, 45], [20, 50],
   [25, 20], [25, 25], [25, 30], [25, 35], [25, 40], [25, 45], [25, 50],
 ]
-const COLUMNAS = [[15, 15], [25, 10], [36, 36]]
+const COLUMNAS = [
+  [15, 15], [15, 20], [15, 25], [20, 20], [20, 25], [25, 10], [25, 25], [30, 30], [36, 36],
+]
 
-/** Como las nombra RAM en el grupo: «15 X 15» */
-export const nombreSeccionRam = (b, h) => `${b} X ${h}`
+/**
+ * Como se llaman en RAM: «20 X 35» las vigas y «COL 20 X 25» las columnas.
+ * RAM busca las secciones por NOMBRE, así que una viga y una columna de la
+ * misma medida no pueden llamarse igual; el prefijo es el que ya usaba el
+ * grupo NTC («COL 36 X 36»). El nombre siempre es b × h.
+ */
+export const nombreSeccionRam = (b, h, tipo = 'viga') => `${tipo === 'columna' ? 'COL ' : ''}${b} X ${h}`
 
-const alta = (tipo, tabla) => ([b, h]) => ({ b, h, s: RECUB_RAM, nombre: nombreSeccionRam(b, h), tipo, tabla })
+const alta = (tipo, tabla) => ([b, h]) => ({ b, h, s: RECUB_RAM, nombre: nombreSeccionRam(b, h, tipo), tipo, tabla })
 export const SECCIONES_RAM = [
   ...VIGAS.map(alta('viga', TABLA_VIGAS)),
   ...COLUMNAS.map(alta('columna', TABLA_COLUMNAS)),
@@ -82,8 +89,17 @@ export const MATERIALES_RAM = FC_RAM.map((fc) => materialRam(fc))
  * de RAM: las secciones con su tabla, y los materiales con las columnas de
  * Concreto.mat ya como texto (RAM las guarda así: «9.9E-6», «221359.43…»).
  */
+// Lo que instaló una versión anterior del catálogo y ya no va: se quita de
+// la tabla sólo si sigue EXACTAMENTE como se dejó (si alguien la editó, es
+// suya y se queda).
+const RETIRADAS = [
+  { tabla: TABLA_COLUMNAS, nombre: '25 X 10', b: 25, h: 10, s: 3 },   // ahora «COL 25 X 10»
+  { tabla: TABLA_COLUMNAS, nombre: '36 X 36', b: 36, h: 36, s: 3 },   // ahora «COL 36 X 36»
+]
+
 export function datosCatalogo() {
   return {
+    retirar: RETIRADAS,
     secciones: SECCIONES_RAM.map(({ tabla, nombre, b, h, s }) => ({ tabla, nombre, b, h, s })),
     materiales: MATERIALES_RAM.map((m) => ({
       nombre: m.nombre,

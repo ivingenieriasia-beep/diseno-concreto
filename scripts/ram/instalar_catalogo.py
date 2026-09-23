@@ -29,6 +29,22 @@ import re
 
 # ── El catálogo (lo escribe la app desde catalogoRam.js; no hace falta tocarlo)
 CATALOGO = {
+ "retirar": [
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "25 X 10",
+   "b": 25,
+   "h": 10,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "36 X 36",
+   "b": 36,
+   "h": 36,
+   "s": 3
+  }
+ ],
  "secciones": [
   {
    "tabla": "Vigas de Concreto",
@@ -179,21 +195,63 @@ CATALOGO = {
   },
   {
    "tabla": "Columnas de Concreto",
-   "nombre": "15 X 15",
+   "nombre": "COL 15 X 15",
    "b": 15,
    "h": 15,
    "s": 3
   },
   {
    "tabla": "Columnas de Concreto",
-   "nombre": "25 X 10",
+   "nombre": "COL 15 X 20",
+   "b": 15,
+   "h": 20,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 15 X 25",
+   "b": 15,
+   "h": 25,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 20 X 20",
+   "b": 20,
+   "h": 20,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 20 X 25",
+   "b": 20,
+   "h": 25,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 25 X 10",
    "b": 25,
    "h": 10,
    "s": 3
   },
   {
    "tabla": "Columnas de Concreto",
-   "nombre": "36 X 36",
+   "nombre": "COL 25 X 25",
+   "b": 25,
+   "h": 25,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 30 X 30",
+   "b": 30,
+   "h": 30,
+   "s": 3
+  },
+  {
+   "tabla": "Columnas de Concreto",
+   "nombre": "COL 36 X 36",
    "b": 36,
    "h": 36,
    "s": 3
@@ -332,10 +390,24 @@ def escribir_tabla(ruta, leo, enc, filas, cod):
         fh.write(texto.encode(cod, 'replace'))
 
 
-def fusionar(existentes, nuevas):
+def es_retirada(f, retirar):
+    u"""¿Es una fila que puso una versión anterior del catálogo, intacta?"""
+    for r in retirar:
+        if f.get(u'Name', u'').strip().lower() != r['nombre'].lower():
+            continue
+        try:
+            return float(f.get(u'b')) == r['b'] and float(f.get(u'h')) == r['h'] and float(f.get(u's')) == r['s']
+        except (TypeError, ValueError):
+            return False
+    return False
+
+
+def fusionar(existentes, nuevas, retirar=()):
     u"""Las del catálogo mandan sobre las que se llaman igual; el resto se queda."""
     porNombre = dict((n[u'Name'].strip().lower(), n) for n in nuevas)
     usadas, salida, actualizadas = set(), [], 0
+    quitadas = [f for f in existentes if es_retirada(f, retirar)]
+    existentes = [f for f in existentes if not es_retirada(f, retirar)]
     for f in existentes:
         k = f.get(u'Name', u'').strip().lower()
         if k in porNombre:
@@ -345,7 +417,7 @@ def fusionar(existentes, nuevas):
         else:
             salida.append(f)
     nuevas_de_verdad = [n for n in nuevas if n[u'Name'].strip().lower() not in usadas]
-    return salida + nuevas_de_verdad, actualizadas, len(nuevas_de_verdad), len(existentes) - actualizadas
+    return salida + nuevas_de_verdad, actualizadas, len(nuevas_de_verdad), len(existentes) - actualizadas, quitadas
 
 
 def invertidas(filas):
@@ -388,7 +460,7 @@ def respaldar(db, relativa, crudo):
     return destino, True
 
 
-def instalar_tabla(db, tipo, nombre_archivo, leo, enc_omision, nuevas):
+def instalar_tabla(db, tipo, nombre_archivo, leo, enc_omision, nuevas, retirar=()):
     relativa = os.path.join(tipo, u'Personales', nombre_archivo)
     ruta = os.path.join(db, relativa)
     carpeta = os.path.dirname(ruta)
@@ -413,10 +485,13 @@ def instalar_tabla(db, tipo, nombre_archivo, leo, enc_omision, nuevas):
         log(u'  respaldo %s: %s' % (u'guardado' if nuevo else u'ya existía, se conserva', destino))
     else:
         enc, existentes, cod = list(enc_omision), [], 'utf-8'
-    filas, act, alta, conservadas = fusionar(existentes, nuevas)
+    filas, act, alta, conservadas, quitadas = fusionar(existentes, nuevas, retirar)
     escribir_tabla(ruta, leo, enc, filas, cod)
     log(u'  %s: %d nueva(s), %d actualizada(s), %d tuya(s) conservada(s) → %d en total'
         % (nombre_archivo, alta, act, conservadas, len(filas)))
+    if quitadas:
+        log(u'    retiradas (las puso una versión anterior del catálogo): %s'
+            % u', '.join(f[u'Name'] for f in quitadas))
     for aviso in invertidas(filas):
         log(u'    ⚠ invertida: %s (el nombre dice lo contrario)' % aviso)
     return True
@@ -450,7 +525,8 @@ else:
         log(u'')
         for tabla in (u'Vigas de Concreto', u'Columnas de Concreto'):
             nuevas = [seccion(s) for s in CATALOGO['secciones'] if s['tabla'] == tabla]
-            instalar_tabla(db, u'Sections', tabla + u'.sec', LEO[tabla], ENC_SECCION, nuevas)
+            retirar = [r for r in CATALOGO.get('retirar', []) if r['tabla'] == tabla]
+            instalar_tabla(db, u'Sections', tabla + u'.sec', LEO[tabla], ENC_SECCION, nuevas, retirar)
         instalar_tabla(db, u'Materials', u'Concreto.mat', LEO_MAT, ENC_MATERIAL,
                        [material(m) for m in CATALOGO['materiales']])
 

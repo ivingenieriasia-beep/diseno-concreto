@@ -140,3 +140,49 @@ describe('crear las secciones que faltan desde el modelo', () => {
       .toMatchObject({ nombre: 'X-9', ancho: null, peralte: null })
   })
 })
+
+describe('las medidas reales de la sección, no las del nombre', () => {
+  const base = JSON.parse(TXT)
+  // lo que manda el script cuando lee las tablas de RAM
+  const conTablas = {
+    ...base,
+    secciones: {
+      'RcBeam 20x25': { b: 25, h: 20, s: 2, tipo: 'viga', fuente: 'el propio modelo', tabla: 'Vigas de Concreto' },
+      'COL 36 X 36': { b: 36, h: 36, s: 2, tipo: 'columna', fuente: 'el propio modelo', tabla: 'Columnas de Concreto' },
+    },
+  }
+  const R2 = parseModeloRam(JSON.stringify(conTablas))
+
+  it('T5 se diseña como RAM la analizó (25×20), no como dice su nombre', () => {
+    const t5 = R2.grupos.find((g) => g.nombre === 'T5')
+    const s = seccionSugerida(t5)
+    expect(s.ancho).toBe(25)
+    expect(s.peralte).toBe(20)
+    expect(s.fuente).toBe('el propio modelo')
+    expect(s.contradice).toEqual({ dice: '20×25', invertida: true })
+  })
+
+  it('y lo avisa con nombre y apellido', () => {
+    expect(R2.warnings.some((w) => /T5: la sección «RcBeam 20x25» se llama 20×25 pero en RAM está dada de alta como 25×20/.test(w))).toBe(true)
+  })
+
+  it('una sección que sí cuadra no avisa, y la columna se sabe columna por su tabla', () => {
+    const c1 = seccionSugerida(R2.grupos.find((g) => g.nombre === 'C1'))
+    expect(c1.contradice).toBeNull()
+    expect(c1.esColumna).toBe(true)
+    expect(c1.ancho).toBe(36)
+  })
+
+  it('sin tablas, como siempre: del nombre', () => {
+    const sinTablas = parseModeloRam(TXT)
+    const t5 = seccionSugerida(sinTablas.grupos.find((g) => g.nombre === 'T5'))
+    expect(t5.ancho).toBe(20)
+    expect(t5.peralte).toBe(25)
+    expect(t5.fuente).toBe('el nombre')
+  })
+
+  it('RAM no distingue mayúsculas ni espacios dobles', () => {
+    const otro = { ...base, secciones: { 'rcbeam  20X25': { b: 25, h: 20, s: 2, tipo: 'viga', fuente: 'x' } } }
+    expect(seccionSugerida(parseModeloRam(JSON.stringify(otro)).grupos.find((g) => g.nombre === 'T5')).ancho).toBe(25)
+  })
+})

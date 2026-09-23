@@ -229,7 +229,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
       const b = +(a.tipo === 'trabe' ? chip.ancho : chip.b) || 0
       const h = +(a.tipo === 'trabe' ? chip.peralte : chip.h) || 0
       if (b !== su.ancho || h !== su.peralte) {
-        discrepan.push({ tipo: a.tipo, idx: a.idx, nombre: chip.nombre, b, h, ancho: su.ancho, peralte: su.peralte, seccion: su.seccion })
+        discrepan.push({ tipo: a.tipo, idx: a.idx, nombre: chip.nombre, b, h, ancho: su.ancho, peralte: su.peralte, seccion: su.seccion, contradice: su.contradice })
       }
     }
     for (const a of asignados) {
@@ -565,6 +565,13 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               <span>
                 <b>Las demandas que acaban de entrar son de otra sección.</b>{' '}
                 {discrepan.map((d) => `${d.nombre}: el proyecto dice ${d.b}×${d.h} y RAM analizó ${d.ancho}×${d.peralte} (${d.seccion})`).join(' · ')}.
+                {discrepan.filter((d) => d.contradice).map((d) => (
+                  <div key={d.nombre} data-testid="aviso-invertida" style={{ marginTop: 4 }}>
+                    ⚠ Ojo con {d.nombre}: la sección de RAM se llama {d.contradice.dice} pero está dada de alta como {d.ancho}×{d.peralte}
+                    {d.contradice.invertida ? ' — invertida' : ''}. Si la intención era {d.contradice.dice}, el error está en RAM:
+                    corrígela allá, vuelve a analizar y sincroniza; «usar las medidas de RAM» sólo copiaría el error.
+                  </div>
+                ))}
               </span>
               <button className="btn btn-primary" style={{ fontSize: 10.5, marginLeft: 'auto' }} data-testid="usar-medidas-ram" onClick={usarMedidasDeRam}>
                 usar las medidas de RAM

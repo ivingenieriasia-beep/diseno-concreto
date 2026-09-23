@@ -80,6 +80,12 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
     porGrupo.get(g).push(m)
   }
 
+  // Las medidas REALES de cada sección, leídas por el script de las tablas de
+  // RAM. El nombre puede mentir («RCBEAM 20X25» estaba dada de alta 25×20) y
+  // RAM analiza con la tabla, así que manda la tabla.
+  const medidas = new Map(Object.entries(d.secciones || {}).map(([k, v]) => [normalSeccion(k), v]))
+  const medidasDe = (sec) => medidas.get(normalSeccion(sec)) || null
+
   const grupos = []
   for (const [nombre, lista] of porGrupo) {
     const members = []
@@ -116,9 +122,21 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
       points.push({ id: `${m.id}-Min`, member: String(m.id), tipo: 'Min', ...repMin, P: -repMin.axial, combo })
     }
     if (!members.length) continue
+    // la sección que usa el grupo: la de la mayoría (y se avisa si mezcla)
+    const cuenta = new Map()
+    for (const mb of members) cuenta.set(mb.seccion, (cuenta.get(mb.seccion) || 0) + 1)
+    const seccion = [...cuenta].sort((a, b) => b[1] - a[1])[0][0]
+    if (cuenta.size > 1) {
+      warnings.push(`${nombre} mezcla ${cuenta.size} secciones (${[...cuenta].map(([k, n]) => `${k} ×${n}`).join(', ')}); se toma ${seccion}.`)
+    }
+    const med = medidasDe(seccion)
+    const contradice = contradiceNombre(seccion, med)
+    if (contradice) {
+      warnings.push(`${nombre}: la sección «${seccion}» se llama ${contradice.dice} pero en RAM está dada de alta como ${med.b}×${med.h} (b×h), y así la analizó. Se diseña con ${med.b}×${med.h}.`)
+    }
     grupos.push({
       nombre, clave: claveNombre(nombre), n: members.length,
-      seccion: members[0].seccion,
+      seccion, medidas: med, contradice,
       perfil: {
         archivo, combo, unidades, formato: 'ram-api',
         members, L: 0, Lpor: {}, invertir: false, minLen: 0.6, porElemento: true,
@@ -145,6 +163,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
     ok: true, warnings, archivo,
     modelo: d.modelo || {}, combos: d.combinaciones || [], casos: d.casos || [], envueltas,
     model, grupos, reacciones,
+    conMedidas: medidas.size > 0,
   }
 }
 
@@ -192,12 +211,32 @@ export function seccionSugerida(grupo) {
   const m = /^([A-Za-z]+)[\s-]*(.+)$/.exec(crudo)
   const nombre = m ? `${m[1].toUpperCase()}-${m[2].toUpperCase()}` : crudo
   const seccion = String(grupo?.seccion || '')
-  const d = sectionDims(seccion)
+  // Las medidas de la tabla de RAM mandan; el nombre sólo si no las hay
+  const med = grupo?.medidas || null
+  const d = med ? { b: med.b, h: med.h } : sectionDims(seccion)
   // La etiqueta de RAM no siempre dice «COL», así que el nombre también cuenta
-  const esColumna = /col/i.test(seccion) || /^c\d/i.test(String(grupo?.clave || ''))
+  const esColumna = med?.tipo ? med.tipo === 'columna' : (/col/i.test(seccion) || /^c\d/i.test(String(grupo?.clave || '')))
   return {
     nombre, seccion, esColumna,
     ancho: d ? d.b : null,
     peralte: d ? d.h : null,
+    fuente: med ? med.fuente : (d ? 'el nombre' : null),
+    contradice: grupo?.contradice || null,
   }
+}
+
+/** 'COL  25 X 10' y 'col 25 x 10' son la misma sección para RAM */
+export const normalSeccion = (s) => String(s || '').split(/\s+/).filter(Boolean).join(' ').toLowerCase()
+
+/**
+ * ¿El nombre dice otras medidas que la tabla? «RcBeam 20x25» con b = 25 y
+ * h = 20 → { dice: '20×25', invertida: true }.
+ */
+export function contradiceNombre(seccion, med) {
+  if (!med) return null
+  const nums = String(seccion || '').match(/\d+(?:\.\d+)?/g)
+  if (!nums || nums.length < 2) return null
+  const [n1, n2] = nums.slice(-2).map(Number)
+  if (n1 === +med.b && n2 === +med.h) return null
+  return { dice: `${n1}×${n2}`, invertida: n1 === +med.h && n2 === +med.b }
 }

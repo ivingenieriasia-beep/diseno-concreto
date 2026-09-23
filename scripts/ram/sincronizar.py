@@ -50,6 +50,8 @@ SOLO_GRUPOS = None      # None = todos. Ej: ['T5', 'T2A'] para probar rápido
 
 import json
 import os
+import re
+import sys
 import time
 
 VERSION = 1
@@ -286,6 +288,140 @@ def alrededor(xs, i, L, n=11):
     return [a + k * (b - a) / (n - 1.0) for k in range(1, n - 1)]
 
 
+# ── Las medidas REALES de cada sección ────────────────────────
+# El nombre de una sección puede mentir: «RCBEAM 20X25» estaba dada de alta
+# con b = 25 y h = 20, y RAM analiza con la tabla, no con el nombre. Las
+# tablas son texto plano, así que se leen y se manda a la app lo que RAM usó.
+# Por orden de preferencia:
+#   1. la copia que guarda el propio modelo (ZipTemp), si es la del abierto
+#   2. los grupos del usuario (ProgramData: Personales, NTC…)
+#   3. los de la instalación
+A_CM = {'cm': 1.0, 'mm': 0.1, 'm': 100.0, 'in': 2.54, 'ft': 30.48}
+
+
+def _normal(nombre):
+    u"""'COL  25 X 10' y 'col 25 x 10' son la misma: RAM no distingue."""
+    return u' '.join((u'%s' % nombre).split()).lower()
+
+
+def _leer_sec(ruta):
+    u"""Filas de una tabla .sec: [(nombre, b, h, s en cm, plantilla)]."""
+    try:
+        with open(ruta, 'rb') as f:
+            crudo = f.read()
+    except Exception:
+        return []
+    try:
+        texto = crudo.decode('utf-8')
+    except UnicodeDecodeError:
+        texto = crudo.decode('cp1252', 'replace')
+    plantilla, enc, out = u'', None, []
+    for linea in texto.splitlines():
+        if not linea.strip() or linea.startswith(u'//'):
+            continue
+        if linea.startswith(u'['):
+            plantilla = linea.strip(u'[] ')
+            continue
+        partes = linea.split(u'\t')
+        if enc is None:
+            enc = [x.strip().lower() for x in partes]
+            continue
+        fila = dict(zip(enc, partes))
+        try:
+            k = A_CM.get(fila.get('unit', 'cm').strip().lower(), 1.0)
+            out.append((fila.get('name', u'').strip(), float(fila['b']) * k, float(fila['h']) * k,
+                        float(fila.get('s') or 0) * k, plantilla))
+        except (KeyError, ValueError):
+            continue
+    return out
+
+
+def _modelo_reciente():
+    u"""El nombre (sin extensión) del último modelo que abrió RAM."""
+    app = os.environ.get('APPDATA')
+    raiz = os.path.join(app, 'Bentley', 'Engineering', 'RAM Elements') if app else None
+    if not raiz or not os.path.isdir(raiz):
+        return None
+    candidatos = []
+    for dirpath, _d, files in os.walk(raiz):
+        for f in files:
+            if f.lower() == 'recents.xml':
+                ruta = os.path.join(dirpath, f)
+                try:
+                    candidatos.append((os.path.getmtime(ruta), ruta))
+                except Exception:
+                    pass
+    if not candidatos:
+        return None
+    try:
+        with open(max(candidatos)[1], 'rb') as f:
+            txt = f.read().decode('utf-8', 'replace')
+    except Exception:
+        return None
+    m = re.search(r'[A-Za-z]:[^<>"\r\n]+?\.ret\w*', txt)
+    if not m:
+        return None
+    base = re.split(r'[\\/]', m.group(0))[-1]
+    return re.sub(r'\.ret\w*$', '', base, flags=re.I).lower()
+
+
+def _fuentes_de_secciones():
+    u"""[(prioridad, fuente, ruta de la .sec)], la más fiable primero."""
+    fuentes = []
+    reciente = _modelo_reciente()
+    app = os.environ.get('APPDATA')
+    raiz = os.path.join(app, 'Bentley', 'Engineering', 'RAM Elements') if app else None
+    for dirpath, _d, files in (os.walk(raiz) if raiz and os.path.isdir(raiz) else []):
+        if os.path.basename(dirpath).lower() != 'ziptemp':
+            continue
+        modelos = [re.sub(r'\.ret\w*$', '', f, flags=re.I).lower() for f in files if re.search(r'\.ret\w*$', f, re.I)]
+        es_este = bool(reciente) and reciente in modelos
+        for d2, _d2, f2 in os.walk(os.path.join(dirpath, 'Sections')):
+            for f in f2:
+                if f.lower().endswith('.sec'):
+                    fuentes.append((0 if es_este else 3, u'el propio modelo' if es_este else u'la copia de otro modelo',
+                                    os.path.join(d2, f)))
+    pd = os.path.join(os.environ.get('PROGRAMDATA') or u'C:/ProgramData', 'Bentley', 'Engineering', 'RAM Elements')
+    for v in (os.listdir(pd) if os.path.isdir(pd) else []):
+        for d2, _d2, f2 in os.walk(os.path.join(pd, v, 'Database', 'Sections')):
+            for f in f2:
+                if f.lower().endswith('.sec'):
+                    fuentes.append((1, u'grupo %s' % os.path.basename(d2), os.path.join(d2, f)))
+    inst = os.path.join(os.path.dirname(sys.executable), 'Database', 'Sections')
+    for d2, _d2, f2 in os.walk(inst):
+        for f in f2:
+            if f.lower().endswith('.sec'):
+                fuentes.append((2, u'instalación, %s' % os.path.basename(d2), os.path.join(d2, f)))
+    fuentes.sort(key=lambda x: x[0])
+    return fuentes
+
+
+def medidas_de_secciones(nombres):
+    u"""{nombre usado en el modelo: {b, h, s, tipo, fuente, tabla}}."""
+    buscar = dict((_normal(n), n) for n in nombres if n)
+    hallado = {}
+    for _prio, fuente, ruta in _fuentes_de_secciones():
+        if len(hallado) == len(buscar):
+            break
+        for nom, b, h, s_, plantilla in _leer_sec(ruta):
+            k = _normal(nom)
+            if k not in buscar or buscar[k] in hallado:
+                continue
+            pl = plantilla.lower()
+            hallado[buscar[k]] = {
+                'b': round(b, 2), 'h': round(h, 2), 's': round(s_, 2),
+                'tipo': 'columna' if 'col' in pl else 'viga' if 'beam' in pl else plantilla,
+                'fuente': fuente, 'tabla': os.path.splitext(os.path.basename(ruta))[0],
+            }
+    return hallado
+
+
+def _dice_el_nombre(nombre):
+    u"""Las dos últimas cifras del nombre: 'RcBeam 20x25' → (20, 25)."""
+    nums = re.findall(r'\d+(?:\.\d+)?', u'%s' % nombre)
+    return (float(nums[-2]), float(nums[-1])) if len(nums) >= 2 else None
+
+
 def exportar(destino, log=log):
     u"""Lee el modelo y escribe el .json. Devuelve el resumen para el panel."""
     t0 = time.perf_counter()
@@ -510,6 +646,14 @@ def exportar(destino, log=log):
             reacciones.append({'nudo': nid, 'x': round(x, 4), 'y': round(y, 4), 'z': round(z, 4),
                                'por': por})
 
+    # ── Las medidas reales de las secciones que se usan ──────
+    # Nunca tumba la sincronización: si algo falla, la app deduce del nombre
+    try:
+        secciones = medidas_de_secciones(set(x['seccion'] for x in miembros))
+    except Exception as e:
+        secciones = {}
+        log(u'  (no se pudieron leer las tablas de secciones: %s)' % e)
+
     # ── Escribir ─────────────────────────────────────────────
     salida = {
         'formato': 'auxiliar-iv/ram', 'version': VERSION,
@@ -521,6 +665,7 @@ def exportar(destino, log=log):
         'campos_est': ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax'],
         'casos': casos, 'combinaciones': combos, 'envueltas': usadas,
         'nudos': nudos, 'miembros': miembros, 'reacciones': reacciones,
+        'secciones': secciones,
         'saltados': {'sin_longitud': sin_largo, 'sin_resultados': sin_result, 'motivos': motivos},
     }
 
@@ -547,6 +692,23 @@ def exportar(destino, log=log):
             log(u'  sin resultados: %s%s' % (sin_result[:15], u' …' if len(sin_result) > 15 else u''))
         for k, v in sorted(motivos.items(), key=lambda kv: -kv[1]):
             log(u'  motivo (%d veces): %s' % (v, k))
+
+    usadas_sec = sorted(set(x['seccion'] for x in miembros))
+    log(u'')
+    log(u'SECCIONES: %d en uso · %d con sus medidas reales leídas de las tablas de RAM'
+        % (len(usadas_sec), len(secciones)))
+    for nom in usadas_sec:
+        d = secciones.get(nom)
+        if not d:
+            log(u'  %-16s sin tabla: la app deducirá las medidas del nombre' % nom)
+            continue
+        dice = _dice_el_nombre(nom)
+        ojo = u''
+        if dice and (d['b'], d['h']) != dice and (d['h'], d['b']) == dice:
+            ojo = u'   ⚠ INVERTIDA: el nombre dice %g×%g' % dice
+        elif dice and (d['b'], d['h']) != dice:
+            ojo = u'   ⚠ el nombre dice %g×%g' % dice
+        log(u'  %-16s b %-5g h %-5g s %-4g %-8s (%s)%s' % (nom, d['b'], d['h'], d['s'], d['tipo'], d['fuente'], ojo))
 
     log(u'')
     log(u'ESTACIONES POR GRUPO (mín / media / máx) — si salen 2 o 3, la curva es plana:')
