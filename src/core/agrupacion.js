@@ -43,10 +43,13 @@ const RECUB = 3
 
 const area = (s) => s.b * s.h
 
+/** Los peraltes de las vigas del catálogo (cm) */
+export const PERALTES = [...new Set(SECCIONES_RAM.filter((s) => s.tipo === 'viga').map((s) => s.h))].sort((a, b) => a - b)
+
 /** Las vigas del catálogo que se pueden proponer, de menos a más concreto */
-export function candidatas(anchos = [15, 20, 25]) {
+export function candidatas(anchos = [15, 20, 25], peraltes = null) {
   return SECCIONES_RAM
-    .filter((s) => s.tipo === 'viga' && anchos.includes(s.b))
+    .filter((s) => s.tipo === 'viga' && anchos.includes(s.b) && (!peraltes || peraltes.includes(s.h)))
     .sort((a, b) => area(a) - area(b) || b.h - a.h)       // a igual área, la más peraltada
 }
 
@@ -218,8 +221,8 @@ export function agrupar(elems, cands, tau) {
  * Todo de una vez: elementos, secciones mínimas y las tres propuestas.
  * @returns { elementos, hoy:{ grupos, concreto }, natural, propuestas:[…] }
  */
-export function proponerAgrupacion(R, nombres, { anchos = [15, 20, 25] } = {}) {
-  const cands = candidatas(anchos)
+export function proponerAgrupacion(R, nombres, { anchos = [15, 20, 25], peraltes = null } = {}) {
+  const cands = candidatas(anchos, peraltes)
   const els = elementos(R, nombres)
   for (const e of els) e.minima = seccionMinima(e, cands)
   // los miembros de esos grupos que no son horizontales (rampas, apoyos inclinados…) no se tocan

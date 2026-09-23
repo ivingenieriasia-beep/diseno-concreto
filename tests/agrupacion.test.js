@@ -7,7 +7,7 @@ import {
   inventario, elementos, candidatas, capacidad, aprovechamiento, seccionMinima,
   proponerAgrupacion, verificarGrupo, UMBRALES,
   manualDesde, manualVacio, grupoNuevo, armarManual, renumerar, problemasDeNombres,
-  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO, flechasDeEjes, GIRO_RAM, leerMiembros, buscarMiembros,
+  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO, flechasDeEjes, GIRO_RAM, leerMiembros, buscarMiembros, PERALTES,
 } from '../src/core/agrupacion.js'
 import { generarAplicarAgrupacion } from '../src/core/ramScript.js'
 import { SECCIONES_RAM } from '../src/core/catalogoRam.js'
@@ -53,6 +53,17 @@ describe('dimensionar', () => {
       const i = cands.indexOf(sec)
       for (const previa of cands.slice(0, i)) expect(aprovechamiento(e, previa)).toBeGreaterThan(1)
     }
+  })
+
+  it('con tope de peralte, ninguna propuesta pasa de él', () => {
+    expect(PERALTES).toEqual([20, 25, 30, 35, 40, 45, 50])
+    expect(candidatas([15, 20, 25], [20, 25, 30]).every((s) => s.h <= 30)).toBe(true)
+    const A = proponerAgrupacion(R, ['T5', 'T6', 'T4', 'T7'], { peraltes: [20, 25, 30, 35] })
+    for (const P of A.propuestas) for (const g of P.grupos) expect(g.sec.h).toBeLessThanOrEqual(35)
+    // lo que no cabe en ninguna permitida se marca, no se sube por encima del tope
+    const B = proponerAgrupacion(R, ['T5', 'T6', 'T4', 'T7'], { peraltes: [20] })
+    expect(B.propuestas.every((P) => P.grupos.every((g) => g.sec.h === 20))).toBe(true)
+    expect(B.elementos.some((e) => e.minima.fuera)).toBe(true)
   })
 
   it('sólo propone vigas del catálogo, y en los anchos permitidos', () => {

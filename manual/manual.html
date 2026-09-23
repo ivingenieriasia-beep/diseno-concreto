@@ -375,7 +375,9 @@
   <h3>Paso 1 · Qué agrupar</h3>
   <figure><img src="img/agr-que.png" alt=""></figure>
   <p>Cada casilla es un grupo de hoy (una descripción de RAM, o <b>(sin nombre)</b>). Vienen marcadas las trabes de 15 cm o más; las nervaduras y las columnas no.
-  Abajo, los <b>anchos que se pueden proponer</b>: el ancho suele mandarlo el muro o la columna, así que quita los que no quieras.</p>
+  Abajo, los <b>anchos</b> y los <b>peraltes que se pueden proponer</b>: el ancho suele mandarlo el muro o la columna y el peralte la arquitectura
+  (plafones, ventanas, altura libre). <b>tope</b> marca de un golpe todos los peraltes hasta ése. Con un tope, la propuesta compensa con más ancho si lo permites;
+  si una trabe no cabe en ninguna sección permitida, su grupo se marca ⚠ y la verificación dice si se puede armar con más acero. La app recuerda lo que marcaste.</p>
 
   <h3>Paso 2 · Las propuestas</h3>
   <figure><img src="img/agr-propuestas.png" alt=""></figure>
@@ -610,7 +612,8 @@
     <tr><td><b>Materiales</b></td><td>f'c 250 kg/cm² y fy 4 200 kg/cm² para dimensionar la agrupación. Ec según NTC: clase 1 (f'c ≥ 250) 14 000√f'c con agregado calizo (11 000√f'c si es basáltico); clase 2 (200 ≤ f'c &lt; 250) 8 000√f'c.</td></tr>
     <tr><td><b>Sección mínima de una trabe</b> (Agrupación)</td><td>Flexión: MR con ρ = ½ ρ balanceada, FR = 0.9, recubrimiento 3 cm; con eso se arma cómoda y es dúctil.
       Cortante: estribos #2.5 de dos ramas a no menos de 8 cm; si el acero de cortante pasa de FR · 1.1√f'c · b · d la separación máxima baja a d/4, y en poco peralte eso ya no se arma: pide peralte. Sin pasar del cortante máximo de la sección.</td></tr>
-    <tr><td><b>Propuestas de agrupación</b></td><td>Una clase sube a la sección del grupo de arriba si todas sus trabes caben y la más cargada la aprovecharía al menos al 50, 65 u 80 %. Sólo trabes horizontales; sólo secciones del catálogo y de los anchos permitidos.</td></tr>
+    <tr><td><b>Propuestas de agrupación</b></td><td>Una clase sube a la sección del grupo de arriba si todas sus trabes caben y la más cargada la aprovecharía al menos al 50, 65 u 80 %. Sólo trabes horizontales; sólo secciones del catálogo con los anchos y peraltes permitidos.
+      La sección se elige con la cuantía de dimensionamiento (½ ρ balanceada); el armado real lo pone después la verificación, que puede usar más acero (hasta 0.9 ρ balanceada) si hace falta.</td></tr>
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 8, con H del modelo.</td></tr>

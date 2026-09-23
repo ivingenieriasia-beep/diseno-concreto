@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseModeloRam } from '../core/ramModel'
 import { modeloGuardado, hace, EVENTO_MODELO } from '../core/ramSync'
 import {
-  inventario, proponerAgrupacion, verificarGrupo, planos, GIRO_RAM, armarManual, manualDesde, manualVacio, problemasDeNombres,
+  inventario, proponerAgrupacion, verificarGrupo, planos, GIRO_RAM, PERALTES, armarManual, manualDesde, manualVacio, problemasDeNombres,
 } from '../core/agrupacion'
 import { generarAplicarAgrupacion } from '../core/ramScript'
 import AgrupacionManual from './AgrupacionManual'
@@ -12,6 +12,9 @@ import AgrupacionManual from './AgrupacionManual'
 // acomodo a mano, partiendo de una de ellas o de cero, que sale igual.
 
 const ANCHOS = [15, 20, 25]
+const FILTROS = 'auxiv.agrupacion.filtros'
+const leerFiltros = () => { try { return JSON.parse(localStorage.getItem(FILTROS) || 'null') || {} } catch { return {} } }
+const alterna = (lista, v) => (lista.includes(v) ? lista.filter((x) => x !== v) : [...lista, v].sort((x, y) => x - y))
 const pct = (v) => `${Math.round(v * 100)} %`
 const m3 = (v) => `${v.toFixed(2)} m³`
 const GUARDADO = 'auxiv.agrupacion.manual'
@@ -60,12 +63,12 @@ function Tarjeta({ P, vs, hoy, activa, onClick, subtitulo, accion, nota }) {
           const v = vs[i]
           return [
             <b key={`${i}n`} style={{ color: v ? (v.estado === 'ok' ? '#15803d' : '#c62828') : 'inherit' }}>{v ? (v.estado === 'ok' ? '✓' : '✗') : '·'} {g.nombre}</b>,
-            <span key={`${i}s`} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.sec ? g.sec.nombre.replace(' X ', '×') : '—'}{g.fuera ? ' ⚠' : ''}</span>,
+            <span key={`${i}s`} data-sec={g.sec?.nombre || ''} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.sec ? g.sec.nombre.replace(' X ', '×') : '—'}{g.fuera ? ' ⚠' : ''}</span>,
             <span key={`${i}c`} style={{ color: 'var(--color-tx3)' }}>{g.elems.length} trabe(s) · {g.miembros.length} miembros</span>,
             <span key={`${i}u`} style={{ color: 'var(--color-tx3)' }} title={v?.texto || ''}>
               aprovechamiento {pct(g.uMin)}–{pct(g.uMax)}
               {v?.motivos?.length ? <span style={{ color: '#c62828' }}> · {v.motivos[0]}</span> : null}
-              {g.fuera ? <span style={{ color: '#c62828' }}> · {g.auto === false ? 'no cabe en la sección fijada' : 'ninguna del catálogo alcanza'}</span> : null}
+              {g.fuera ? <span style={{ color: '#c62828' }}> · {g.auto === false ? 'no cabe en la sección fijada' : 'ninguna sección permitida alcanza'}</span> : null}
             </span>,
           ]
         })}
@@ -78,7 +81,9 @@ export default function AgrupacionView({ onToast }) {
   const [fuente, setFuente] = useState(null)       // { archivo, at, R }
   const [aviso, setAviso] = useState('')
   const [elegidos, setElegidos] = useState(null)   // Set de grupos a agrupar
-  const [anchos, setAnchos] = useState(ANCHOS)
+  const [anchos, setAnchos] = useState(() => leerFiltros().anchos || ANCHOS)
+  const [peraltes, setPeraltes] = useState(() => leerFiltros().peraltes || PERALTES)
+  useEffect(() => { try { localStorage.setItem(FILTROS, JSON.stringify({ anchos, peraltes })) } catch { /* sin almacenamiento */ } }, [anchos, peraltes])
   const [verif, setVerif] = useState({})           // `${propuesta}|${grupo}` → resultado de la Fase 1
   const [elegida, setElegida] = useState('equilibrada')
   const [manual, setManual] = useState(null)       // el acomodo a mano (ver core/agrupacion)
@@ -110,9 +115,9 @@ export default function AgrupacionView({ onToast }) {
 
   const inv = useMemo(() => (fuente ? inventario(fuente.R) : []), [fuente])
   const A = useMemo(() => {
-    if (!fuente || !elegidos?.size || !anchos.length) return null
-    try { return proponerAgrupacion(fuente.R, [...elegidos], { anchos }) } catch (e) { console.error(e); return null }
-  }, [fuente, elegidos, anchos])
+    if (!fuente || !elegidos?.size || !anchos.length || !peraltes.length) return null
+    try { return proponerAgrupacion(fuente.R, [...elegidos], { anchos, peraltes }) } catch (e) { console.error(e); return null }
+  }, [fuente, elegidos, anchos, peraltes])
 
   // Verificar cada grupo con la Fase 1, de a uno para que la pantalla respire
   useEffect(() => {
@@ -278,12 +283,34 @@ export default function AgrupacionView({ onToast }) {
             <span style={{ color: 'var(--color-tx2)' }}>Anchos que se pueden proponer:</span>
             {ANCHOS.map((b) => (
               <label key={b} data-testid={`agr-ancho-${b}`} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                <input type="checkbox" checked={anchos.includes(b)} onChange={() => setAnchos((a) => (a.includes(b) ? a.filter((x) => x !== b) : [...a, b].sort((x, y) => x - y)))} />
+                <input type="checkbox" checked={anchos.includes(b)} onChange={() => setAnchos((a) => alterna(a, b))} />
                 {b} cm
               </label>
             ))}
             <span style={{ color: 'var(--color-tx3)', fontSize: 10.5 }}>(el ancho suele mandarlo el muro o la columna)</span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11.5, flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--color-tx2)' }}>Peraltes que se pueden proponer:</span>
+            {PERALTES.map((h) => (
+              <label key={h} data-testid={`agr-peralte-${h}`} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                <input type="checkbox" checked={peraltes.includes(h)} onChange={() => setPeraltes((a) => alterna(a, h))} />
+                {h}
+              </label>
+            ))}
+            <span style={{ color: 'var(--color-tx2)' }}>cm</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 6 }} title="Marca todos los peraltes hasta éste y ninguno más grande">
+              tope
+              <select data-testid="agr-tope" value={peraltes.length ? Math.max(...peraltes) : ''}
+                onChange={(e) => setPeraltes(PERALTES.filter((h) => h <= +e.target.value))}
+                style={{ fontSize: 11.5, border: '1px solid var(--color-border)', borderRadius: 5, background: 'var(--color-bg)', color: 'inherit' }}>
+                {PERALTES.map((h) => <option key={h} value={h}>{h} cm</option>)}
+              </select>
+            </label>
+            <span style={{ color: 'var(--color-tx3)', fontSize: 10.5 }}>(el peralte suele mandarlo la arquitectura: plafones, ventanas, altura libre)</span>
+          </div>
+          {(!anchos.length || !peraltes.length) && (
+            <div style={{ color: '#c62828', fontSize: 11, marginTop: 6 }}>Marca al menos un ancho y un peralte.</div>
+          )}
         </Paso>
       )}
 
