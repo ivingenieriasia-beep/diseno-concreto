@@ -32,6 +32,10 @@ Ajusta CARPETA para que apunte a donde la app va a leer.
 #   'preguntar'   vuelve a preguntar (para cambiarla)
 #   r'C:\\ruta'    esa y sin preguntar
 CARPETA = None
+# MODO: 'panel' abre una ventanita con dos botones (configurar carpeta ·
+# sincronizar) y se queda ahí; 'directo' exporta y termina. Con la carpeta ya
+# recordada, 'directo' + Ctrl+R en la consola es lo más rápido que hay.
+MODO = 'panel'
 ARCHIVO = 'modelo.json'
 PASO_M = 0.05           # una estación cada 5 cm
 MIN_EST = 21            # nunca menos de esto por miembro
@@ -252,10 +256,8 @@ def alrededor(xs, i, L, n=11):
     return [a + k * (b - a) / (n - 1.0) for k in range(1, n - 1)]
 
 
-def main():
-    # Primero la carpeta: más vale preguntar antes de ponerse a calcular.
-    destino, comoSalio = resolver_carpeta()
-    log(u'Destino: %s  (%s)' % (destino, comoSalio))
+def exportar(destino, log=log):
+    u"""Lee el modelo y escribe el .json. Devuelve el resumen para el panel."""
     t0 = time.perf_counter()
     import ramelements
     m = ramelements.model()
@@ -464,8 +466,110 @@ def main():
     log(u'%.1f s · %.1f KB' % (dt, os.path.getsize(ruta) / 1024.0))
     log(u'')
     log(u'>>> %s' % ruta)
-    log(u'    (carpeta %s · para cambiarla, pon CARPETA = \'preguntar\' arriba)' % comoSalio)
     log(u'>>> En la app: Sincronizar con RAM')
+    return {
+        'ruta': ruta, 'miembros': len(miembros), 'grupos': grupos,
+        'estaciones': n_est, 'reacciones': len(reacciones), 'nudos': len(nudos),
+        'segundos': dt, 'kb': os.path.getsize(ruta) / 1024.0,
+        'saltados': len(sin_largo) + len(sin_result),
+    }
+
+
+# ── La ventanita: dos botones y ya ────────────────────────────
+def panel():
+    u"""
+    Un panel mínimo sobre RAM: la carpeta arriba y dos botones.
+    Ojo: mientras esté abierto, la consola de Python queda ocupada (es su
+    mismo hilo). Se cierra al terminar y RAM sigue como si nada.
+    """
+    import tkinter as tk
+    from tkinter import scrolledtext
+
+    cfg = _leer_config()
+    estado = {'carpeta': cfg.get('carpeta') or ''}
+
+    raiz = tk.Tk()
+    raiz.title(u'Auxiliar IV · sincronizar con RAM')
+    raiz.geometry('620x400')
+    try:
+        raiz.attributes('-topmost', True)
+    except Exception:
+        pass
+
+    cab = tk.Frame(raiz, padx=12, pady=10)
+    cab.pack(fill='x')
+    tk.Label(cab, text=u'Carpeta donde la app busca el modelo.json:',
+             font=('Segoe UI', 9)).pack(anchor='w')
+    vCarpeta = tk.StringVar(value=estado['carpeta'] or u'— sin configurar —')
+    tk.Label(cab, textvariable=vCarpeta, font=('Consolas', 9), fg='#1a4a7a',
+             wraplength=580, justify='left').pack(anchor='w', pady=(2, 8))
+
+    botones = tk.Frame(cab)
+    botones.pack(fill='x')
+    salida = scrolledtext.ScrolledText(raiz, height=15, font=('Consolas', 8))
+    salida.pack(fill='both', expand=True, padx=12, pady=(0, 12))
+
+    def escribir(*a):
+        salida.insert('end', u' '.join(str(x) for x in a) + u'\n')
+        salida.see('end')
+        raiz.update_idletasks()
+
+    def configurar():
+        d = elegir_carpeta(estado['carpeta'] or None)
+        if not d:
+            escribir(u'(no se eligió carpeta)')
+            return
+        estado['carpeta'] = d
+        c = _leer_config()
+        c['carpeta'] = d
+        _guardar_config(c)
+        vCarpeta.set(d)
+        escribir(u'Carpeta guardada: %s' % d)
+
+    def sincronizar():
+        if not estado['carpeta']:
+            escribir(u'Primero configura la carpeta.')
+            configurar()
+            if not estado['carpeta']:
+                return
+        bSync.config(state='disabled', text=u'Sincronizando…')
+        salida.delete('1.0', 'end')
+        try:
+            r = exportar(estado['carpeta'], log=escribir)
+            escribir(u'')
+            escribir(u'LISTO · %d miembros · %d estaciones · %.0f KB · %.1f s'
+                     % (r['miembros'], r['estaciones'], r['kb'], r['segundos']))
+            escribir(u'Ahora, en la app: Sincronizar con RAM')
+        except Exception as e:
+            import traceback
+            escribir(u'ERROR: %s: %s' % (type(e).__name__, e))
+            escribir(traceback.format_exc())
+        finally:
+            bSync.config(state='normal', text=u'  Sincronizar ahora  ')
+
+    tk.Button(botones, text=u'  Carpeta…  ', command=configurar).pack(side='left')
+    bSync = tk.Button(botones, text=u'  Sincronizar ahora  ', command=sincronizar,
+                      font=('Segoe UI', 9, 'bold'))
+    bSync.pack(side='left', padx=8)
+    tk.Button(botones, text=u'  Cerrar  ', command=raiz.destroy).pack(side='right')
+
+    escribir(u'Con el modelo abierto y el análisis corrido, dale a Sincronizar.')
+    if not estado['carpeta']:
+        escribir(u'Primero hay que decir en qué carpeta dejar el modelo.json.')
+    raiz.mainloop()
+
+
+def main():
+    if MODO == 'panel':
+        try:
+            panel()
+            return
+        except Exception as e:
+            log(u'(no se pudo abrir el panel: %s — se hace directo)' % e)
+    destino, comoSalio = resolver_carpeta()
+    log(u'Destino: %s  (%s)' % (destino, comoSalio))
+    exportar(destino)
+    log(u'    (carpeta %s · para cambiarla, pon CARPETA = \'preguntar\' arriba)' % comoSalio)
 
 
 try:
