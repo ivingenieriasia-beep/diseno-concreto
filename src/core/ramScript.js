@@ -20,6 +20,8 @@
 // ══════════════════════════════════════════════════════════════
 
 import PLANTILLA from '../../scripts/ram/sincronizar.py?raw'
+import INSTALADOR from '../../scripts/ram/instalar_catalogo.py?raw'
+import { datosCatalogo } from './catalogoRam'
 
 /** Quita comillas, espacios y barras sobrantes de una ruta pegada a mano */
 export function normalizarRuta(s) {
@@ -89,4 +91,20 @@ export function generarScriptRam(ruta, { proyecto = '' } = {}) {
     nombre: 'sincronizar.py',
     aviso: '',
   }
+}
+
+// ── El instalador del catálogo ────────────────────────────────
+// A diferencia de sincronizar.py, no depende del proyecto: es una vez por
+// computadora. Se genera aquí para que el catálogo tenga una sola fuente
+// (catalogoRam.js) y el .py nunca se quede atrás.
+const BLOQUE_CATALOGO = /^CATALOGO = \{[\s\S]*?\n\}\n/m
+
+/** El catálogo como literal de Python (JSON sin true/false/null lo es) */
+export const catalogoComoPython = () => `CATALOGO = ${JSON.stringify(datosCatalogo(), null, 1)}\n`
+
+export function generarInstaladorCatalogo() {
+  if (!BLOQUE_CATALOGO.test(INSTALADOR)) {
+    return { ok: false, aviso: 'La plantilla del instalador ya no trae el bloque CATALOGO.' }
+  }
+  return { ok: true, nombre: 'instalar_catalogo.py', texto: INSTALADOR.replace(BLOQUE_CATALOGO, catalogoComoPython()) }
 }

@@ -5,7 +5,8 @@ import { REPORTES, clasificarLote } from '../core/ramReports'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
 import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../core/ramModel'
-import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta } from '../core/ramScript'
+import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta, generarInstaladorCatalogo } from '../core/ramScript'
+import { SECCIONES_RAM, MATERIALES_RAM } from '../core/catalogoRam'
 import { proponerTrabe, proponerColumna } from '../core/propuesta'
 import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta,
@@ -261,12 +262,24 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
     if (!r.ok) { setAvisoRuta(r.aviso); return }
     setAvisoRuta('')
     setRutaRam(r.ruta)
+    descargar(r)
+    setMsg(`${r.nombre} descargado. Déjalo en «${nombreCarpeta(r.ruta)}» y ábrelo en la consola de Python de RAM.`)
+  }
+
+  function descargar(r) {
     const url = URL.createObjectURL(new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url; a.download = r.nombre
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setMsg(`${r.nombre} descargado. Déjalo en «${nombreCarpeta(r.ruta)}» y ábrelo en la consola de Python de RAM.`)
+  }
+
+  /** El catálogo de la casa al grupo Personales de RAM: una vez por computadora */
+  function bajarInstalador() {
+    const r = generarInstaladorCatalogo()
+    if (!r.ok) { setMsg(r.aviso); return }
+    descargar(r)
+    setMsg(`${r.nombre} descargado. En RAM: Python Console → Abrir Script… → Ctrl+R (pegado en el editor se descompone la sangría).`)
   }
 
   /** Adopta en los chips las medidas de la sección que RAM analizó */
@@ -501,6 +514,15 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 </button>
               </div>
               {avisoRuta && <div data-testid="aviso-ruta" style={{ color: '#c62828', fontSize: 10.5, marginTop: 5 }}>{avisoRuta}</div>}
+              <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed var(--color-border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="bajar-catalogo" onClick={bajarInstalador}>
+                  ⬇ instalar_catalogo.py
+                </button>
+                <span style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.5, flex: '1 1 300px' }}>
+                  Da de alta en el grupo <b>Personales</b> de RAM las {SECCIONES_RAM.length} secciones y los {MATERIALES_RAM.length} concretos
+                  del catálogo. Una vez por computadora, no por proyecto: conserva lo que ya tengas y guarda un respaldo.
+                </span>
+              </div>
               {esRutaWindows(ruta) && carpeta && nombreCarpeta(ruta) !== carpeta.name && (
                 <div style={{ color: '#92400e', fontSize: 10.5, marginTop: 5 }}>
                   ⚠ La carpeta que elegiste arriba se llama <b>{carpeta.name}</b> y esta ruta acaba en

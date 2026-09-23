@@ -64,6 +64,7 @@ export function materialRam(fc, { agregado = 'calizo' } = {}) {
     clase,
     fc,                              // kg/cm² — el nominal, no 4 ksi
     Ec: Math.round(k * Math.sqrt(fc)), // kg/cm²
+    EcExacto: k * Math.sqrt(fc),     // el que se escribe en RAM, sin redondear
     nu: 0.2,                         // Poisson del concreto (en RAM estaba 0.3)
     pesoUnitario: 0.0024,            // kg/cm³ = 2.4 t/m³, concreto reforzado
     alfa: 1.0e-5,                    // 1/°C
@@ -75,3 +76,27 @@ export function materialRam(fc, { agregado = 'calizo' } = {}) {
 }
 
 export const MATERIALES_RAM = FC_RAM.map((fc) => materialRam(fc))
+
+/**
+ * El catálogo en la forma en que lo escribe instalar_catalogo.py en las tablas
+ * de RAM: las secciones con su tabla, y los materiales con las columnas de
+ * Concreto.mat ya como texto (RAM las guarda así: «9.9E-6», «221359.43…»).
+ */
+export function datosCatalogo() {
+  return {
+    secciones: SECCIONES_RAM.map(({ tabla, nombre, b, h, s }) => ({ tabla, nombre, b, h, s })),
+    materiales: MATERIALES_RAM.map((m) => ({
+      nombre: m.nombre,
+      U: String(m.nu),
+      W: String(m.pesoUnitario),
+      Alpha: m.alfa.toExponential().toUpperCase(),
+      E: String(m.EcExacto),
+      FyH: String(m.fy),
+      factorTor: String(m.J),
+      FcH: String(m.fc),
+      Es: String(m.Es),
+      FytH: String(m.fyt),
+      RCRegion: 'US',
+    })),
+  }
+}
