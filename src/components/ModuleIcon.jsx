@@ -34,6 +34,13 @@ const PATHS = {
       <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
     </>
   ),
+  grupos: (
+    <>
+      <path d="M3 5h18" strokeWidth="3" />
+      <path d="M3 12h12" strokeWidth="2.2" />
+      <path d="M3 19h7" />
+    </>
+  ),
 }
 
 export default function ModuleIcon({ nombre, size = 18, strokeWidth = 1.8 }) {

@@ -24,6 +24,14 @@ export const MODULOS = [
     palabras: ['longitudinal', 'alzado', 'alzados', 'bastones', 'estaciones', 'trabe', 'trabes', 'envolvente'],
   },
   {
+    id: 'agrupacion',
+    nombre: 'Agrupación',
+    tipo: 'pestana',
+    icono: 'grupos',
+    resumen: 'De un modelo sin agrupar a unas pocas T: tres propuestas con su sección y su armado, y el script para aplicarlas en RAM.',
+    palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1'],
+  },
+  {
     id: 'bdglobal',
     nombre: 'BD Global',
     tipo: 'pestana',

@@ -21,6 +21,7 @@
 
 import PLANTILLA from '../../scripts/ram/sincronizar.py?raw'
 import INSTALADOR from '../../scripts/ram/instalar_catalogo.py?raw'
+import APLICAR from '../../scripts/ram/aplicar_agrupacion.py?raw'
 import { datosCatalogo } from './catalogoRam'
 
 /** Quita comillas, espacios y barras sobrantes de una ruta pegada a mano */
@@ -107,4 +108,28 @@ export function generarInstaladorCatalogo() {
     return { ok: false, aviso: 'La plantilla del instalador ya no trae el bloque CATALOGO.' }
   }
   return { ok: true, nombre: 'instalar_catalogo.py', texto: INSTALADOR.replace(BLOQUE_CATALOGO, catalogoComoPython()) }
+}
+
+// ── Aplicar una agrupación en RAM ─────────────────────────────
+const BLOQUE_AGRUPACION = /^AGRUPACION = \{[\s\S]*?\n\}\n/m
+
+/**
+ * El aplicar_agrupacion.py con la propuesta elegida dentro.
+ * @param propuesta  { nombre, grupos:[{ nombre, sec:{nombre}, miembros:[ids] }] }
+ */
+export function generarAplicarAgrupacion(propuesta) {
+  if (!BLOQUE_AGRUPACION.test(APLICAR)) {
+    return { ok: false, aviso: 'La plantilla de aplicar_agrupacion.py ya no trae el bloque AGRUPACION.' }
+  }
+  const datos = {
+    propuesta: propuesta.nombre || '',
+    grupos: propuesta.grupos.map((g) => ({
+      descripcion: g.nombre,
+      seccion: g.sec.nombre,
+      // los ids de RAM son enteros; en la app viajan como texto
+      miembros: g.miembros.map((id) => Number(id)).filter((n) => Number.isFinite(n)),
+    })),
+  }
+  const texto = APLICAR.replace(BLOQUE_AGRUPACION, `AGRUPACION = ${JSON.stringify(datos, null, 1)}\n`)
+  return { ok: true, nombre: 'aplicar_agrupacion.py', texto }
 }
