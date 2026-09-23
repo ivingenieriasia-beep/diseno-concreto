@@ -266,6 +266,34 @@ def exportar(destino, log=log):
                 u'    Corre el análisis en RAM (o m.analyze() aquí) y vuelve a intentarlo.')
         # otra cosa: que siga y que cada miembro lo reporte por su cuenta
 
+    # ── ¿Estamos midiendo la misma longitud que RAM? ─────────
+    # La documentación de Bentley dice que member.node_i / node_j son «node
+    # INDICES»; el modelo real devuelve números que encajan como IDs. Si nos
+    # equivocáramos, emparejaríamos nudos que no son y todas las longitudes
+    # saldrían mal, en silencio.
+    #
+    # Hay una forma de preguntárselo a RAM: rechaza cualquier estación fuera
+    # de [0, L]. Si acepta una un 5 % más allá de la L que calculamos con las
+    # coordenadas, es que su miembro es más largo — y no estamos midiendo lo
+    # mismo.
+    def verificar_longitudes(muestra=25):
+        todos_mb = list(m.members)
+        if not todos_mb:
+            return []
+        paso = max(1, len(todos_mb) // muestra)
+        combo0 = usadas[0]
+        malos = []
+        for mb in todos_mb[::paso][:muestra]:
+            L = largo(mb)
+            if L <= 0.01:
+                continue
+            try:
+                m.results.member_forces_at_station(int(mb.id), combo0, [L * 1.05])
+                malos.append((int(mb.id), L))     # lo aceptó: RAM lo tiene más largo
+            except Exception:
+                pass                               # lo rechazó: vamos bien
+        return malos
+
     # ── Condiciones de carga: se envuelven todas las combinaciones ──
     combos, casos = [], []
     for lc in m.load_condition:
@@ -303,6 +331,20 @@ def exportar(destino, log=log):
         if not a or not b:
             return 0.0
         return sum((a[k] - b[k]) ** 2 for k in range(3)) ** 0.5
+
+    malos = verificar_longitudes()
+    if malos:
+        log(u'')
+        log(u'  ⚠⚠ LAS LONGITUDES NO CUADRAN CON LAS DE RAM ⚠⚠')
+        log(u'  RAM acepta estaciones más allá de la longitud que calculamos con')
+        log(u'  las coordenadas de los nudos, en %d de los miembros de muestra:' % len(malos))
+        for mid, L in malos[:5]:
+            log(u'     miembro %s: medimos %.4f m' % (mid, L))
+        log(u'  Puede que node_i/node_j sean índices y no ids. NO uses este')
+        log(u'  archivo hasta aclararlo: los momentos estarían mal ubicados.')
+        log(u'')
+    else:
+        log(u'Longitudes verificadas contra RAM (muestra de miembros): coinciden')
 
     # ── Miembros ─────────────────────────────────────────────
     miembros = []
