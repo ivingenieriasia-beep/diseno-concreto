@@ -28,8 +28,8 @@ export const MODULOS = [
     nombre: 'Agrupación',
     tipo: 'pestana',
     icono: 'grupos',
-    resumen: 'De un modelo sin agrupar a unas pocas T: tres propuestas o tu propio acomodo en planta, con su sección, su armado y el script para aplicarlo en RAM.',
-    palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1', 'manual', 'acomodo', 'planta'],
+    resumen: 'De un modelo sin agrupar a unas pocas T y C: trabes por flexión y cortante, columnas con su diagrama de interacción. Tres propuestas o tu propio acomodo en planta, con su sección, su armado y el script para aplicarlo en RAM.',
+    palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'columnas', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1', 'c1', 'manual', 'acomodo', 'planta', 'flexocompresion', 'interaccion'],
   },
   {
     id: 'deflexiones',

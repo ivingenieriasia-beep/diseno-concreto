@@ -6,7 +6,7 @@ import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
 import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
-import { evaluateBeamEnvelope } from './ramParser'
+import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
 import { analyzeGroup, unitLabel, unidadesTexto } from './longitudinal'
 import { elevationSvg, diagramSvg } from './longitudinalSvg'
@@ -282,7 +282,9 @@ function renderColumnas(columnsArr, envStats = null) {
     const env = col.envelope
     if (D.env) {
       const ev = D.env
-      const filas = [...ev.results].sort((a, b) => (b.util || 0) - (a.util || 0)).map((r) => `
+      // un punto por miembro: el que rige (con fuerzas simultáneas hay uno por combinación en el pie y la cabeza)
+      const rige = peorPorMiembro(ev.results)
+      const filas = rige.map((r) => `
         <tr${r.id === ev.critical?.id ? ' style="background:#fff8e1"' : ''}>
           <td>${esc(r.member)}</td><td>${esc(r.tipo)}</td>
           <td>${fmt(r.Pu, 2)}</td><td>${fmt(r.Mux, 2)}</td><td>${fmt(r.Muy, 2)}</td>
@@ -298,7 +300,9 @@ function renderColumnas(columnsArr, envStats = null) {
         </div>
         <table class="summary"><tr><th>Miembro</th><th>Env.</th><th>Pu (t)</th><th>Mux</th><th>Muy</th>
           <th>MRx</th><th>MRy</th><th>Util.</th><th></th></tr>${filas}</table>
-        <div style="font-size:10px;color:#6b7280;margin-top:4px">Se listan los ${ev.total} ejemplares del reporte, ordenados por utilización.</div>`
+        <div style="font-size:10px;color:#6b7280;margin-top:4px">${rige.length < ev.total
+          ? `Se revisaron ${ev.total} puntos (cada combinación, con sus P, Mx y My simultáneos); se lista el que rige de cada uno de los ${rige.length} miembros, ordenados por utilización.`
+          : `Se listan los ${ev.total} ejemplares del reporte, ordenados por utilización.`}</div>`
     }
 
     // Tabla de puntos del diagrama

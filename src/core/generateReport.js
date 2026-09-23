@@ -3,7 +3,7 @@ import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
-import { evaluateBeamEnvelope } from './ramParser'
+import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
 import { resistenciasConPuntual } from './sectionResults'
 import { columnDemand, demandCase } from './columnDemand'
 import { analyzeGroup, unidadesTexto } from './longitudinal'
@@ -263,15 +263,16 @@ function computeChecks(t) {
 }
 
 // ── Rejilla compacta de ejemplares (miembros de una envolvente) ──
-// Devuelve la nueva "y" tras dibujarla. Se listan TODOS, en varias
-// columnas para que quepan; los que no pasan van en rojo.
+// Devuelve la nueva "y" tras dibujarla. Se listan TODOS los miembros, cada
+// uno con el punto que rige (una columna trae uno por combinación en su pie
+// y su cabeza), en varias columnas para que quepan; los que no pasan van en rojo.
 function drawEjemplares(doc, ev, x, y, maxW, pageH, marginT, onNewPage) {
-  const rows = [...ev.results].sort((a, b) => (b.util || 0) - (a.util || 0))
+  const rows = peorPorMiembro(ev.results)
   const perRow = 6
   const colW = maxW / perRow
   doc.setFontSize(6)
   setColor(doc, COL.tx3)
-  doc.text(`Ejemplares revisados (${ev.total}) - miembro : utilizacion` +
+  doc.text(`${rows.length < ev.total ? `Miembros revisados (${rows.length}, ${ev.total} puntos) - miembro : utilizacion del que rige` : `Ejemplares revisados (${ev.total}) - miembro : utilizacion`}` +
     (ev.conPuntual ? `   (* = cubierto por el baston puntual del analisis a lo largo)` : ''), x, y)
   y += 3.4
 

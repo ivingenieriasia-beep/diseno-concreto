@@ -149,6 +149,22 @@ export function evaluateBeamEnvelope(points, R, invertir = false, punt = null) {
 }
 
 /**
+ * El punto que rige de cada miembro (el de mayor utilización), del más al
+ * menos exigido. Una columna con fuerzas simultáneas trae un punto por
+ * combinación en su pie y su cabeza; para listar, basta el que manda.
+ */
+export function peorPorMiembro(results) {
+  const util = (r) => (Number.isFinite(r.util) ? r.util : Infinity)
+  const m = new Map()
+  for (const r of results || []) {
+    const k = String(r.member)
+    const a = m.get(k)
+    if (!a || util(r) > util(a) || (!r.ok && a.ok)) m.set(k, r)
+  }
+  return [...m.values()].sort((a, b) => util(b) - util(a))
+}
+
+/**
  * Evalúa cada punto de la envolvente contra el diagrama de la columna.
  * @param mapping 'M33X' → Mux=|M33|, Muy=|M22| · 'M22X' → invertido
  */

@@ -49,6 +49,7 @@ TOL_REL = 0.01          # al compactar la curva, error admitido (1 % del rango)
 SOLO_GRUPOS = None      # None = todos. Ej: ['T5', 'T2A'] para probar rápido
 DEFLEXIONES = True      # flechas: desplazamientos de las trabes por caso de carga (módulo Deflexiones)
 EST_FLECHA = 11         # estaciones por trabe para las flechas
+FLEXO = True            # columnas: P, M22 y M33 simultáneos por combinación (Columnas y Agrupación)
 
 import json
 import os
@@ -288,6 +289,42 @@ def alrededor(xs, i, L, n=11):
     if b <= a:
         return []
     return [a + k * (b - a) / (n - 1.0) for k in range(1, n - 1)]
+
+
+# ── Columnas: las fuerzas SIMULTÁNEAS ─────────────────────────
+# La envolvente de arriba guarda el máximo de cada fuerza por su lado, y en
+# una trabe eso basta. En una columna no: el diagrama de interacción pide el
+# P que va JUNTO con sus M22 y M33 en la misma combinación, y el P máximo casi
+# nunca viene con el momento máximo. Por eso, en cada columna y en cada
+# combinación, se guardan los extremos (y el punto de en medio si ahí el
+# momento es mayor). Sale del mismo barrido: no cuesta llamadas a RAM.
+CAMPOS_FLEXO = ['x', 'combo', 'axial', 'm22', 'm33', 'v2', 'v3']
+
+
+def _es_columna(a, b):
+    u"""Vertical (Y es la vertical en RAM)."""
+    dh = ((b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2) ** 0.5
+    return dh <= 0.1 and abs(b[1] - a[1]) > 0.1
+
+
+def flexo(xs, por_combo, usadas):
+    u"""[[x, i de la combinación en 'envueltas', axial, M22, M33, V2, V3], …]"""
+    out = []
+    n = len(xs)
+    for ci, c in enumerate(usadas):
+        d = por_combo.get(c)
+        if not d or n < 2:
+            continue
+        mom = [(float(d[i].M22) ** 2 + float(d[i].M33) ** 2) ** 0.5 for i in range(n)]
+        idx = [0, n - 1]
+        k = max(range(n), key=lambda i: mom[i])
+        if 0 < k < n - 1 and mom[k] > 1.05 * max(mom[0], mom[-1]):
+            idx.insert(1, k)
+        for i in idx:
+            f = d[i]
+            out.append([round(xs[i], 3), ci, round(float(f.axial), 3), round(float(f.M22), 3), round(float(f.M33), 3),
+                        round(float(f.V2), 3), round(float(f.V3), 3)])
+    return out
 
 
 # ── Las medidas REALES de cada sección ────────────────────────
@@ -655,6 +692,7 @@ def exportar(destino, log=log):
     # Saltar miembros en silencio esconde problemas: se apunta el motivo y el id.
     sin_largo, sin_result, motivos = [], [], {}
     est_por_grupo = {}
+    n_flexo = 0
     todos = list(m.members)
     for k, mb in enumerate(todos):
         grupo = str(mb.description or u'(sin nombre)').strip()
@@ -690,6 +728,17 @@ def exportar(destino, log=log):
 
         datos = list(por_combo.values())
         m33max, m33min, v2max, v2min, axmax, axmin = envolver(xs, datos)
+
+        # columnas: las fuerzas simultáneas de cada combinación, antes de afinar
+        fl = None
+        if FLEXO:
+            a_, b_ = coords.get(int(mb.node_i)), coords.get(int(mb.node_j))
+            if a_ and b_ and _es_columna(a_, b_):
+                try:
+                    fl = flexo(xs, por_combo, usadas)
+                except Exception as e:
+                    clave = u'fuerzas de columna, %s: %s' % (type(e).__name__, e)
+                    motivos[clave] = motivos.get(clave, 0) + 1
 
         # 2) afinar alrededor de los extremos: el pico casi nunca cae en la
         #    rejilla, y es justo el valor con el que se diseña
@@ -741,6 +790,9 @@ def exportar(destino, log=log):
                 'axp': round(max(axmax), 4), 'axn': round(min(axmin), 4),
             },
         })
+        if fl:
+            miembros[-1]['flexo'] = fl
+            n_flexo += 1
         grupos[grupo] = grupos.get(grupo, 0) + 1
         est_por_grupo.setdefault(grupo, []).append(len(est))
         if (k + 1) % 200 == 0:
@@ -790,6 +842,7 @@ def exportar(destino, log=log):
             'nudos_total': len(nudos), 'miembros_total': len(todos),
         },
         'campos_est': ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax'],
+        'campos_flexo': CAMPOS_FLEXO,
         'casos': casos, 'combinaciones': combos, 'envueltas': usadas,
         'nudos': nudos, 'miembros': miembros, 'reacciones': reacciones,
         'secciones': secciones,
@@ -810,6 +863,9 @@ def exportar(destino, log=log):
     log(u'Grupos: %s' % u', '.join(u'%s(%d)' % (g, n) for g, n in sorted(grupos.items(), key=lambda kv: -kv[1])))
     log(u'%d miembros · %d estaciones guardadas (%.1f por miembro) · %d reacciones'
         % (len(miembros), n_est, n_est / float(len(miembros) or 1), len(reacciones)))
+    if FLEXO:
+        log(u'COLUMNAS: %d miembros verticales con P, M22 y M33 simultáneos en %d combinaciones'
+            % (n_flexo, len(usadas)))
     if sin_largo or sin_result:
         log(u'')
         log(u'SALTADOS: %d sin longitud, %d sin resultados' % (len(sin_largo), len(sin_result)))

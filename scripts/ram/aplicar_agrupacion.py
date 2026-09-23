@@ -88,26 +88,8 @@ def principal():
     m = ramelements.model()
     por_id = dict((int(mb.id), mb) for mb in m.members)
 
-    # 1) ¿Existen todas las secciones? Se prueba en un miembro y se devuelve.
-    faltan = []
-    for g in grupos:
-        mb = next((por_id[i] for i in g['miembros'] if i in por_id), None)
-        if mb is None:
-            continue
-        antes = mb.section
-        try:
-            mb.section = g['seccion']
-            mb.section = antes
-        except Exception as e:
-            faltan.append((g['seccion'], e))
-    if faltan:
-        log(u'No toqué nada: estas secciones no existen en la base de datos de RAM:')
-        for s, e in faltan:
-            log(u'   %s  (%s)' % (s, e))
-        log(u'Corre instalar_catalogo.py (Reportes de RAM → Configurar RAM) y vuelve a intentarlo.')
-        return
-
-    # 2) Lo que había, para poder deshacerlo
+    # 1) Lo que había, para poder deshacerlo (antes de tocar nada, también
+    #    antes de la prueba de abajo)
     antes = {}
     ausentes = []
     for g in grupos:
@@ -117,6 +99,37 @@ def principal():
                 ausentes.append(i)
                 continue
             antes[str(i)] = [u'%s' % (mb.description or u''), u'%s' % (mb.section or u'')]
+
+    # 2) ¿Existen todas las secciones? Se prueba en un miembro y se devuelve.
+    #    Poner la nueva y devolver la de antes son dos cosas: si RAM no deja
+    #    devolverla, no es que falte la nueva, y hay que decirlo.
+    faltan, sin_devolver = [], []
+    for g in grupos:
+        mb = next((por_id[i] for i in g['miembros'] if i in por_id), None)
+        if mb is None:
+            continue
+        previa = mb.section
+        try:
+            mb.section = g['seccion']
+        except Exception as e:
+            faltan.append((g['seccion'], e))
+            continue
+        try:
+            mb.section = previa
+        except Exception as e:
+            sin_devolver.append((int(mb.id), g['seccion'], previa, e))
+    if faltan:
+        log(u'No apliqué la agrupación: estas secciones no existen en la base de datos de RAM:')
+        for s, e in faltan:
+            log(u'   %s  (%s)' % (s, e))
+        log(u'Corre instalar_catalogo.py (Reportes de RAM → Configurar RAM) y vuelve a intentarlo.')
+        for i, s, p, e in sin_devolver:
+            log(u'  ⚠ Al probar, el miembro %d se quedó con «%s»: RAM no dejó devolverle «%s» (%s).' % (i, s, p, e))
+        if sin_devolver:
+            log(u'    Cierra el modelo SIN guardar para dejarlo como estaba.')
+        return
+    for i, s, p, e in sin_devolver:
+        log(u'  (el miembro %d no aceptó de vuelta «%s» al probar; de todos modos lleva «%s»)' % (i, p, s))
     fecha = time.strftime('%Y-%m-%d %H.%M')
     donde = CARPETA_DESHACER if CARPETA_DESHACER and os.path.isdir(CARPETA_DESHACER) else escritorio()
     ruta = os.path.join(donde, u'Deshacer agrupación %s.py' % fecha)

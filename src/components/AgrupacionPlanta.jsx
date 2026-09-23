@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { GIRO_RAM } from '../core/agrupacion'
 
-// Las trabes en planta, un dibujo por nivel, coloreadas por su grupo.
-// Clic: una trabe · Mayús/Ctrl+clic: la agrega o la quita · arrastrar en un
+// Las trabes (o las columnas) en planta, un dibujo por nivel, coloreadas por
+// su grupo. Las columnas son un cuadro sobre las trabes del nivel, en gris.
+// Clic: una · Mayús/Ctrl+clic: la agrega o la quita · arrastrar en un
 // hueco: selección por ventana (con Mayús, se suma) · Esc: nada.
 
 const SEL = '#f59e0b'
 const COLUMNA = '#8b93a3'
 
-function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destello }) {
+const PIEZA = { trabe: 'trabe(s)', columna: 'columna(s)' }
+
+function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destello, pieza }) {
   const svgRef = useRef(null)
   const drag = useRef(null)
   const [ventana, setVentana] = useState(null)
@@ -61,28 +64,56 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destell
   const todasSel = N.ids.length > 0 && N.ids.every((id) => sel.has(id))
   const cols = geo.columnas.filter((c) => c.nivel === N.n)
   const lado = fs * 0.75
+  const ladoCol = fs * 1.15
 
   return (
     <div data-testid={`agr-nivel-${N.n}`} style={{ border: '1px solid var(--color-border)', borderRadius: 9, background: 'var(--color-bg)', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '5px 9px', borderBottom: '1px solid var(--color-border)', fontSize: 11 }}>
-        <b>N{N.n}</b>
-        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>{geo.up} = {N.v >= 0 ? '+' : ''}{N.v.toFixed(2)} m</span>
-        <span style={{ color: 'var(--color-tx3)' }}>{N.ids.length} trabe(s)</span>
-        <button className="btn btn-secondary" style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 7px' }}
+      <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 8, rowGap: 2, padding: '5px 9px', borderBottom: '1px solid var(--color-border)', fontSize: 11 }}>
+        <b>{N.etiqueta || `N${N.n}`}</b>
+        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)', whiteSpace: 'nowrap' }}>{N.titulo || `${geo.up} = ${N.v >= 0 ? '+' : ''}${N.v.toFixed(2)} m`}</span>
+        <span style={{ color: 'var(--color-tx3)', whiteSpace: 'nowrap' }}>{N.ids.length} {PIEZA[pieza] || PIEZA.trabe}</span>
+        <button className="btn btn-secondary" style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 7px', whiteSpace: 'nowrap' }}
           onClick={(ev) => onSel(todasSel ? new Set([...sel].filter((id) => !N.ids.includes(id))) : new Set([...(suma(ev) ? sel : []), ...N.ids]))}>
           {todasSel ? 'quitar el nivel' : 'todo el nivel'}
         </button>
       </div>
       <svg ref={svgRef} viewBox={vb.join(' ')} style={{ width: '100%', height: 'auto', maxHeight: '72vh', display: 'block', touchAction: 'none', userSelect: 'none', cursor: 'crosshair' }}
         onPointerDown={abajo} onPointerMove={mueve} onPointerUp={arriba} onPointerCancel={() => { drag.current = null; setVentana(null) }}>
+        {(N.contexto || []).length > 0 && (
+          <path d={N.contexto.map((s) => `M${s[0]} ${s[1]}L${s[2]} ${s[3]}`).join('')} stroke={COLUMNA} strokeWidth={1.3} opacity={0.5}
+            fill="none" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+        )}
         {cols.map((c, i) => (
           <rect key={i} x={c.x - lado / 2} y={c.y - lado / 2} width={lado} height={lado} fill={COLUMNA} opacity={0.55} pointerEvents="none" />
         ))}
         {N.ids.map((id) => {
           const g = geo.porId.get(id)
           const st = estilo(id)
-          const d = g.segs.map((s) => `M${s[0]} ${s[1]}L${s[2]} ${s[3]}`).join('')
           const on = sel.has(id)
+          if (g.punto) {
+            // una columna: un cuadro de su color
+            const [x, y] = g.punto
+            const cuadro = (l, extra) => <rect x={x - l / 2} y={y - l / 2} width={l} height={l} {...extra} />
+            return (
+              <g key={id} data-testid={`agr-trabe-${id}`} data-grupo={st.etiqueta || ''} data-sel={on ? '1' : '0'}
+                onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => clic(ev, id)}
+                onPointerEnter={(ev) => setHover({ id, x: ev.clientX, y: ev.clientY })}
+                onPointerMove={(ev) => setHover({ id, x: ev.clientX, y: ev.clientY })}
+                onPointerLeave={() => setHover(null)} style={{ cursor: 'pointer' }}>
+                {destello?.has(id) && cuadro(ladoCol * 2.6, {
+                  fill: SEL, pointerEvents: 'none',
+                  children: <animate attributeName="fill-opacity" values="0.9;0.1;0.9" dur="0.6s" repeatCount="3" />,
+                })}
+                {on && cuadro(ladoCol * 1.9, { fill: SEL, opacity: 0.5 })}
+                {cuadro(ladoCol, {
+                  fill: st.dash ? 'var(--color-bg)' : st.color, stroke: st.mal ? '#c62828' : st.color,
+                  strokeWidth: st.mal ? 2.2 : 1.4, strokeDasharray: st.dash ? '2 2' : undefined, vectorEffect: 'non-scaling-stroke',
+                })}
+                {cuadro(ladoCol * 2.2, { fill: 'transparent' })}
+              </g>
+            )
+          }
+          const d = g.segs.map((s) => `M${s[0]} ${s[1]}L${s[2]} ${s[3]}`).join('')
           return (
             <g key={id} data-testid={`agr-trabe-${id}`} data-grupo={st.etiqueta || ''} data-sel={on ? '1' : '0'}
               onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => clic(ev, id)}
@@ -106,7 +137,7 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destell
           const st = estilo(id)
           if (!st.etiqueta) return null
           return (
-            <text key={`t${id}`} x={g.cx} y={g.cy} fontSize={fs} textAnchor="middle" dominantBaseline="central" pointerEvents="none"
+            <text key={`t${id}`} x={g.cx} y={g.punto ? g.cy - ladoCol * 1.25 : g.cy} fontSize={fs} textAnchor="middle" dominantBaseline="central" pointerEvents="none"
               fill={st.color} strokeWidth={fs * 0.3} paintOrder="stroke" strokeLinejoin="round"
               style={{ stroke: 'var(--color-bg)', fontWeight: 800, fontFamily: 'var(--font-sans, sans-serif)' }}>
               {st.etiqueta}
@@ -122,7 +153,7 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destell
   )
 }
 
-export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar, foco }) {
+export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar, foco, pieza = 'trabe' }) {
   const [nivel, setNivel] = useState(null)          // null = todos
   const [nombres, setNombres] = useState(true)
   const [hover, setHover] = useState(null)
@@ -147,13 +178,14 @@ export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar,
     return () => window.removeEventListener('keydown', esc)
   }, [onSel])
 
-  if (!geo?.niveles.length) return <div style={{ fontSize: 11.5, color: 'var(--color-tx3)' }}>No hay trabes que dibujar.</div>
+  if (!geo?.niveles.length) return <div style={{ fontSize: 11.5, color: 'var(--color-tx3)' }}>No hay {pieza === 'columna' ? 'columnas' : 'trabes'} que dibujar.</div>
 
   const visibles = nivel ? geo.niveles.filter((N) => N.n === nivel) : geo.niveles
+  const solo = nivel || geo.niveles.length === 1
   const b = geo.bounds
   const pad = Math.max(b.w, b.h) * 0.05 + 0.4
   const vb = [b.minX - pad, b.minY - pad, b.w + 2 * pad, b.h + 2 * pad]
-  const fs = Math.max(b.w, b.h) / (nivel ? 64 : 34)
+  const fs = Math.max(b.w, b.h) / (solo ? 64 : 34)
   const chip = (on) => ({
     fontSize: 11, padding: '2px 9px', borderRadius: 7, cursor: 'pointer',
     border: `1px solid ${on ? 'var(--color-accent)' : 'var(--color-border)'}`,
@@ -163,9 +195,9 @@ export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar,
   return (
     <div data-testid="agr-planta" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <button style={chip(nivel === null)} onClick={() => setNivel(null)}>Todos los niveles</button>
-        {geo.niveles.map((N) => (
-          <button key={N.n} data-testid={`agr-ver-nivel-${N.n}`} style={chip(nivel === N.n)} onClick={() => setNivel(N.n)}>N{N.n}</button>
+        {geo.niveles.length > 1 && <button style={chip(nivel === null)} onClick={() => setNivel(null)}>Todos {pieza === 'columna' ? 'los entrepisos' : 'los niveles'}</button>}
+        {geo.niveles.length > 1 && geo.niveles.map((N) => (
+          <button key={N.n} data-testid={`agr-ver-nivel-${N.n}`} style={chip(nivel === N.n)} onClick={() => setNivel(N.n)}>{N.etiqueta || `N${N.n}`}</button>
         ))}
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, marginLeft: 8, cursor: 'pointer' }}>
           <input type="checkbox" checked={nombres} onChange={() => setNombres((v) => !v)} /> nombres
@@ -182,9 +214,9 @@ export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar,
           clic: una · Mayús/Ctrl+clic: suma o quita · arrastrar en un hueco: ventana · Esc: ninguna
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: nivel ? '1fr' : 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: solo ? '1fr' : 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
         {visibles.map((N) => (
-          <Planta key={N.n} N={N} geo={geo} vb={vb} fs={fs} estilo={estilo} sel={sel} onSel={onSel} nombres={nombres} setHover={setHover} destello={destello} />
+          <Planta key={N.n} N={N} geo={geo} vb={vb} fs={fs} estilo={estilo} sel={sel} onSel={onSel} nombres={nombres} setHover={setHover} destello={destello} pieza={pieza} />
         ))}
       </div>
       {hover && (

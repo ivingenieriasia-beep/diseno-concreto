@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react'
 import AgrupacionPlanta from './AgrupacionPlanta'
 import AgrupacionEscala from './AgrupacionEscala'
+import InteractionDiagram from './InteractionDiagram'
 import {
   aprovechamiento, seccionDeGrupo, mismasEnOtrosNiveles, VIGAS_CATALOGO, grupoNuevo, renumerar, buscarMiembros,
 } from '../core/agrupacion'
+import { COLUMNAS_CATALOGO, criticoDe, diagramaDe, nubeDe } from '../core/agrupacionColumnas'
 
-// Ver una propuesta en planta y, en el acomodo manual, mover trabes entre
-// grupos, crear y quitar grupos, renombrarlos y fijarles sección.
+// Ver una propuesta en planta y, en el acomodo manual, mover trabes (o
+// columnas) entre grupos, crear y quitar grupos, renombrarlos y fijarles sección.
+
+const PALABRAS = {
+  trabe: { una: 'Trabe', unas: 'trabe(s)', pre: 'T', grupos: 'T' },
+  columna: { una: 'Columna', unas: 'columna(s)', pre: 'C', grupos: 'grupo' },
+}
 
 export const PALETA = [
   '#1a7a5e', '#2563eb', '#ea580c', '#9333ea', '#0891b2', '#65a30d', '#db2777', '#4f46e5',
@@ -16,7 +23,7 @@ export const colorGrupo = (g, i) => PALETA[(g.c ?? i) % PALETA.length]
 const SUELTA = '#9aa3b2'
 
 const pct = (v) => (Number.isFinite(v) ? `${Math.round(v * 100)} %` : '—')
-const corto = (s) => (s ? s.nombre.replace(' X ', '×') : '—')
+const corto = (s) => (s ? s.nombre.replace(/^COL /, '').replace(' X ', '×') : '—')
 const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : '—')
 
 /** El aprovechamiento de cada trabe en la sección de su grupo: 0 a 125 % */
@@ -47,8 +54,14 @@ function Nombre({ valor, onCambio, testid, disabled }) {
 }
 
 export default function AgrupacionManual({
-  A, R, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, girar,
+  A, R, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, girar, pieza = 'trabe',
 }) {
+  const esCol = pieza === 'columna'
+  const W = PALABRAS[pieza] || PALABRAS.trabe
+  const nivelDe = (id) => {
+    const n = geo.porId.get(id)?.nivel
+    return geo.niveles.find((N) => N.n === n)?.etiqueta || `N${n ?? '?'}`
+  }
   const [busca, setBusca] = useState('')
   const [hallazgo, setHallazgo] = useState(null)   // lo que encontró la última búsqueda
   const [foco, setFoco] = useState(null)           // trabes a enfocar y hacer parpadear en la planta
@@ -67,20 +80,26 @@ export default function AgrupacionManual({
     return { color: colorGrupo(x.g, x.i), etiqueta: x.g.nombre, mal: x.g.sec ? aprovechamiento(e, x.g.sec) > 1 + 1e-9 : false }
   }
   const info = (id) => {
-    const e = elemPor.get(id), g = geo.porId.get(id), x = grupoDe.get(id)
+    const e = elemPor.get(id), x = grupoDe.get(id)
     const out = [
-      `Trabe ${id} · N${g?.nivel ?? '?'}`,
-      `L ${e.L.toFixed(2)} m · Mu+ ${f1(e.MuP)} · Mu− ${f1(e.MuN)} t·m · Vu ${f1(e.Vu)} t`,
+      `${W.una} ${id} · ${nivelDe(id)}`,
+      esCol
+        ? `H ${e.L.toFixed(2)} m · Pu ${f1(e.Pu)} t · Mux ${f1(e.Mux)} · Muy ${f1(e.Muy)} t·m (máximos, no juntos)`
+        : `L ${e.L.toFixed(2)} m · Mu+ ${f1(e.MuP)} · Mu− ${f1(e.MuN)} t·m · Vu ${f1(e.Vu)} t`,
       `le basta ${corto(e.minima?.sec)}${e.minima?.fuera ? ' (ni ésa alcanza)' : ''} · hoy ${e.hoy.b && e.hoy.h ? `${e.hoy.b}×${e.hoy.h}` : e.hoy.seccion}`,
     ]
     out.push(x ? `en ${x.g.nombre} (${corto(x.g.sec)}) al ${pct(aprovechamiento(e, x.g.sec))}` : 'sin asignar: en RAM no se toca')
+    if (esCol && x?.g.sec) {
+      const c = criticoDe(e, x.g.sec)
+      if (c) out.push(`rige ${c.tipo} del ${c.member}: P ${f1(c.P)} · Mx ${f1(c.Mx)} · My ${f1(c.My)}`)
+    }
     out.push(`miembros: ${e.miembros.length > 14 ? `${e.miembros.slice(0, 14).join(', ')}…` : e.miembros.join(', ')}`)
     return out
   }
 
   // ── buscar por miembro de RAM ──
   const buscar = (sumar) => {
-    const r = buscarMiembros(R, A.elementos, busca)
+    const r = buscarMiembros(R, A.elementos, busca, pieza)
     setHallazgo(r)
     if (!r.elems.length) return
     setSel(sumar ? new Set([...sel, ...r.elems]) : new Set(r.elems))
@@ -93,9 +112,9 @@ export default function AgrupacionManual({
     if (h.encontrados.length && h.encontrados.length <= 3) {
       for (const f of h.encontrados) {
         const x = grupoDe.get(f.elem)
-        partes.push(`${f.miembro} → trabe ${f.elem} · N${geo.porId.get(f.elem)?.nivel ?? '?'} · ${x ? `en ${x.g.nombre}` : 'sin asignar'}`)
+        partes.push(`${f.miembro} → ${W.una.toLowerCase()} ${f.elem} · ${nivelDe(f.elem)} · ${x ? `en ${x.g.nombre}` : 'sin asignar'}`)
       }
-    } else if (h.encontrados.length) partes.push(`${h.encontrados.length} miembros → ${h.elems.length} trabe(s) seleccionada(s)`)
+    } else if (h.encontrados.length) partes.push(`${h.encontrados.length} miembros → ${h.elems.length} ${W.unas} seleccionada(s)`)
     const fuera = h.fuera.slice(0, 3).map((f) => `${f.miembro}: ${f.motivo}`)
     if (h.fuera.length > 3) fuera.push(`y ${h.fuera.length - 3} más que no están`)
     return { txt: [...partes, ...fuera].join(' · '), mal: !h.encontrados.length }
@@ -108,7 +127,7 @@ export default function AgrupacionManual({
   // ── acciones del acomodo ──
   const mover = (gid, ids = selIds) => cambiar((m) => ({ ...m, de: { ...m.de, ...Object.fromEntries(ids.map((id) => [id, gid])) } }))
   const nuevo = (ids = selIds) => cambiar((m) => {
-    const g = grupoNuevo(m)
+    const g = grupoNuevo(m, undefined, W.pre)
     return { ...m, grupos: [...m.grupos, g], de: { ...m.de, ...Object.fromEntries(ids.map((id) => [id, g.id])) } }
   })
   const soltar = (ids = selIds) => cambiar((m) => {
@@ -157,19 +176,31 @@ export default function AgrupacionManual({
 
   const btn = { fontSize: 11, padding: '3px 9px' }
   const anchos = [...new Set(VIGAS_CATALOGO.map((s) => s.b))]
+  // columnas: el diagrama de la sección donde están (si todas en un grupo) o de la que piden juntas
+  const diag = useMemo(() => {
+    if (!esCol || !selElems.length) return null
+    const gs = new Set(selElems.map((e) => grupoDe.get(e.id)?.g))
+    const g = gs.size === 1 ? [...gs][0] : null
+    const sec = g?.sec || pide?.sec
+    if (!sec) return null
+    const D = diagramaDe(sec)
+    return { sec, D, nube: nubeDe(selElems, sec), de: g ? `la de ${g.nombre}` : 'la que piden juntas' }
+  }, [esCol, selElems, grupoDe, pide]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
           <b style={{ fontSize: 12 }}>Escala de aprovechamiento</b>
-          <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>qué tanto usa cada trabe la sección de su grupo; la selección es la misma que en la planta</span>
+          <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>{esCol
+            ? 'qué tanto usa cada columna el diagrama de interacción de la sección de su grupo'
+            : 'qué tanto usa cada trabe la sección de su grupo'}; la selección es la misma que en la planta</span>
           <button className="btn btn-secondary" data-testid="agr-escala-ver" style={{ fontSize: 10, padding: '1px 8px', marginLeft: 'auto' }} onClick={() => setConEscala((v) => !v)}>
             {conEscala ? 'ocultar' : 'mostrar'}
           </button>
         </div>
         {conEscala && (
-          <AgrupacionEscala filas={filas} sueltos={editable ? P.sueltos : []} editable={editable} sel={sel} setSel={setSel} info={info}
+          <AgrupacionEscala filas={filas} sueltos={editable ? P.sueltos : []} editable={editable} sel={sel} setSel={setSel} info={info} pieza={pieza}
             uDe={(e, g) => (g.sec ? aprovechamiento(e, g.sec) : Infinity)} colorDe={colorGrupo} destino={destino} onSoltarEn={soltarEn} />
         )}
       </div>
@@ -178,7 +209,7 @@ export default function AgrupacionManual({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <input data-testid="agr-buscar" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar miembro de RAM: 97, 120-124"
             onKeyDown={(e) => { if (e.key === 'Enter') buscar(e.shiftKey) }}
-            title="Número de miembro de RAM; varios con coma o espacio, o un rango 120-124. Enter selecciona su trabe; Mayús+Enter la suma a la selección"
+            title={`Número de miembro de RAM; varios con coma o espacio, o un rango 120-124. Enter selecciona su ${W.una.toLowerCase()}; Mayús+Enter la suma a la selección`}
             style={{ width: 250, fontSize: 12, fontFamily: 'var(--font-mono)', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-bg)', color: 'inherit' }} />
           <button className="btn btn-secondary" data-testid="agr-buscar-ir" style={btn} onClick={() => buscar(false)}>🔍 buscar</button>
           {hallazgo && (() => {
@@ -186,19 +217,24 @@ export default function AgrupacionManual({
             return <span data-testid="agr-buscar-msg" style={{ fontSize: 11, color: m.mal ? '#c62828' : 'var(--color-tx2)' }}>{m.txt}</span>
           })()}
         </div>
-        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} girar={girar} foco={foco} />
+        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} girar={girar} foco={foco} pieza={pieza} />
 
         {selElems.length > 0 && (
           <div data-testid="agr-seleccion" style={{ border: `1px solid ${'#f59e0b'}`, borderRadius: 9, padding: '8px 10px', background: 'var(--color-bg)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5 }}>
-              <b data-testid="agr-sel-n">{selElems.length} trabe(s) seleccionada(s)</b>
+              <b data-testid="agr-sel-n">{selElems.length} {W.unas} seleccionada(s)</b>
               <span style={{ color: 'var(--color-tx2)' }}>
                 juntas piden al menos <b style={{ fontFamily: 'var(--font-mono)' }}>{corto(pide?.sec)}</b>{pide?.fuera ? ' (y ni ésa alcanza)' : ''}
-                {' '}· Mu máx {f1(Math.max(...selElems.map((e) => e.Mu)))} t·m · Vu máx {f1(Math.max(...selElems.map((e) => e.Vu)))} t
+                {esCol
+                  ? <>{' '}· Pu máx {f1(Math.max(...selElems.map((e) => e.Pu)))} t · Mux máx {f1(Math.max(...selElems.map((e) => e.Mux)))} · Muy máx {f1(Math.max(...selElems.map((e) => e.Muy)))} t·m</>
+                  : <>{' '}· Mu máx {f1(Math.max(...selElems.map((e) => e.Mu)))} t·m · Vu máx {f1(Math.max(...selElems.map((e) => e.Vu)))} t</>}
               </span>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                <button className="btn btn-secondary" data-testid="agr-mismas" style={btn} title="La misma trabe en los otros niveles (misma posición en planta)"
-                  onClick={() => setSel(mismasEnOtrosNiveles(geo, selIds))}>＋ las mismas en otros niveles</button>
+                {geo.niveles.length > 1 && (
+                  <button className="btn btn-secondary" data-testid="agr-mismas" style={btn}
+                    title={esCol ? 'La misma columna en los otros entrepisos (misma posición en planta)' : 'La misma trabe en los otros niveles (misma posición en planta)'}
+                    onClick={() => setSel(mismasEnOtrosNiveles(geo, selIds))}>{esCol ? '＋ la misma en otros entrepisos' : '＋ las mismas en otros niveles'}</button>
+                )}
                 <button className="btn btn-secondary" data-testid="agr-limpiar" style={btn} onClick={() => setSel(new Set())}>limpiar</button>
               </span>
             </div>
@@ -206,20 +242,24 @@ export default function AgrupacionManual({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
                 <thead>
                   <tr style={{ color: 'var(--color-tx3)', textAlign: 'right' }}>
-                    <th style={{ textAlign: 'left', fontWeight: 600 }}>nivel</th><th style={{ textAlign: 'left', fontWeight: 600 }}>trabe</th>
-                    <th style={{ fontWeight: 600 }}>L m</th><th style={{ fontWeight: 600 }}>Mu+</th><th style={{ fontWeight: 600 }}>Mu−</th><th style={{ fontWeight: 600 }}>Vu t</th>
+                    <th style={{ textAlign: 'left', fontWeight: 600 }}>nivel</th><th style={{ textAlign: 'left', fontWeight: 600 }}>{W.una.toLowerCase()}</th>
+                    {esCol
+                      ? <><th style={{ fontWeight: 600 }}>H m</th><th style={{ fontWeight: 600 }}>Pu t</th><th style={{ fontWeight: 600 }}>Mux</th><th style={{ fontWeight: 600 }}>Muy</th></>
+                      : <><th style={{ fontWeight: 600 }}>L m</th><th style={{ fontWeight: 600 }}>Mu+</th><th style={{ fontWeight: 600 }}>Mu−</th><th style={{ fontWeight: 600 }}>Vu t</th></>}
                     <th style={{ fontWeight: 600 }}>le basta</th><th style={{ fontWeight: 600 }}>grupo</th><th style={{ fontWeight: 600 }}>aprov.</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...selElems].sort((a, b) => (geo.porId.get(a.id)?.nivel ?? 0) - (geo.porId.get(b.id)?.nivel ?? 0) || b.Mu - a.Mu).slice(0, 80).map((e) => {
+                  {[...selElems].sort((a, b) => (geo.porId.get(a.id)?.nivel ?? 0) - (geo.porId.get(b.id)?.nivel ?? 0) || (esCol ? b.Pu - a.Pu : b.Mu - a.Mu)).slice(0, 80).map((e) => {
                     const x = grupoDe.get(e.id)
                     const u = x ? aprovechamiento(e, x.g.sec) : null
                     return (
                       <tr key={e.id} style={{ borderTop: '1px solid var(--color-border)', textAlign: 'right' }}>
-                        <td style={{ textAlign: 'left' }}>N{geo.porId.get(e.id)?.nivel ?? '?'}</td>
+                        <td style={{ textAlign: 'left' }}>{nivelDe(e.id)}</td>
                         <td style={{ textAlign: 'left' }}>{e.id}</td>
-                        <td>{e.L.toFixed(2)}</td><td>{f1(e.MuP)}</td><td>{f1(e.MuN)}</td><td>{f1(e.Vu)}</td>
+                        {esCol
+                          ? <><td>{e.L.toFixed(2)}</td><td>{f1(e.Pu)}</td><td>{f1(e.Mux)}</td><td>{f1(e.Muy)}</td></>
+                          : <><td>{e.L.toFixed(2)}</td><td>{f1(e.MuP)}</td><td>{f1(e.MuN)}</td><td>{f1(e.Vu)}</td></>}
                         <td>{corto(e.minima?.sec)}</td>
                         <td style={{ color: x ? colorGrupo(x.g, x.i) : SUELTA, fontWeight: 800 }}>{x ? x.g.nombre : '—'}</td>
                         <td style={{ color: u > 1 + 1e-9 ? '#c62828' : 'inherit' }}>{u === null ? '' : pct(u)}</td>
@@ -230,6 +270,21 @@ export default function AgrupacionManual({
               </table>
               {selElems.length > 80 && <div style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>… y {selElems.length - 80} más</div>}
             </div>
+            {diag && (
+              <div data-testid="agr-diagrama" style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-tx2)', marginBottom: 5, lineHeight: 1.5 }}>
+                  <b>Diagrama de interacción</b> de <b style={{ fontFamily: 'var(--font-mono)' }}>{corto(diag.sec)}</b> ({diag.de}) con {diag.D.texto},
+                  el armado con que se dimensiona. Cada punto es una combinación en el pie o en la cabeza de una columna, con su P y sus
+                  momentos de esa misma combinación; rojo, los que no caben (Mx y My juntos, con el contorno biaxial).
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <InteractionDiagram analysis={diag.D.an.dirX} cloud={diag.nube} cloudKey="Mux" color="#2563a8" width={330} height={270} ajuste="demand"
+                    title={`P–Mx (M33, peralte h = ${diag.sec.h})`} />
+                  <InteractionDiagram analysis={diag.D.an.dirY} cloud={diag.nube} cloudKey="Muy" color="#c94f2a" width={330} height={270} ajuste="demand"
+                    title={`P–My (M22, ancho b = ${diag.sec.b})`} />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -241,13 +296,13 @@ export default function AgrupacionManual({
               ＋ grupo nuevo con la selección{selIds.length ? ` (${selIds.length})` : ''}
             </button>
             <button className="btn btn-secondary" data-testid="agr-soltar" style={btn} disabled={!selIds.length} onClick={() => soltar()}>sacar de su grupo</button>
-            <button className="btn btn-secondary" data-testid="agr-renumerar" style={btn} title="T1 la sección más grande … Tn la más chica"
-              onClick={() => cambiar((m) => renumerar(m, P))}>renumerar T1…</button>
+            <button className="btn btn-secondary" data-testid="agr-renumerar" style={btn} title={`${W.pre}1 la sección más grande … ${W.pre}n la más chica`}
+              onClick={() => cambiar((m) => renumerar(m, P, W.pre))}>renumerar {W.pre}1…</button>
             <button className="btn btn-secondary" data-testid="agr-deshacer" style={btn} disabled={!nHist} onClick={deshacer}>↶ deshacer</button>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--color-tx2)' }}>
-            <span>Así queda <b>{P.nombre}</b>. Para mover trabes:</span>
+            <span>Así queda <b>{P.nombre}</b>. Para mover {esCol ? 'columnas' : 'trabes'}:</span>
             <button className="btn btn-primary" data-testid="agr-ajustar-aqui" style={btn} onClick={onAjustar}>✎ ajustar ésta a mano</button>
           </div>
         )}
@@ -261,7 +316,7 @@ export default function AgrupacionManual({
               background: 'var(--color-panel)', display: 'flex', flexDirection: 'column', gap: 4, opacity: g.vacio ? 0.7 : 1,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button title="Seleccionar sus trabes (con Mayús, sumarlas)" data-testid={`agr-g-sel-${g.nombre}`} onClick={(ev) => seleccionarGrupo(g, ev)}
+                <button title={`Seleccionar sus ${esCol ? 'columnas' : 'trabes'} (con Mayús, sumarlas)`} data-testid={`agr-g-sel-${g.nombre}`} onClick={(ev) => seleccionarGrupo(g, ev)}
                   style={{ width: 16, height: 16, borderRadius: 4, background: color, border: 'none', cursor: 'pointer', flex: 'none' }} />
                 {editable
                   ? <Nombre valor={g.nombre} testid={`agr-g-nombre-${g.nombre}`} onCambio={(nombre) => editar(g.id, { nombre })} />
@@ -270,24 +325,26 @@ export default function AgrupacionManual({
                   <select data-testid={`agr-g-sec-${g.nombre}`} value={g.auto ? '' : g.sec?.nombre || ''} onChange={(ev) => editar(g.id, { sec: ev.target.value || null })}
                     style={{ fontSize: 11.5, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '2px 4px', border: '1px solid var(--color-border)', borderRadius: 5, background: 'var(--color-bg)', color: 'inherit' }}>
                     <option value="">auto · {corto(g.auto ? g.sec : null)}</option>
-                    {anchos.map((b) => (
-                      <optgroup key={b} label={`b = ${b} cm`}>
-                        {VIGAS_CATALOGO.filter((s) => s.b === b).map((s) => <option key={s.nombre} value={s.nombre}>{corto(s)}</option>)}
-                      </optgroup>
-                    ))}
+                    {esCol
+                      ? COLUMNAS_CATALOGO.map((s) => <option key={s.nombre} value={s.nombre}>{corto(s)}</option>)
+                      : anchos.map((b) => (
+                        <optgroup key={b} label={`b = ${b} cm`}>
+                          {VIGAS_CATALOGO.filter((s) => s.b === b).map((s) => <option key={s.nombre} value={s.nombre}>{corto(s)}</option>)}
+                        </optgroup>
+                      ))}
                   </select>
                 ) : (
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12 }}>{corto(g.sec)}</span>
                 )}
                 <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>
-                  {g.vacio ? 'vacío' : `${g.elems.length} trabe(s) · ${g.L.toFixed(1)} m`}
+                  {g.vacio ? 'vacío' : `${g.elems.length} ${W.unas} · ${g.L.toFixed(1)} m`}
                 </span>
                 {editable && (
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
                     <button className="btn btn-secondary" data-testid={`agr-g-aqui-${g.nombre}`} style={{ ...btn, padding: '1px 7px' }} disabled={!selIds.length}
-                      title="Mover aquí las trabes seleccionadas" onClick={() => mover(g.id)}>← aquí</button>
+                      title={`Mover aquí las ${esCol ? 'columnas' : 'trabes'} seleccionadas`} onClick={() => mover(g.id)}>← aquí</button>
                     <button className="btn btn-secondary" data-testid={`agr-g-borrar-${g.nombre}`} style={{ ...btn, padding: '1px 7px' }}
-                      title="Quitar el grupo: sus trabes quedan sin asignar" onClick={() => borrar(g.id)}>✕</button>
+                      title={`Quitar el grupo: sus ${esCol ? 'columnas' : 'trabes'} quedan sin asignar`} onClick={() => borrar(g.id)}>✕</button>
                   </span>
                 )}
               </div>
@@ -310,14 +367,17 @@ export default function AgrupacionManual({
           <div data-testid="agr-sueltos" style={{ border: '1px dashed var(--color-border)', borderLeft: `5px dashed ${SUELTA}`, borderRadius: 8, padding: '6px 8px', fontSize: 11 }}>
             <button onClick={(ev) => setSel(new Set([...(ev.shiftKey ? sel : []), ...P.sueltos.map((e) => e.id)]))}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontSize: 11, textAlign: 'left' }}>
-              <b>{P.sueltos.length} trabe(s) sin asignar</b> <span style={{ color: 'var(--color-tx3)' }}>— clic para seleccionarlas. Al aplicar, en RAM no se tocan.</span>
+              <b>{P.sueltos.length} {W.unas} sin asignar</b> <span style={{ color: 'var(--color-tx3)' }}>— clic para seleccionarlas. Al aplicar, en RAM no se tocan.</span>
             </button>
           </div>
         )}
         {editable && manual && (
           <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.55 }}>
-            «auto» toma la sección de menos concreto que les basta a todas sus trabes (con los anchos permitidos); si la fijas,
-            las que no quepan se marcan en rojo en la tira y con puntos rojos en la planta.
+            {esCol
+              ? <>«auto» toma la columna de menos concreto en cuyo diagrama caben todas (con las secciones permitidas); si la fijas,
+                las que no quepan se marcan en rojo en la tira y con borde rojo en la planta.</>
+              : <>«auto» toma la sección de menos concreto que les basta a todas sus trabes (con los anchos permitidos); si la fijas,
+                las que no quepan se marcan en rojo en la tira y con puntos rojos en la planta.</>}
           </div>
         )}
       </div>

@@ -5,9 +5,9 @@ import { useState, useMemo, useId } from 'react'
  * Curva de frontera (barrido fino) + puntos canónicos del Excel +
  * punto de demanda (Mu, Pu) con estado.
  */
-export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#2563a8', title, width = 380, height = 330, cloud = null, cloudKey = 'Mux' }) {
+export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#2563a8', title, width = 380, height = 330, cloud = null, cloudKey = 'Mux', ajuste = 'full' }) {
   const [hover, setHover] = useState(null)
-  const [fit, setFit] = useState('full') // 'full' | 'demand'
+  const [fit, setFit] = useState(ajuste) // 'full' | 'demand'
   const clipId = useId().replace(/:/g, '')
 
   const PAD = { l: 52, r: 16, t: 26, b: 40 }

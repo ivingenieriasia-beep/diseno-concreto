@@ -75,14 +75,21 @@ export function capacidad(b, h, { fc = 250, fy = 4200, r = RECUB, L = 5 } = {}) 
 // El acomodo manual lo recalcula en cada clic: se guarda por elemento
 const USOS = new WeakMap()
 
-/** Qué tanto usaría el elemento esa sección: 1 = justo */
+/**
+ * Qué tanto usaría el elemento esa sección: 1 = justo. Una trabe, por momento
+ * y cortante; un elemento que trae su propia medida (`uso`, las columnas con
+ * su diagrama de interacción) se mide con ella.
+ */
 export function aprovechamiento(e, s) {
   let m = USOS.get(e)
   if (!m) USOS.set(e, (m = new Map()))
   const k = `${s.b}|${s.h}`
   if (!m.has(k)) {
-    const c = capacidad(s.b, s.h, { L: e.L })
-    m.set(k, Math.max(e.Mu / c.MR, e.Vu / c.Vr))
+    if (e.uso) m.set(k, e.uso(s))
+    else {
+      const c = capacidad(s.b, s.h, { L: e.L })
+      m.set(k, Math.max(e.Mu / c.MR, e.Vu / c.Vr))
+    }
   }
   return m.get(k)
 }
@@ -104,7 +111,7 @@ function medidasDeGrupo(g) {
   return d ? { b: d.b, h: d.h } : { b: null, h: null }
 }
 
-function geometria(R) {
+export function geometria(R) {
   const nodes = new Map(Object.entries(R.model?.nodes || {}))
   const rows = R.model?.rows || []
   return { nodes, rows, up: detectUpAxis(nodes), porId: new Map(rows.map((r) => [String(r.member), r])) }
@@ -173,7 +180,7 @@ export function elementos(R, nombres) {
  * @param tau    umbral de aprovechamiento para que una clase suba de sección
  * @returns { grupos:[{ nombre, sec, elems, clases, uMin, uMax, L, concreto, miembros }], ... }
  */
-export function agrupar(elems, cands, tau) {
+export function agrupar(elems, cands, tau, { prefijo = 'T' } = {}) {
   const clases = new Map()
   for (const e of elems) {
     const k = e.minima.sec.nombre
@@ -202,7 +209,7 @@ export function agrupar(elems, cands, tau) {
   }
 
   grupos.forEach((g, i) => {
-    g.nombre = `T${i + 1}`
+    g.nombre = `${prefijo}${i + 1}`
     const us = g.elems.map((e) => aprovechamiento(e, g.sec))
     g.uMin = Math.min(...us)
     g.uMax = Math.max(...us)
@@ -313,7 +320,7 @@ export function manualDesde(P) {
 export const manualVacio = () => ({ base: 'cero', grupos: [], de: {} })
 
 /** El siguiente id y el primer color libre para un grupo nuevo */
-export function grupoNuevo(manual, nombre) {
+export function grupoNuevo(manual, nombre, prefijo = 'T') {
   let n = 1
   while (manual.grupos.some((g) => g.id === `g${n}`)) n++
   const usados = new Set(manual.grupos.map((g) => g.c))
@@ -321,8 +328,8 @@ export function grupoNuevo(manual, nombre) {
   while (usados.has(c)) c++
   if (!nombre) {
     let t = 1
-    while (manual.grupos.some((g) => g.nombre === `T${t}`)) t++
-    nombre = `T${t}`
+    while (manual.grupos.some((g) => g.nombre === `${prefijo}${t}`)) t++
+    nombre = `${prefijo}${t}`
   }
   return { id: `g${n}`, nombre, sec: null, c }
 }
@@ -341,7 +348,8 @@ export function armarManual(elems, cands, manual) {
   }
   const todos = manual.grupos.map((g) => {
     const es = porGrupo.get(g.id)
-    const fija = g.sec ? VIGAS_CATALOGO.find((s) => s.nombre === g.sec) || null : null
+    // los nombres del catálogo no se repiten entre vigas y columnas («COL 30 X 30»)
+    const fija = g.sec ? SECCIONES_RAM.find((s) => s.nombre === g.sec) || null : null
     const base = { id: g.id, nombre: g.nombre, c: g.c, auto: !fija, elems: es }
     if (!es.length) {
       return { ...base, sec: fija, vacio: true, us: [], uMin: 0, uMax: 0, L: 0, concreto: 0, miembros: [], fuera: false }
@@ -366,8 +374,8 @@ export function armarManual(elems, cands, manual) {
   }
 }
 
-/** T1…Tn de la sección más grande a la más chica (como las propuestas); los vacíos al final */
-export function renumerar(manual, armado) {
+/** T1…Tn (o C1…Cn) de la sección más grande a la más chica (como las propuestas); los vacíos al final */
+export function renumerar(manual, armado, prefijo = 'T') {
   const info = new Map(armado.todos.map((g) => [g.id, g]))
   const orden = [...manual.grupos].sort((a, b) => {
     const A = info.get(a.id), B = info.get(b.id)
@@ -375,7 +383,7 @@ export function renumerar(manual, armado) {
     const sa = A.sec ? area(A.sec) : 0, sb = B.sec ? area(B.sec) : 0
     return sb - sa || (B.sec?.h || 0) - (A.sec?.h || 0) || B.L - A.L
   })
-  return { ...manual, grupos: orden.map((g, i) => ({ ...g, nombre: `T${i + 1}` })) }
+  return { ...manual, grupos: orden.map((g, i) => ({ ...g, nombre: `${prefijo}${i + 1}` })) }
 }
 
 /**
@@ -404,7 +412,7 @@ export function problemasDeNombres(grupos, ocupados = []) {
 // en el sentido del reloj a partir de ahí; con 1 queda como la vista de RAM
 // de siempre: Z hacia la izquierda y X hacia el frente (abajo).
 export const GIRO_RAM = 1
-const gira = (x, y, giro) => {
+export const gira = (x, y, giro) => {
   for (let i = 0; i < ((giro % 4) + 4) % 4; i++) [x, y] = [-y, x]
   return [x, y]
 }
@@ -515,7 +523,7 @@ export function leerMiembros(texto) {
  * En qué trabe continua quedó cada miembro buscado y, si en ninguna, por qué.
  * @returns { encontrados:[{ miembro, elem }], elems:[ids sin repetir], fuera:[{ miembro, motivo }] }
  */
-export function buscarMiembros(R, elems, texto) {
+export function buscarMiembros(R, elems, texto, pieza = 'trabe') {
   const ids = leerMiembros(texto)
   const deMiembro = new Map()
   for (const e of elems) for (const m of e.miembros) deMiembro.set(String(m), e.id)
@@ -532,8 +540,10 @@ export function buscarMiembros(R, elems, texto) {
     else if (!a || !b) motivo = 'no tiene nudos en el modelo'
     else {
       const k = memberKind(a, b, G.up)
-      if (k === 'columna') motivo = `es una columna${grupoDe.has(id) ? ` (${grupoDe.get(id)})` : ''}`
-      else if (k !== 'trabe') motivo = 'no es horizontal: no se agrupa'
+      const de = grupoDe.has(id) ? ` (${grupoDe.get(id)})` : ''
+      if (pieza === 'trabe' && k === 'columna') motivo = `es una columna${de}: está en Agrupación → Columnas`
+      else if (pieza === 'columna' && k === 'trabe') motivo = `es una trabe${de}: está en Agrupación → Trabes`
+      else if (k !== pieza) motivo = pieza === 'trabe' ? 'no es horizontal: no se agrupa' : 'no es vertical: no se agrupa'
       else if (grupoDe.has(id)) motivo = `su grupo «${grupoDe.get(id)}» no está marcado en «Qué agrupar»`
       else motivo = 'no llegó con resultados del análisis'
     }

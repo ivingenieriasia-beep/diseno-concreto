@@ -140,7 +140,7 @@ export function proponerTrabe(t, model, opts = {}) {
  * primero y último) y 2 en cada lecho intermedio, nh lechos en total.
  * Sólo los que caben con la separación libre mínima.
  */
-function arreglosColumna(b, h, r, num) {
+export function arreglosColumna(b, h, r, num) {
   const v = bdLookup(num)
   const libre = Math.max(1.5 * v.diam, 4)       // separación libre mínima entre barras, cm
   const caben = (lado) => Math.max(2, Math.floor((lado - 2 * r) / (libre + v.diam)) + 1)

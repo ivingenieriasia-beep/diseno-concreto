@@ -102,8 +102,8 @@
   .vuelta b { color: var(--tinta); }
 
   .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; }
-  .indice { columns: 3; column-gap: 18pt; margin: 4pt 0 0; padding: 0; list-style: none; font-size: 9.2pt; }
-  .indice li { break-inside: avoid; margin-bottom: 2pt; }
+  .indice { columns: 3; column-gap: 10pt; margin: 4pt 0 0; padding: 0; list-style: none; font-size: 9pt; }
+  .indice li { break-inside: avoid; margin-bottom: 1pt; white-space: nowrap; }
   .indice li b { color: var(--verde); display: inline-block; width: 16pt; }
   .etiqueta { display: inline-block; font-size: 7.6pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1pt 5pt; border-radius: 3pt; background: var(--verde); color: #fff; vertical-align: 1pt; }
   .gris { color: var(--gris); }
@@ -134,7 +134,7 @@
 <!-- ═════════════════════════ LO ESENCIAL ═════════════════════════ -->
 <section>
   <h2>Lo esencial en una página</h2>
-  <p class="entrada">Si sólo vas a leer una hoja, que sea ésta. El resto del manual explica cada paso, qué hace la app por dentro y qué hacer cuando algo no sale.</p>
+  <p class="entrada">Si sólo vas a leer una hoja, que sea ésta; el resto del manual explica cada paso.</p>
 
   <div class="ciclo">
     <div class="c">
@@ -164,9 +164,9 @@
     </div>
     <div class="c ancho">
       <div class="cuando">Al estructurar · modelo sin agrupar</div>
-      <h4>Agrupar las trabes</h4>
+      <h4>Agrupar trabes y columnas</h4>
       <ol>
-        <li>App: <b>Módulos → Agrupación</b>. Elige una de las tres propuestas o acomódala tú en planta (<b>✎ a mano</b>).</li>
+        <li>App: <b>Módulos → Agrupación</b>, trabes o columnas. Elige una propuesta o acomódala tú (<b>✎ a mano</b>).</li>
         <li><b>⬇ aplicar_agrupacion.py</b> → en RAM, <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b> → reanaliza → sincroniza. Repite una o dos veces: al cambiar secciones cambian los momentos.</li>
       </ol>
     </div>
@@ -181,7 +181,7 @@
     </ol>
   </div>
 
-  <h3 style="margin-top:10pt">Contenido</h3>
+  <h3 style="margin-top:5pt">Contenido</h3>
   <ul class="indice">
     <li><b>1</b>Cómo encaja todo</li>
     <li><b>2</b>Preparar la computadora</li>
@@ -189,13 +189,14 @@
     <li><b>4</b>El ciclo de todos los días</li>
     <li><b>5</b>Agrupación de trabes</li>
     <li><b>6</b>Acomodar la agrupación a mano</li>
-    <li><b>7</b>Crear las secciones con su armado</li>
-    <li><b>8</b>Revisar y detallar</li>
-    <li><b>9</b>Deflexiones</li>
-    <li><b>10</b>Los criterios de la app</li>
-    <li><b>11</b>Problemas frecuentes</li>
-    <li><b>12</b>Práctica con el edificio de prueba</li>
-    <li><b>13</b>Referencia rápida</li>
+    <li><b>7</b>Agrupación de columnas</li>
+    <li><b>8</b>Crear las secciones con su armado</li>
+    <li><b>9</b>Revisar y detallar</li>
+    <li><b>10</b>Deflexiones</li>
+    <li><b>11</b>Los criterios de la app</li>
+    <li><b>12</b>Problemas frecuentes</li>
+    <li><b>13</b>Práctica con el edificio de prueba</li>
+    <li><b>14</b>Referencia rápida</li>
   </ul>
 </section>
 
@@ -212,7 +213,7 @@
     <div class="n"><b>Secciones</b><span class="d">Armado, alzados, verificación y memoria.</span></div>
   </div>
   <div class="vuelta">
-    <b>La vuelta:</b> cuando el modelo todavía no está agrupado, el módulo <b>Agrupación</b> propone las T, tú eliges o acomodas, y
+    <b>La vuelta:</b> cuando el modelo todavía no está agrupado, el módulo <b>Agrupación</b> propone las T (y las C de las columnas), tú eliges o acomodas, y
     <b>aplicar_agrupacion.py</b> les pone su descripción y su sección en RAM. Reanalizas, sincronizas y ya entran como secciones.
   </div>
 
@@ -220,9 +221,9 @@
   <p>Todos los <code>.py</code> los genera la app; no hay que editarlos. Corren dentro de RAM, así que ven el modelo que tengas abierto.</p>
   <table>
     <thead><tr><th style="width:24%">Script</th><th>Qué hace</th><th style="width:28%">Qué toca</th></tr></thead>
-    <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM y los desplazamientos de las trabes para las flechas.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
+    <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM, los desplazamientos de las trabes para las flechas y, en cada columna, P, M22 y M33 simultáneos de cada combinación.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
     <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones y concretos en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
-    <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en <code>1 Agrupación</code>.</td></tr>
+    <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2… o C1, C2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en <code>1 Agrupación</code>.</td></tr>
     <tr><td><b>edificio_prueba.py</b></td><td>Construye y analiza un edificio de práctica.</td><td>Sólo un modelo nuevo y vacío.</td></tr>
   </table>
 
@@ -367,7 +368,8 @@
   <h3>Qué entra</h3>
   <ul>
     <li>Un <b>grupo</b> por cada descripción de RAM, con todos sus miembros. El grupo <code>T-5</code> alimenta la sección <b>T-5</b>.</li>
-    <li>Las <b>demandas</b> de cada miembro por estaciones, con los picos exactos: momentos positivo y negativo, cortante; y para columnas, carga axial y momentos.</li>
+    <li>Las <b>demandas</b> de cada miembro por estaciones, con los picos exactos: momentos positivo y negativo, cortante y carga axial.</li>
+    <li>En cada <b>columna</b>, las fuerzas <b>simultáneas</b> de cada combinación en su pie y en su cabeza: P, M22 y M33 de la misma combinación, que es lo que pide el diagrama de interacción. Con ellas revisan el módulo Columnas y la agrupación de columnas.</li>
     <li>Las <b>medidas reales</b> de cada sección (b, h y recubrimiento) leídas de las tablas de RAM, no del nombre.</li>
     <li>La geometría: nudos y miembros, para encadenar tramos en trabes continuas y dibujar el modelo.</li>
     <li>En cada trabe, el <b>desplazamiento vertical y el momento por caso de carga</b> (CM, CV…, sin sismo), para <b>Deflexiones</b>. El script comprueba la unidad de los desplazamientos con los giros de RAM.</li>
@@ -376,7 +378,7 @@
   <h3>Los avisos, y qué hacer con cada uno</h3>
   <h4>Grupos que el proyecto todavía no tiene</h4>
   <figure><img src="img/faltan.png" alt=""></figure>
-  <p><b>crear las N secciones con su armado</b> las da de alta con las medidas de RAM y un armado propuesto (capítulo 7). <b>ahora no</b> las deja para después.</p>
+  <p><b>crear las N secciones con su armado</b> las da de alta con las medidas de RAM y un armado propuesto (capítulo 8). <b>ahora no</b> las deja para después.</p>
 
   <h4>Las demandas son de otra sección</h4>
   <figure><img src="img/aviso-invertida.png" alt=""></figure>
@@ -386,7 +388,7 @@
 
   <h4>Miembros sin descripción</h4>
   <figure><img src="img/sin-descripcion.png" alt=""></figure>
-  <p>No se crea una sección con ellos: todavía no están agrupados. Ve a <b>Módulos → Agrupación</b> (capítulos 5 y 6).</p>
+  <p>No se crea una sección con ellos: todavía no están agrupados. Ve a <b>Módulos → Agrupación</b> (capítulos 5 a 7).</p>
 </section>
 
 <!-- ═════════════════════════ 5 ═════════════════════════ -->
@@ -400,7 +402,8 @@
     más grupos hacen falta para no desperdiciar concreto. Por eso hay tres propuestas, de pocos grupos a ajustada, y además el acomodo a mano.
   </div>
 
-  <p>Se abre en <b>Módulos → Agrupación</b> (o <kbd>Ctrl</kbd>+<kbd>K</kbd> y «agrupación»). Toma sola el último modelo sincronizado; también puedes cargar un <code>modelo.json</code>.</p>
+  <p>Se abre en <b>Módulos → Agrupación</b> (o <kbd>Ctrl</kbd>+<kbd>K</kbd> y «agrupación»). Toma sola el último modelo sincronizado; también puedes cargar un <code>modelo.json</code>.
+  Arriba del paso 1 está el interruptor <b>Trabes | Columnas</b>: este capítulo y el siguiente son de trabes; las columnas, en el capítulo 7.</p>
 
   <h3>Paso 1 · Qué agrupar</h3>
   <figure><img src="img/agr-que.png" alt=""></figure>
@@ -414,10 +417,10 @@
   <p>Cómo se arman:</p>
   <ol>
     <li>Los tramos colineales y seguidos se encadenan en <b>trabes continuas</b>: una trabe continua es una sola sección.</li>
-    <li>A cada trabe su <b>sección mínima</b>: la de menos concreto del catálogo que da el momento con una cuantía cómoda y el cortante con estribos que se pueden armar (criterios en el capítulo 10).</li>
+    <li>A cada trabe su <b>sección mínima</b>: la de menos concreto del catálogo que da el momento con una cuantía cómoda y el cortante con estribos que se pueden armar (criterios en el capítulo 11).</li>
     <li>Las trabes con la misma sección mínima forman una clase. De la más grande a la más chica, una clase <b>sube</b> a la sección del grupo de arriba si cabe y si su trabe más cargada la aprovecharía al menos al umbral:
       <b>Pocos grupos 50 %</b>, <b>Equilibrada 65 %</b>, <b>Ajustada 80 %</b>. Umbral más bajo, menos grupos y más concreto.</li>
-    <li>Cada grupo pasa por el mismo motor que arma las secciones (capítulo 7): si sale <b>✓</b>, se puede armar con esa sección.</li>
+    <li>Cada grupo pasa por el mismo motor que arma las secciones (capítulo 8): si sale <b>✓</b>, se puede armar con esa sección.</li>
   </ol>
   <p>Cómo leer una tarjeta: número de grupos; <b>m³</b> de concreto en trabes y su cambio contra hoy (si hoy todo es 15×20, crece: es lo esperado); <b>kg</b> de acero del armado propuesto;
   y por grupo su sección y el rango de <b>aprovechamiento</b> de sus trabes (100 % = justo). Un rango muy abierto, como 30–95 %, quiere decir que hay trabes ligeras pagando la sección de las pesadas.</p>
@@ -530,7 +533,64 @@
 
 <!-- ═════════════════════════ 7 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">7</span>Crear las secciones con su armado</h2>
+  <h2><span class="n">7</span>Agrupación de columnas</h2>
+  <p class="entrada">El mismo agrupador, con flexocompresión: cada columna se ubica en el diagrama de interacción de cada sección del catálogo y se juntan las que caben en la misma. Se elige con el interruptor <b>Columnas</b>, arriba del paso 1.</p>
+
+  <figure>
+    <img src="img/agr-col-propuestas.png" alt="">
+    <figcaption><b>Agrupación → Columnas</b> con el edificio de prueba, por entrepiso. En <b>Equilibrada</b>, C1 de 36×36 para las tres columnas más cargadas, C2 de 30×30 y C3 de 25×25 en el último entrepiso; la Fase 1 arma y verifica los tres grupos.</figcaption>
+  </figure>
+
+  <div class="caja ojo">
+    <span class="t">Necesita el sincronizar.py actual</span>
+    Uno anterior guardaba de cada columna el P máximo y el M33 máximo por separado, y sin M22: no sirve para flexocompresión. Si el <code>modelo.json</code> es de antes, la app lo avisa en el paso 1.
+    Genera el script otra vez (capítulo 3), córrelo en RAM y sincroniza.
+  </div>
+
+  <h3>Paso 1 · Qué agrupar</h3>
+  <ul>
+    <li>Vienen marcados los grupos de columnas (los que tienen miembros verticales); las trabes, no.</li>
+    <li><b>Secciones que se pueden proponer:</b> las columnas del catálogo. De fábrica, las de 20 cm o más por lado; las de 15 cm son castillos y se marcan a mano si las quieres.</li>
+    <li><b>Misma sección en toda la altura:</b> cada columna completa, de la base a la azotea, es un solo elemento con la demanda de su entrepiso más cargado. Sin marcar, cada entrepiso va por separado (E1 es el de abajo) y la sección puede bajar hacia arriba.</li>
+  </ul>
+
+  <h3>Cómo se mide el aprovechamiento</h3>
+  <ol>
+    <li>Cada sección del catálogo tiene su <b>diagrama de interacción</b> con un armado de referencia: el de menos varillas con cuantía entre 1.5 y 2.5 % (8#5 en 30×30, 4#6 en 25×25, 8#6 en 36×36). Es un armado cómodo; el de cada grupo lo pone después la Fase 1.</li>
+    <li>Cada combinación en el pie y en la cabeza de una columna es un <b>punto</b> (P, Mx, My): Mx = |M33| trabaja el peralte h y My = |M22| el ancho b, como en el módulo Columnas, y los dos se revisan juntos con el contorno biaxial.</li>
+    <li>El <b>aprovechamiento</b> de un punto es qué tanto habría que crecer su P y sus momentos, juntos y en la misma proporción, para tocar la frontera: 100 % es justo en el diagrama; 50 % es que aguantaría el doble. El de la columna es el de su punto más exigido.</li>
+    <li>De ahí en adelante es igual que con las trabes: la sección mínima de cada columna, las clases, los tres umbrales (50, 65 y 80 %) y los grupos <b>C1, C2…</b> de la sección más grande a la más chica. Cada grupo lo arma la Fase 1 con el motor del módulo Columnas (capítulo 8).</li>
+  </ol>
+
+  <h3>La planta y el acomodo a mano</h3>
+  <figure>
+    <img src="img/agr-col-planta.png" alt="">
+    <figcaption><b>Las columnas en planta,</b> un cuadro de su color por entrepiso, sobre las trabes del nivel en gris. A la derecha, los grupos con su tira de aprovechamiento y el acero de la Fase 1.</figcaption>
+  </figure>
+  <p>Todo lo del capítulo 6 funciona igual: la escala de aprovechamiento, seleccionar en la planta o en la escala, arrastrar a otro grupo o a <b>＋ grupo nuevo</b>, fijar la sección, <b>renumerar C1…</b>, buscar un miembro de RAM y deshacer.
+  <b>＋ la misma en otros entrepisos</b> agrega la columna de arriba y la de abajo. Con la sección fija, una columna que no cabe se ve con borde rojo.</p>
+
+  <figure>
+    <img src="img/agr-col-diagrama.png" alt="">
+    <figcaption><b>El diagrama de interacción de la selección.</b> Se seleccionaron las columnas de C3: sus 70 puntos (7 columnas × 5 combinaciones × pie y cabeza) sobre el diagrama de 25×25 con 4#6. <b>⤢ demanda</b> / <b>⤡ todo</b> acerca o aleja.</figcaption>
+  </figure>
+  <p>Con columnas seleccionadas aparece su diagrama, en X y en Y: el de la sección de su grupo si todas están en uno, o el de la sección que piden juntas. Verde, los puntos que caben; rojo, los que no.
+  X e Y se dibujan por separado pero se revisan juntos, así que un punto que en cada dibujo parece holgado puede estar cerca del 100 %: el número que manda es el de la tabla.
+  Al pasar el mouse sobre una columna se ve qué combinación y qué extremo la rigen.</p>
+
+  <h3>Aplicar</h3>
+  <p><b>⬇ aplicar_agrupacion.py</b> baja <code>aplicar_agrupacion columnas &lt;fecha&gt;.py</code>, con cada C y su sección <code>COL …</code>. Trabes y columnas se aplican por separado, cada una con su script y su Deshacer, en el orden que quieras.
+  Luego, como siempre: reanaliza, sincroniza y vuelve a abrir Agrupación.</p>
+
+  <div class="caja mal">
+    <span class="t">Lo que no revisa</span>
+    Esbeltez (efectos de segundo orden) ni cortante de columnas: la agrupación y la Fase 1 revisan flexocompresión con las fuerzas del análisis.
+  </div>
+</section>
+
+<!-- ═════════════════════════ 8 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">8</span>Crear las secciones con su armado</h2>
   <p class="entrada">Cuando la sincronización trae grupos nuevos, la app los da de alta con las medidas de RAM y un armado propuesto, verificado con los mismos motores que Longitudinal y Columnas.</p>
 
   <figure>
@@ -549,7 +609,9 @@
   El número de varillas corridas por lecho se limita por el ancho para que se pueda colar: hasta 3 en 25 cm, 4 en 35 cm, 5 en más.</p>
   <h3>Columnas</h3>
   <p>El arreglo con menos varillas que pasa, con cuantía entre 1 y 4 %, separación centro a centro no mayor de 20 cm y varilla #4 o mayor si un lado mide 20 cm o más.
-  Los estribos salen por zonas con la altura del modelo (capítulo 8).</p>
+  Los estribos salen por zonas con la altura del modelo (capítulo 9).</p>
+  <p>La envolvente de una columna son sus combinaciones con P, M22 y M33 simultáneos, en el pie y en la cabeza de cada miembro. El módulo Columnas las dibuja y las revisa todas;
+  los informes listan la que rige de cada miembro.</p>
 
   <div class="caja ojo">
     <span class="t">Revisa siempre</span>
@@ -557,9 +619,9 @@
   </div>
 </section>
 
-<!-- ═════════════════════════ 8 ═════════════════════════ -->
+<!-- ═════════════════════════ 9 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">8</span>Revisar y detallar</h2>
+  <h2><span class="n">9</span>Revisar y detallar</h2>
   <p class="entrada">Con las secciones creadas, el trabajo es el de siempre, ahora con las demandas del modelo ya dentro.</p>
 
   <h3>Longitudinal</h3>
@@ -590,14 +652,14 @@
   </ul>
 </section>
 
-<!-- ═════════════════════════ 9 ═════════════════════════ -->
+<!-- ═════════════════════════ 10 ═════════════════════════ -->
 <section class="cap salto">
-  <h2><span class="n">9</span>Deflexiones</h2>
+  <h2><span class="n">10</span>Deflexiones</h2>
   <p class="entrada">Las flechas de todas las trabes, con los desplazamientos que calcula RAM, corregidos con la inercia agrietada del armado de cada sección y con las diferidas, contra los límites de la NTC.</p>
 
   <ol class="pasos">
     <li>Sincroniza con un <code>sincronizar.py</code> actual: es el que lee los desplazamientos. Si la app dice que el <code>modelo.json</code> no los trae, genera el script otra vez (capítulo 3).</li>
-    <li>Crea las secciones de las trabes (capítulo 7): sin armado no hay inercia agrietada, y esos tramos se muestran con la flecha elástica de RAM, marcados <b>? sin armado</b>.</li>
+    <li>Crea las secciones de las trabes (capítulo 8): sin armado no hay inercia agrietada, y esos tramos se muestran con la flecha elástica de RAM, marcados <b>? sin armado</b>.</li>
     <li><b>Módulos → Deflexiones.</b> Revisa que arriba diga <code>CS = 1·CM + 1·CV</code> (si tu modelo nombra distinto los casos, cambia su papel); la tabla se ordena del tramo más comprometido al menos.</li>
   </ol>
 
@@ -632,9 +694,9 @@
   </div>
 </section>
 
-<!-- ═════════════════════════ 10 ═════════════════════════ -->
+<!-- ═════════════════════════ 11 ═════════════════════════ -->
 <section class="cap salto">
-  <h2><span class="n">10</span>Los criterios de la app</h2>
+  <h2><span class="n">11</span>Los criterios de la app</h2>
   <p class="entrada">Para saber qué está suponiendo la app cuando propone, y qué no revisa.</p>
 
   <table>
@@ -644,26 +706,28 @@
       Cortante: estribos #2.5 de dos ramas a no menos de 8 cm; si el acero de cortante pasa de FR · 1.1√f'c · b · d la separación máxima baja a d/4, y en poco peralte eso ya no se arma: pide peralte. Sin pasar del cortante máximo de la sección.</td></tr>
     <tr><td><b>Propuestas de agrupación</b></td><td>Una clase sube a la sección del grupo de arriba si todas sus trabes caben y la más cargada la aprovecharía al menos al 50, 65 u 80 %. Sólo trabes horizontales; sólo secciones del catálogo con los anchos y peraltes permitidos.
       La sección se elige con la cuantía de dimensionamiento (½ ρ balanceada); el armado real lo pone después la verificación, que puede usar más acero (hasta 0.9 ρ balanceada) si hace falta.</td></tr>
+    <tr><td><b>Sección mínima de una columna</b> (Agrupación)</td><td>El diagrama de interacción de cada sección con el armado de menos varillas entre 1.5 y 2.5 % de cuantía; P, Mx = |M33| y My = |M22| de la misma combinación, en el pie y la cabeza, con el contorno biaxial del módulo Columnas.
+      Aprovechamiento: cuánto habría que crecer la demanda, P y M en la misma proporción, para llegar a la frontera. Mismos umbrales que las trabes; sólo columnas del catálogo y secciones permitidas.</td></tr>
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
-    <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 8, con H del modelo.</td></tr>
-    <tr><td><b>Deflexiones</b></td><td>Con CS = 1·CM + 1·CV: elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) × inmediata de CS (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 9).</td></tr>
+    <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 9, con H del modelo.</td></tr>
+    <tr><td><b>Deflexiones</b></td><td>Con CS = 1·CM + 1·CV: elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) × inmediata de CS (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 10).</td></tr>
   </table>
 
   <div class="caja mal">
     <span class="t">Lo que NO revisa</span>
     <ul style="margin:0">
       <li><b>Deflexiones al agrupar o al proponer armado</b>: ni la agrupación ni las propuestas las consideran; se revisan después, en el módulo Deflexiones, con las secciones ya creadas.</li>
-      <li><b>Cortante en columnas</b>: la propuesta de columnas no lo revisa todavía.</li>
+      <li><b>Cortante y esbeltez en columnas</b>: ni la agrupación ni la propuesta de columnas los revisan todavía.</li>
       <li><b>Segunda iteración</b>: la agrupación usa las demandas del análisis con las secciones de hoy; por eso se aplica, se reanaliza y se vuelve a agrupar.</li>
       <li><b>Zona extrema de castillos</b> a la mitad: es criterio de la oficina, no de la norma.</li>
     </ul>
   </div>
 </section>
 
-<!-- ═════════════════════════ 11 ═════════════════════════ -->
+<!-- ═════════════════════════ 12 ═════════════════════════ -->
 <section class="cap salto">
-  <h2><span class="n">11</span>Problemas frecuentes</h2>
+  <h2><span class="n">12</span>Problemas frecuentes</h2>
   <p class="entrada">Casi todos tienen que ver con cómo se corrió el script o con la carpeta.</p>
 
   <table>
@@ -683,13 +747,14 @@
     <tr><td>Deflexiones: «este modelo.json no trae desplazamientos»</td><td>El <code>sincronizar.py</code> es de una versión anterior.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
     <tr><td>Deflexiones: «? sin armado»</td><td>El proyecto no tiene esa sección.</td><td>Créala desde <b>Reportes de RAM</b>; mientras, sólo se ve la elástica de RAM, que se queda corta.</td></tr>
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
-    <tr><td>El aplicar dice que falta una sección</td><td>No se cambió nada: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar.</td></tr>
+    <tr><td>El aplicar dice que falta una sección</td><td>No se aplicó la agrupación: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar. Si además dice que un miembro «se quedó con» otra sección al probar, cierra el modelo sin guardar.</td></tr>
+    <tr><td>Agrupación → Columnas: «Este modelo.json es de un sincronizar.py anterior»</td><td>Las columnas no traen M22 ni las fuerzas de cada combinación.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
   </table>
 </section>
 
-<!-- ═════════════════════════ 12 ═════════════════════════ -->
+<!-- ═════════════════════════ 13 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">12</span>Práctica con el edificio de prueba</h2>
+  <h2><span class="n">13</span>Práctica con el edificio de prueba</h2>
   <p class="entrada">Para aprender el flujo completo sin tocar una obra: un script construye en RAM un edificio pequeño, todo en 15×20 y sin agrupar, como cuando se empieza a estructurar.</p>
 
   <div class="caja nota">
@@ -706,15 +771,16 @@
     <li>En la app, un proyecto nuevo → <b>Reportes de RAM → Configurar RAM</b> → la ruta de esa carpeta → <b>Generar sincronizar.py</b>; elige la carpeta.</li>
     <li>En RAM, <b>sincronizar.py</b>; en la app, <b>🔄 Sincronizar</b>. Llegan 204 miembros sin descripción y el grupo C1: a las columnas, <b>ahora no</b> por el momento.</li>
     <li><b>Módulos → Agrupación.</b> Quita el ancho de 15 cm, compara las tres propuestas, mira la planta y prueba el acomodo manual: por ejemplo, junta las trabes de fachada de los tres niveles en un grupo, o arrastra en la escala de aprovechamiento las trabes que quedan solas a la izquierda.</li>
-    <li><b>⬇ aplicar_agrupacion.py</b> → en RAM <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b> → reanaliza → sincroniza.</li>
+    <li>Cambia a <b>Columnas</b>: compara por entrepiso y con <b>misma sección en toda la altura</b>, y selecciona un grupo para ver sus puntos en el diagrama de interacción.</li>
+    <li><b>⬇ aplicar_agrupacion.py</b> de trabes y, si quieres, el de columnas → en RAM <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b> cada uno → reanaliza → sincroniza.</li>
     <li>Ahora llegan T1…Tn y C1: <b>crear las secciones con su armado</b>. Revisa los ✓, ⚠ y ✗, abre Longitudinal, <b>Deflexiones</b> y la memoria.</li>
     <li>Vuelve a Agrupación con las demandas nuevas: ¿siguen pasando los grupos? Ésa es la segunda iteración.</li>
   </ol>
 </section>
 
-<!-- ═════════════════════════ 13 ═════════════════════════ -->
+<!-- ═════════════════════════ 14 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">13</span>Referencia rápida</h2>
+  <h2><span class="n">14</span>Referencia rápida</h2>
 
   <h3>Dónde queda cada cosa</h3>
   <table>
@@ -736,7 +802,9 @@
     <tr><td><b>Grupo</b></td><td>Los miembros de RAM con la misma descripción. Cada grupo es una sección de la app.</td></tr>
     <tr><td><b>Trabe continua</b></td><td>Tramos colineales y seguidos encadenados: una trabe, una sección.</td></tr>
     <tr><td><b>Sección mínima</b></td><td>La de menos concreto del catálogo que le basta a una trabe.</td></tr>
-    <tr><td><b>Aprovechamiento</b></td><td>Demanda entre capacidad de dimensionamiento, lo mayor de flexión y cortante. 100 % es justo.</td></tr>
+    <tr><td><b>Aprovechamiento</b></td><td>Demanda entre capacidad de dimensionamiento: en trabes, lo mayor de flexión y cortante; en columnas, qué tanto de su diagrama de interacción usa su punto más exigido. 100 % es justo.</td></tr>
+    <tr><td><b>Entrepiso</b></td><td>En Agrupación → Columnas: la columna entre dos niveles de trabes. E1 es el de abajo.</td></tr>
+    <tr><td><b>Fuerzas simultáneas</b></td><td>P, M22 y M33 de una misma combinación en un mismo punto de la columna; no el máximo de cada una por su lado.</td></tr>
     <tr><td><b>Armado propuesto</b></td><td>El que pone la app al crear una sección; se marca hasta que lo edites.</td></tr>
     <tr><td><b>Tramo</b></td><td>En Deflexiones: la parte de una trabe continua entre dos apoyos, o un voladizo.</td></tr>
     <tr><td><b>Ie</b></td><td>Inercia efectiva de la sección agrietada (Branson), con el armado de la sección.</td></tr>

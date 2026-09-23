@@ -16,7 +16,7 @@ const FILA = 34
 const R = 4.6
 const SEL = '#f59e0b'
 const ROJO = '#c62828'
-const corto = (s) => (s ? s.nombre.replace(' X ', '×') : '—')
+const corto = (s) => (s ? s.nombre.replace(/^COL /, '').replace(' X ', '×') : '—')
 const pct = (v) => `${Math.round(v * 100)} %`
 
 /** Acomoda los puntos de una fila en carriles para que no se encimen */
@@ -37,8 +37,9 @@ function enjambre(items, xDe, sep = R * 2.1) {
 }
 
 export default function AgrupacionEscala({
-  filas, sueltos, uDe, colorDe, sel, setSel, editable, info, destino, onSoltarEn,
+  filas, sueltos, uDe, colorDe, sel, setSel, editable, info, destino, onSoltarEn, pieza = 'trabe',
 }) {
+  const unas = pieza === 'columna' ? 'columna(s)' : 'trabe(s)'
   const wrapRef = useRef(null)
   const svgRef = useRef(null)
   const [ancho, setAncho] = useState(800)
@@ -200,7 +201,7 @@ export default function AgrupacionEscala({
           const esDestino = arrastre && arrastre.fila === k
           const col = l.tipo === 'grupo' ? colorDe(l.g, l.i) : '#9aa3b2'
           const titulo = l.tipo === 'grupo' ? l.g.nombre : l.tipo === 'sueltos' ? 'sin asignar' : '＋ grupo nuevo'
-          const sub = l.tipo === 'grupo' ? `${corto(l.g.sec)}${l.g.auto ? ' auto' : ''} · ${l.elems.length}` : l.tipo === 'sueltos' ? `${l.elems.length} trabe(s)` : 'suelta aquí'
+          const sub = l.tipo === 'grupo' ? `${corto(l.g.sec)}${l.g.auto ? ' auto' : ''} · ${l.elems.length}` : l.tipo === 'sueltos' ? `${l.elems.length} ${unas}` : 'suelta aquí'
           return (
             <g key={l.key} data-testid={`agr-esc-fila-${l.tipo === 'grupo' ? l.g.nombre : l.tipo}`}>
               <rect x={2} y={y - FILA / 2 + 1} width={ancho - 4} height={FILA - 2} rx={6}
@@ -256,7 +257,7 @@ export default function AgrupacionEscala({
             ))}
             {previa && <text x={x1 + 8} y={yDe(arrastre.fila) + 15} fontSize={9.5} fill={previa.malo ? ROJO : previa.crece ? '#92400e' : '#15803d'} style={{ fontWeight: 700 }}>{previa.texto}</text>}
             <text x={arrastre.x + 10} y={arrastre.y - 8} fontSize={11} fontWeight={800} fill={SEL}>
-              {arrastre.ids.length} trabe(s) → {lAr.tipo === 'grupo' ? lAr.g.nombre : lAr.tipo === 'sueltos' ? 'sin asignar' : 'grupo nuevo'}
+              {arrastre.ids.length} {unas} → {lAr.tipo === 'grupo' ? lAr.g.nombre : lAr.tipo === 'sueltos' ? 'sin asignar' : 'grupo nuevo'}
             </text>
           </g>
         )}
@@ -275,7 +276,9 @@ export default function AgrupacionEscala({
         </div>
       )}
       <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', padding: '0 10px 7px', lineHeight: 1.5 }}>
-        Cada punto es una trabe en la sección de su grupo. Con trabes seleccionadas, los círculos huecos dicen dónde caerían en cada T.
+        {pieza === 'columna'
+          ? 'Cada punto es una columna en la sección de su grupo: 100 % es que su punto más exigido toca el diagrama de interacción. Con columnas seleccionadas, los círculos huecos dicen dónde caerían en cada grupo.'
+          : 'Cada punto es una trabe en la sección de su grupo. Con trabes seleccionadas, los círculos huecos dicen dónde caerían en cada T.'}
         {editable ? ' Arrastra puntos a otra fila para moverlos, a «＋ grupo nuevo» para armar uno o a «sin asignar» para sacarlos.' : ' Para moverlas, ✎ ajusta esta propuesta a mano.'}
       </div>
     </div>

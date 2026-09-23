@@ -18,9 +18,12 @@
 
 import { claveNombre } from './bulkEnvelopes'
 import { sectionDims } from './geometry'
+import { detectUpAxis } from './modelView'
 
 /** Orden de los números de cada estación, tal como los escribe el script */
 const CAMPOS = ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax']
+/** Las fuerzas simultáneas de una columna: por combinación, en sus extremos */
+const CAMPOS_FLEXO = ['x', 'combo', 'axial', 'm22', 'm33', 'v2', 'v3']
 
 /** ¿Este texto (o este objeto) es el modelo.json de la app? */
 export function looksLikeModeloRam(x) {
@@ -76,6 +79,33 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
   }))
   const model = { archivo, rows, nodes }
 
+  // ── Columnas: P, M22 y M33 de la MISMA combinación ────────
+  // Si el script las trae, son la envolvente de la columna: cada combinación
+  // en su pie y en su cabeza. Sin ellas (un modelo.json de antes) quedan el
+  // máximo y el mínimo de siempre, que no son simultáneos ni traen M22.
+  const cf = Array.isArray(d.campos_flexo) && d.campos_flexo.length ? d.campos_flexo : CAMPOS_FLEXO
+  const jF = {}
+  cf.forEach((c, i) => { jF[c] = i })
+  const up = detectUpAxis(new Map(Object.entries(nodes)))
+  let conFlexo = 0
+  const puntosFlexo = (m, L) => {
+    const a = nodes[String(m.ni)], b = nodes[String(m.nj)]
+    const iAbajo = !a || !b || a[up] <= b[up]
+    return m.flexo.map((f) => {
+      const x = num(f[jF.x])
+      const combo = envueltas[f[jF.combo]] ?? String(f[jF.combo])
+      const t = L > 0 ? x / L : 0
+      const cerca = t < 0.02 ? 'i' : t > 0.98 ? 'j' : null
+      const ext = !cerca ? 'centro' : (cerca === 'i') === iAbajo ? 'pie' : 'cabeza'
+      const axial = num(f[jF.axial])
+      return {
+        id: `${m.id}-${combo}-${ext}`, member: String(m.id), tipo: `${combo} ${ext}`,
+        axial, v2: num(f[jF.v2]), v3: num(f[jF.v3]), tors: 0, m22: num(f[jF.m22]), m33: num(f[jF.m33]),
+        P: -axial, combo,
+      }
+    })
+  }
+
   // ── Un perfil por grupo ──────────────────────────────────
   const porGrupo = new Map()
   for (const m of d.miembros) {
@@ -122,6 +152,11 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
         id: String(m.id), Lreport: L, stations, combos: envueltas, repMax, repMin,
         seccion: String(m.seccion || ''), grupo: nombre,
       })
+      if (Array.isArray(m.flexo) && m.flexo.length) {
+        points.push(...puntosFlexo(m, L))
+        conFlexo++
+        continue
+      }
       points.push({ id: `${m.id}-Max`, member: String(m.id), tipo: 'Max', ...repMax, P: -repMax.axial, combo })
       points.push({ id: `${m.id}-Min`, member: String(m.id), tipo: 'Min', ...repMin, P: -repMin.axial, combo })
     }
@@ -188,6 +223,8 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
     modelo: d.modelo || {}, combos: d.combinaciones || [], casos: d.casos || [], envueltas,
     model, grupos, reacciones, flechas,
     conMedidas: medidas.size > 0,
+    // columnas con P, M22 y M33 simultáneos (sincronizar.py de ahora); 0 en un modelo de antes
+    conFlexo,
   }
 }
 
