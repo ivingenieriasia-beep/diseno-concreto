@@ -396,16 +396,31 @@ export function problemasDeNombres(grupos, ocupados = []) {
 
 // ── Las plantas, para ver y acomodar ─────────────────────────
 
+// La planta vista desde arriba, sin espejo (RAM es de mano derecha: con Y
+// vertical, X hacia la derecha deja Z hacia abajo). giro = cuartos de vuelta
+// en el sentido del reloj a partir de ahí; con 1 queda como la vista de RAM
+// de siempre: Z hacia la izquierda y X hacia el frente (abajo).
+export const GIRO_RAM = 1
+const gira = (x, y, giro) => {
+  for (let i = 0; i < ((giro % 4) + 4) % 4; i++) [x, y] = [-y, x]
+  return [x, y]
+}
+const FLECHA = { '1,0': '→', '0,1': '↓', '-1,0': '←', '0,-1': '↑' }
+/** Hacia dónde apunta cada eje horizontal en el dibujo con ese giro */
+export function flechasDeEjes(giro) {
+  const f = (x, y) => FLECHA[gira(x, y, giro).map((v) => Math.round(v) || 0).join(',')]
+  return [f(1, 0), f(0, 1)]
+}
+
 /**
- * Geometría en planta de cada elemento, por nivel. Coordenadas de dibujo
- * (y hacia abajo): x = primer eje horizontal; el segundo hacia abajo, como
- * se ve desde arriba con Y vertical (zAbajo), o hacia arriba.
+ * Geometría en planta de cada elemento, por nivel, en coordenadas de dibujo
+ * (y hacia abajo) con el giro pedido.
  * @returns { up, ejes, niveles:[{ v, n, ids }], porId: Map id → { segs, z, nivel, caja, cx, cy }, columnas, bounds }
  */
-export function planos(R, elems, { tol = 0.05, zAbajo = true } = {}) {
+export function planos(R, elems, { tol = 0.05, giro = GIRO_RAM } = {}) {
   const G = geometria(R)
   const [h, k] = planAxes(G.up)
-  const sk = zAbajo ? 1 : -1
+  const P = (n) => gira(n[h], n[k], giro)
   const porId = new Map()
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   const ver = (x, y) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y) }
@@ -416,7 +431,7 @@ export function planos(R, elems, { tol = 0.05, zAbajo = true } = {}) {
       const r = G.porId.get(String(id))
       const a = r && G.nodes.get(r.nj), b = r && G.nodes.get(r.nk)
       if (!a || !b) continue
-      const s = [a[h], sk * a[k], b[h], sk * b[k]]
+      const s = [...P(a), ...P(b)]
       segs.push(s)
       ver(s[0], s[1]); ver(s[2], s[3])
       zs += a[G.up] + b[G.up]; nz += 2
@@ -450,12 +465,13 @@ export function planos(R, elems, { tol = 0.05, zAbajo = true } = {}) {
     const z1 = Math.min(a[G.up], b[G.up]), z2 = Math.max(a[G.up], b[G.up])
     for (const N of niveles) {
       if (N.v < z1 - 0.25 || N.v > z2 + 0.25) continue
-      columnas.push({ nivel: N.n, x: a[h], y: sk * a[k] })
+      const [x, y] = P(a)
+      columnas.push({ nivel: N.n, x, y })
     }
   }
   if (!porId.size) { minX = 0; maxX = 1; minY = 0; maxY = 1 }
   return {
-    up: G.up, ejes: [h, k], zAbajo, niveles, porId, columnas,
+    up: G.up, ejes: [h, k], flechas: flechasDeEjes(giro), giro, niveles, porId, columnas,
     bounds: { minX, minY, maxX, maxY, w: Math.max(maxX - minX, 0.1), h: Math.max(maxY - minY, 0.1) },
   }
 }

@@ -35,7 +35,7 @@ describe('reconstrucción del modelo', () => {
   })
   it('proyecta en planta, elevación e isométrica de forma consistente', () => {
     const n = { x: 2, y: 3, z: 5 }
-    expect(projectPoint(n, 'planta', 'y')).toEqual([2, -5])
+    expect(projectPoint(n, 'planta', 'y')).toEqual([-5, 2])     // Z a la izquierda, X hacia abajo: como RAM
     expect(projectPoint(n, 'frente', 'y')).toEqual([2, -3])
     expect(projectPoint(n, 'lado', 'y')).toEqual([5, -3])
     const [ix, iy] = projectPoint(n, 'iso', 'y')
@@ -46,8 +46,8 @@ describe('reconstrucción del modelo', () => {
     const p = projectModel(JOF.nodes, JOF.rows, { vista: 'planta' })
     expect(p.segs).toHaveLength(1448)
     expect(p.up).toBe('y')
-    expect(p.bounds.w).toBeCloseTo(18.61, 1)
-    expect(p.bounds.h).toBeCloseTo(10.56, 1)
+    expect(p.bounds.w).toBeCloseTo(10.56, 1)
+    expect(p.bounds.h).toBeCloseTo(18.61, 1)
     const s = p.segs[0]
     expect(s).toMatchObject({ id: '10', seccion: 'RcBeam 15X25', kind: 'trabe' })
     expect(s.len).toBeCloseTo(5.92, 2)

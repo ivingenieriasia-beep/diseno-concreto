@@ -46,7 +46,7 @@ function Nombre({ valor, onCambio, testid, disabled }) {
 }
 
 export default function AgrupacionManual({
-  A, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, voltear,
+  A, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, girar,
 }) {
   const elemPor = useMemo(() => new Map(A.elementos.map((e) => [e.id, e])), [A])
   const filas = editable ? P.todos : P.grupos
@@ -104,7 +104,7 @@ export default function AgrupacionManual({
   return (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <div style={{ flex: '1 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} voltear={voltear} />
+        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} girar={girar} />
 
         {selElems.length > 0 && (
           <div data-testid="agr-seleccion" style={{ border: `1px solid ${'#f59e0b'}`, borderRadius: 9, padding: '8px 10px', background: 'var(--color-bg)' }}>

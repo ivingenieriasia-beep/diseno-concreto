@@ -7,7 +7,7 @@ import {
   inventario, elementos, candidatas, capacidad, aprovechamiento, seccionMinima,
   proponerAgrupacion, verificarGrupo, UMBRALES,
   manualDesde, manualVacio, grupoNuevo, armarManual, renumerar, problemasDeNombres,
-  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO,
+  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO, flechasDeEjes, GIRO_RAM,
 } from '../src/core/agrupacion.js'
 import { generarAplicarAgrupacion } from '../src/core/ramScript.js'
 import { SECCIONES_RAM } from '../src/core/catalogoRam.js'
@@ -197,5 +197,19 @@ describe('acomodo manual', () => {
       const a = geo.porId.get(alguno).caja, b = geo.porId.get(id).caja
       a.forEach((v, i) => expect(Math.abs(v - b[i])).toBeLessThanOrEqual(0.1))
     }
+  })
+
+  it('la planta, como RAM: vista desde arriba sin espejo, Z a la izquierda y X hacia abajo', () => {
+    expect(flechasDeEjes(GIRO_RAM)).toEqual(['↓', '←'])
+    expect(flechasDeEjes(0)).toEqual(['→', '↓'])
+    // girar nunca refleja: X y luego Z siempre van en el sentido del reloj (mano derecha vista desde arriba)
+    const orden = ['→', '↓', '←', '↑']
+    for (let g = 0; g < 4; g++) {
+      const [fx, fz] = flechasDeEjes(g)
+      expect(orden[(orden.indexOf(fx) + 1) % 4]).toBe(fz)
+    }
+    const a = planos(R, A.elementos, { giro: 0 }).bounds, b = planos(R, A.elementos).bounds
+    expect(b.w).toBeCloseTo(a.h, 6)
+    expect(b.h).toBeCloseTo(a.w, 6)
   })
 })

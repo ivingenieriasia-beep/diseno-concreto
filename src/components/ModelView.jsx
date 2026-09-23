@@ -226,7 +226,7 @@ export default function ModelView({
             <span style={{ display: 'inline-block', width: Math.round(escala.px), height: 6, borderLeft: '2px solid var(--color-tx3)', borderRight: '2px solid var(--color-tx3)', borderBottom: '2px solid var(--color-tx3)' }} />
             {escala.paso} m
           </div>}
-          <div>{vista === 'planta' ? `planta · ${ejeH.toUpperCase()}→ ${ejeK.toUpperCase()}↑` : vista === 'iso' ? `isométrica · vertical ${up.toUpperCase()}` : `elevación · vertical ${up.toUpperCase()}`}</div>
+          <div>{vista === 'planta' ? `planta · ${ejeK.toUpperCase()}← ${ejeH.toUpperCase()}↓` : vista === 'iso' ? `isométrica · vertical ${up.toUpperCase()}` : `elevación · vertical ${up.toUpperCase()}`}</div>
         </div>
 
         {/* tarjeta del miembro bajo el cursor */}

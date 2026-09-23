@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { GIRO_RAM } from '../core/agrupacion'
 
 // Las trabes en planta, un dibujo por nivel, coloreadas por su grupo.
 // Clic: una trabe · Mayús/Ctrl+clic: la agrega o la quita · arrastrar en un
@@ -116,7 +117,7 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover }) {
   )
 }
 
-export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, voltear }) {
+export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar }) {
   const [nivel, setNivel] = useState(null)          // null = todos
   const [nombres, setNombres] = useState(true)
   const [hover, setHover] = useState(null)
@@ -150,17 +151,19 @@ export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, voltea
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, marginLeft: 8, cursor: 'pointer' }}>
           <input type="checkbox" checked={nombres} onChange={() => setNombres((v) => !v)} /> nombres
         </label>
-        <span data-testid="agr-ejes" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)', marginLeft: 6 }}>
-          {geo.ejes[0]} → · {geo.ejes[1]} {geo.zAbajo ? '↓' : '↑'}
+        <span data-testid="agr-ejes" title="Vista desde arriba. Con el giro de fábrica queda como la vista de RAM: Z a la izquierda, X hacia el frente"
+          style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)', marginLeft: 6 }}>
+          {geo.ejes[0].toUpperCase()}{geo.flechas[0]} {geo.ejes[1].toUpperCase()}{geo.flechas[1]}
+          {geo.giro === GIRO_RAM ? ' · como RAM' : ''}
         </span>
-        {voltear && (
-          <button data-testid="agr-voltear" style={chip(false)} onClick={voltear} title="Si no se ve como la planta de RAM, voltéala">↕ voltear</button>
+        {girar && (
+          <button data-testid="agr-girar" style={chip(false)} onClick={girar} title="Girar la planta un cuarto de vuelta">↻ girar</button>
         )}
         <span style={{ fontSize: 10.5, color: 'var(--color-tx3)', marginLeft: 'auto' }}>
           clic: una · Mayús/Ctrl+clic: suma o quita · arrastrar en un hueco: ventana · Esc: ninguna
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: nivel ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: nivel ? '1fr' : 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
         {visibles.map((N) => (
           <Planta key={N.n} N={N} geo={geo} vb={vb} fs={fs} estilo={estilo} sel={sel} onSel={onSel} nombres={nombres} setHover={setHover} />
         ))}

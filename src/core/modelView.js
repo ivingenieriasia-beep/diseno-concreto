@@ -60,7 +60,8 @@ export function projectPoint(n, vista, up) {
   const [h, k] = planAxes(up)
   const H = n[h], K = n[k], V = n[up]
   switch (vista) {
-    case 'planta': return [H, -K]
+    // desde arriba y sin espejo, como la vista de RAM: Z a la izquierda, X hacia abajo
+    case 'planta': return [-K, H]
     case 'frente': return [H, -V]
     case 'lado': return [K, -V]
     default: return [(H - K) * COS30, (H + K) * SIN30 - V] // isométrica

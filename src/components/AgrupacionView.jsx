@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseModeloRam } from '../core/ramModel'
 import { modeloGuardado, hace } from '../core/ramSync'
 import {
-  inventario, proponerAgrupacion, verificarGrupo, planos, armarManual, manualDesde, manualVacio, problemasDeNombres,
+  inventario, proponerAgrupacion, verificarGrupo, planos, GIRO_RAM, armarManual, manualDesde, manualVacio, problemasDeNombres,
 } from '../core/agrupacion'
 import { generarAplicarAgrupacion } from '../core/ramScript'
 import AgrupacionManual from './AgrupacionManual'
@@ -46,7 +46,7 @@ function Tarjeta({ P, vs, hoy, activa, onClick, subtitulo, accion, nota }) {
         <span style={{ marginLeft: 'auto' }}>{accion}</span>
       </div>
       <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', marginTop: 1 }}>{subtitulo}</div>
-      <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 2, marginTop: 6, fontSize: 12, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
         <span data-testid={`agr-ngrupos-${P.id}`}><b style={{ fontSize: 18 }}>{P.grupos.length}</b> grupos</span>
         <span>{m3(P.concreto)} <span style={{ color: dC > 0 ? '#92400e' : '#15803d' }}>({dC >= 0 ? '+' : ''}{Math.round(dC * 100)} % vs hoy)</span></span>
         <span>{listos === vs.length ? `${kg.toFixed(0)} kg` : `verificando ${listos}/${vs.length}…`}</span>
@@ -131,14 +131,15 @@ export default function AgrupacionView({ onToast }) {
   }, [A, fuente])
 
   // ── acomodo manual ──
-  const [zAbajo, setZAbajo] = useState(() => { try { return localStorage.getItem(GUARDADO + '.zArriba') !== '1' } catch { return true } })
-  const voltear = () => {
-    setZAbajo((v) => {
-      try { localStorage.setItem(GUARDADO + '.zArriba', v ? '1' : '0') } catch { /* sin almacenamiento */ }
-      return !v
-    })
+  const [giro, setGiro] = useState(() => {
+    try { const g = parseInt(localStorage.getItem(GUARDADO + '.giro'), 10); return Number.isFinite(g) ? g : GIRO_RAM } catch { return GIRO_RAM }
+  })
+  const girar = () => {
+    const g = (giro + 1) % 4
+    try { localStorage.setItem(GUARDADO + '.giro', String(g)) } catch { /* sin almacenamiento */ }
+    setGiro(g)
   }
-  const geo = useMemo(() => (A && fuente ? planos(fuente.R, A.elementos, { zAbajo }) : null), [A, fuente, zAbajo])
+  const geo = useMemo(() => (A && fuente ? planos(fuente.R, A.elementos, { giro }) : null), [A, fuente, giro])
   const M = useMemo(() => (A && manual ? armarManual(A.elementos, A.cands, manual) : null), [A, manual])
 
   // lo que se estaba acomodando la última vez, si es de este modelo
@@ -328,7 +329,7 @@ export default function AgrupacionView({ onToast }) {
           extra={elegida === 'manual' ? 'selecciona trabes en la planta y mándalas a un grupo' : 'los colores son sus grupos; la línea punteada roja, una trabe que no cabe'}>
           <AgrupacionManual A={A} geo={geo} P={mostrada} editable={elegida === 'manual'} manual={manual} cambiar={cambiar}
             sel={sel} setSel={setSel} verifDe={(g) => verifDe(mostrada, g)} onAjustar={() => ajustar(mostrada)}
-            deshacer={deshacer} nHist={hist.length} voltear={voltear} />
+            deshacer={deshacer} nHist={hist.length} girar={girar} />
         </Paso>
       )}
 
