@@ -8,6 +8,7 @@ import BDGlobalView from './components/BDGlobalView'
 import ColumnsView from './components/ColumnsView'
 import LongitudinalView from './components/LongitudinalView'
 import AgrupacionView from './components/AgrupacionView'
+import DeflexionesView from './components/DeflexionesView'
 import LoadsView from './components/LoadsView'
 import ModuleLauncher from './components/ModuleLauncher'
 import LoadCenter from './components/LoadCenter'
@@ -317,6 +318,7 @@ export default function App() {
     longitudinal: <LongitudinalView dxfScale={dxfScale} projectName={projectName} onAbrirCentro={() => setCentro(true)} />,
     bdglobal: <BDGlobalView />,
     agrupacion: <AgrupacionView onToast={showToast} />,
+    deflexiones: <DeflexionesView />,
     pesos: <LoadsView onToast={showToast} />,
   }
 

@@ -34,6 +34,14 @@ const PATHS = {
       <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
     </>
   ),
+  flecha: (
+    <>
+      <path d="M3 7c4 7 14 7 18 0" />
+      <path d="M3 7l-1.5 3h3z" />
+      <path d="M21 7l-1.5 3h3z" />
+      <path d="M12 14v5M10 17l2 2 2-2" />
+    </>
+  ),
   grupos: (
     <>
       <path d="M3 5h18" strokeWidth="3" />

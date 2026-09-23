@@ -47,6 +47,8 @@ TOL_REL = 0.01          # al compactar la curva, error admitido (1 % del rango)
 #    0.020  2090      24.9         0.01 %     2.15 %
 #    0.030  1837      21.2         0.01 %     2.99 %
 SOLO_GRUPOS = None      # None = todos. Ej: ['T5', 'T2A'] para probar rápido
+DEFLEXIONES = True      # flechas: desplazamientos de las trabes por caso de carga (módulo Deflexiones)
+EST_FLECHA = 11         # estaciones por trabe para las flechas
 
 import json
 import os
@@ -422,6 +424,120 @@ def _dice_el_nombre(nombre):
     return (float(nums[-2]), float(nums[-1])) if len(nums) >= 2 else None
 
 
+# ── Flechas ───────────────────────────────────────────────────
+# Para el módulo Deflexiones: en cada trabe horizontal, el desplazamiento
+# vertical y el momento por CASO de carga (no por combinación: la app arma
+# las de servicio, CM + CV, con la parte sostenida que toca a largo plazo).
+# Los casos de sismo, viento y temperatura no se leen.
+_LATERAL = ('SEISM', 'SISM', 'EARTHQ', 'QUAKE', 'WIND', 'VIENTO', 'TEMP')
+# Unidades de longitud que podría tener el desplazamiento: unidades por metro
+_UNIDADES = ((1.0, 'm'), (100.0, 'cm'), (1000.0, 'mm'), (39.3701, 'in'), (3.28084, 'ft'))
+
+
+def _es_lateral(c):
+    t = (u'%s %s' % (c.get('categoria', ''), c.get('descripcion', ''))).upper()
+    if any(k in t for k in _LATERAL):
+        return True
+    return bool(re.match(r'^S[XYZ]', str(c.get('id', '')).upper()))
+
+
+def _factor_ig(mb):
+    u"""El factor de inercia que RAM le aplica al miembro (1 = sin reducir)."""
+    try:
+        sf = mb.get_stiffness_factors()
+        ig = float(sf[0]) if isinstance(sf, (tuple, list)) else float(getattr(sf, 'ig'))
+        return ig if 0 < ig < 1 else 1.0
+    except Exception:
+        return 1.0
+
+
+def flechas(m, R, miembros, coords, casos, log=log):
+    u"""Agrega a cada trabe horizontal su 'def' (x, dy en cm, momento por caso) y su 'ig'."""
+    grav = [c for c in casos if not _es_lateral(c)]
+    if not grav:
+        log(u'Flechas: el modelo no tiene casos de carga gravitacionales sueltos (sólo combinaciones o sismo).')
+        return None
+    ids = [c['id'] for c in grav]
+    por_id = dict((int(mb.id), mb) for mb in m.members)
+    muestras = []       # (pendiente de la flecha, giro global que la predice, giro local)
+    crudos = []
+    for x in miembros:
+        a, b = coords.get(x['ni']), coords.get(x['nj'])
+        if not a or not b:
+            continue
+        dh = ((b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2) ** 0.5
+        if abs(b[1] - a[1]) > 0.01 or dh < 0.05:
+            continue                    # sólo trabes horizontales (Y es la vertical en RAM)
+        ux, uz = (b[0] - a[0]) / dh, (b[2] - a[2]) / dh
+        L = x['L']
+        xs = [acotar(L * i / float(EST_FLECHA - 1), L) for i in range(EST_FLECHA)]
+        dy, mm = {}, {}
+        for c in ids:
+            try:
+                d = list(R.member_displacements_at_station(x['id'], c, xs))
+                f = pedir(R, x['id'], c, xs, L)
+            except Exception:
+                continue
+            dy[c] = [float(v.dy) for v in d]
+            mm[c] = [round(float(v.M33), 4) for v in f]
+            # La unidad del desplazamiento no se adivina: su pendiente a lo largo
+            # de la trabe es el giro, y los giros van en radianes.
+            if len(muestras) < 600:
+                for i in range(len(xs) - 1):
+                    ds = xs[i + 1] - xs[i]
+                    if ds <= 1e-6:
+                        continue
+                    pend = (d[i + 1].dy - d[i].dy) / ds
+                    gg = 0.5 * ((-uz * d[i].rx + ux * d[i].rz) + (-uz * d[i + 1].rx + ux * d[i + 1].rz))
+                    gl = 0.5 * (d[i].rz + d[i + 1].rz)
+                    muestras.append((pend, gg, gl))
+        if not dy:
+            continue
+        x['def'] = {'x': [round(v, 4) for v in xs], 'dy': dy, 'm': mm}
+        ig = _factor_ig(por_id.get(x['id']))
+        if ig < 1:
+            x['ig'] = round(ig, 4)
+        crudos.append(x)
+    if not crudos:
+        log(u'Flechas: RAM no devolvió desplazamientos de ninguna trabe.')
+        return None
+
+    def escala(k):
+        rs = sorted(abs(s_[0] / s_[k]) for s_ in muestras if abs(s_[k]) > 1e-7 and abs(s_[0]) > 1e-12)
+        if len(rs) < 5:
+            return None, 0.0
+        med = rs[len(rs) // 2]
+        return med, sum(1 for r in rs if abs(r - med) <= 0.1 * med) / float(len(rs))
+    g, dg = escala(1)
+    l, dl = escala(2)
+    med, disp, ejes = (g, dg, u'globales') if dg >= dl else (l, dl, u'locales')
+    unidad, comprobada = u'm', False
+    if med:
+        import math
+        k, unidad = min(_UNIDADES, key=lambda u: abs(math.log(med / u[0])))
+        comprobada = abs(math.log(med / k)) < 0.15 and disp >= 0.6
+    else:
+        k = 1.0
+    if not comprobada:
+        k = 1.0
+        unidad = u'm'
+    a_cm = 100.0 / k
+    for x in crudos:
+        x['def']['dy'] = dict((c, [round(v * a_cm, 5) for v in vals]) for c, vals in x['def']['dy'].items())
+    log(u'')
+    log(u'FLECHAS: %d trabes · casos %s' % (len(crudos), u', '.join(ids)))
+    if comprobada:
+        log(u'  desplazamientos de RAM en %s (comprobado con los giros, ejes %s, %d %% de las muestras)'
+            % (unidad, ejes, round(disp * 100)))
+    else:
+        log(u'  ⚠ no se pudo comprobar la unidad de los desplazamientos con los giros: se tomaron en metros.')
+        log(u'    Revisa en la app que las flechas tengan sentido antes de usarlas.')
+    return {
+        'casos': grav, 'unidad': 'cm', 'desde': unidad, 'comprobada': comprobada,
+        'ejes': ejes, 'dispersion': round(disp, 3), 'trabes': len(crudos), 'estaciones': EST_FLECHA,
+    }
+
+
 def exportar(destino, log=log):
     u"""Lee el modelo y escribe el .json. Devuelve el resumen para el panel."""
     t0 = time.perf_counter()
@@ -630,6 +746,17 @@ def exportar(destino, log=log):
         if (k + 1) % 200 == 0:
             log(u'  … %d/%d miembros' % (k + 1, len(todos)))
 
+    # ── Flechas (nunca tumban la sincronización) ─────────────
+    deflexiones = None
+    if DEFLEXIONES:
+        t1 = time.perf_counter()
+        try:
+            deflexiones = flechas(m, R, miembros, coords, casos, log)
+        except Exception as e:
+            log(u'  (no se pudieron leer los desplazamientos: %s: %s)' % (type(e).__name__, e))
+        if deflexiones:
+            log(u'  %.1f s' % (time.perf_counter() - t1))
+
     # ── Reacciones ───────────────────────────────────────────
     reacciones = []
     for nid in apoyos:
@@ -666,6 +793,7 @@ def exportar(destino, log=log):
         'casos': casos, 'combinaciones': combos, 'envueltas': usadas,
         'nudos': nudos, 'miembros': miembros, 'reacciones': reacciones,
         'secciones': secciones,
+        'deflexiones': deflexiones,
         'saltados': {'sin_longitud': sin_largo, 'sin_resultados': sin_result, 'motivos': motivos},
     }
 

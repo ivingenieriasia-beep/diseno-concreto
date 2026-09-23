@@ -69,6 +69,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
   const nodes = {}
   for (const [id, n] of Object.entries(d.nudos || {})) {
     nodes[id] = { x: num(n.x), y: num(n.y), z: num(n.z) }
+    if (n.apoyo) nodes[id].apoyo = String(n.apoyo)
   }
   const rows = d.miembros.map((m) => ({
     member: String(m.id), nj: String(m.ni), nk: String(m.nj), seccion: String(m.seccion || ''),
@@ -158,6 +159,26 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
     }])),
   }))
 
+  // ── Flechas: desplazamiento vertical (cm) y momento por caso, en cada trabe ──
+  let flechas = null
+  if (d.deflexiones && typeof d.deflexiones === 'object') {
+    const porMiembro = {}
+    for (const m of d.miembros) {
+      const df = m.def
+      if (!df || !Array.isArray(df.x) || !df.dy) continue
+      porMiembro[String(m.id)] = {
+        x: df.x.map(num), dy: df.dy, m: df.m || {}, ig: typeof m.ig === 'number' ? m.ig : 1,
+        grupo: String(m.grupo || SIN_NOMBRE), seccion: String(m.seccion || ''), material: String(m.material || ''), L: num(m.L),
+      }
+    }
+    const f = d.deflexiones
+    flechas = {
+      casos: Array.isArray(f.casos) ? f.casos : [], unidad: f.unidad || 'cm', desde: f.desde || '',
+      comprobada: !!f.comprobada, ejes: f.ejes || '', miembros: porMiembro,
+    }
+    if (!f.comprobada) warnings.push('El script no pudo comprobar la unidad de los desplazamientos: revisa que las flechas tengan sentido.')
+  }
+
   const saltados = d.saltados || {}
   const nSalt = (saltados.sin_longitud?.length || 0) + (saltados.sin_resultados?.length || 0)
   if (nSalt) warnings.push(`El script dejó fuera ${nSalt} miembro(s) del modelo; revisa su salida.`)
@@ -165,7 +186,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
   return {
     ok: true, warnings, archivo,
     modelo: d.modelo || {}, combos: d.combinaciones || [], casos: d.casos || [], envueltas,
-    model, grupos, reacciones,
+    model, grupos, reacciones, flechas,
     conMedidas: medidas.size > 0,
   }
 }

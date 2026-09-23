@@ -54,9 +54,14 @@ async function idb(modo, fn, store = STORE) {
 // Casi un mega de estaciones no cabe en localStorage junto con el proyecto
 // (el autoguardado tiene ~5 MB para todo), así que vive aquí. Se guarda tal
 // cual lo escribió el script: si mañana la app lee un campo más, está.
+/** Se dispara cuando entra un modelo sincronizado nuevo */
+export const EVENTO_MODELO = 'auxiv:modelo'
+
 export async function guardarModelo(datos, archivo = '') {
   try {
     await idb('readwrite', (s) => s.put({ archivo, at: Date.now(), datos }, CLAVE_MODELO), DATOS)
+    // los módulos abiertos (Agrupación, Deflexiones) se ponen al día solos
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVENTO_MODELO, { detail: { archivo } }))
     return true
   } catch { return false }
 }

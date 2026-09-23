@@ -32,6 +32,14 @@ export const MODULOS = [
     palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1', 'manual', 'acomodo', 'planta'],
   },
   {
+    id: 'deflexiones',
+    nombre: 'Deflexiones',
+    tipo: 'pestana',
+    icono: 'flecha',
+    resumen: 'Flechas de las trabes con los desplazamientos de RAM: inercia agrietada con su armado, diferidas y límites de la NTC.',
+    palabras: ['deflexiones', 'deflexion', 'flechas', 'flecha', 'desplazamientos', 'servicio', 'ntc', 'l/240', 'l/480', 'diferidas', 'inercia', 'agrietada'],
+  },
+  {
     id: 'bdglobal',
     nombre: 'BD Global',
     tipo: 'pestana',

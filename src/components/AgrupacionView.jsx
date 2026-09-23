@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseModeloRam } from '../core/ramModel'
-import { modeloGuardado, hace } from '../core/ramSync'
+import { modeloGuardado, hace, EVENTO_MODELO } from '../core/ramSync'
 import {
   inventario, proponerAgrupacion, verificarGrupo, planos, GIRO_RAM, armarManual, manualDesde, manualVacio, problemasDeNombres,
 } from '../core/agrupacion'
@@ -102,8 +102,11 @@ export default function AgrupacionView({ onToast }) {
 
   // el último modelo sincronizado (Reportes de RAM lo deja guardado)
   useEffect(() => {
-    modeloGuardado().then((m) => { if (m?.datos) usar(m.datos, m.archivo || 'modelo.json', m.at) })
-  }, [])
+    const cargar = () => modeloGuardado().then((m) => { if (m?.datos) usar(m.datos, m.archivo || 'modelo.json', m.at) })
+    cargar()
+    window.addEventListener(EVENTO_MODELO, cargar)
+    return () => window.removeEventListener(EVENTO_MODELO, cargar)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const inv = useMemo(() => (fuente ? inventario(fuente.R) : []), [fuente])
   const A = useMemo(() => {
