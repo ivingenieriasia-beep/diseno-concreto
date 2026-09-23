@@ -102,10 +102,34 @@ def indices_clave(xs, series, tol_min):
 
 
 # ── Estaciones ────────────────────────────────────────────────
+# La longitud sale de las coordenadas de los nudos y puede quedar un pelo por
+# encima de la que la API tiene por dentro; entonces la última estación cae
+# fuera y RAM rechaza LA LLAMADA ENTERA:
+#     ValueError: station_x 5.47003 is out of range [0, 5.47003]
+# Por eso los extremos se meten 0.1 mm hacia dentro. A efectos de diseño no
+# cambia nada (con V = 2 t son 0.0002 t·m) y evita perder el miembro completo.
+EPS = 1e-4
+
+
+def acotar(x, L):
+    e = min(EPS, L * 0.001)
+    return min(max(x, e), L - e)
+
+
 def estaciones(L):
     n = int(round(L / PASO_M)) + 1
     n = max(MIN_EST, min(MAX_EST, n))
-    return [i * L / (n - 1.0) for i in range(n)]
+    return [acotar(i * L / (n - 1.0), L) for i in range(n)]
+
+
+def pedir(R, mid, combo, xs, L):
+    u"""Pide las fuerzas; si el rango sigue sin gustarle, encoge y reintenta."""
+    try:
+        return R.member_forces_at_station(mid, combo, xs)
+    except ValueError:
+        e = max(EPS, L * 1e-4)
+        xs2 = [min(max(x, e), L - e) for x in xs]
+        return R.member_forces_at_station(mid, combo, xs2)
 
 
 def alrededor(xs, i, L, n=11):
@@ -189,7 +213,7 @@ def main():
         por_combo = {}
         for c in usadas:
             try:
-                por_combo[c] = R.member_forces_at_station(mid, c, xs)
+                por_combo[c] = pedir(R, mid, c, xs, L)
             except Exception as e:
                 clave = u'%s: %s' % (type(e).__name__, e)
                 motivos[clave] = motivos.get(clave, 0) + 1
@@ -215,12 +239,12 @@ def main():
         for serie, quien in ((m33max, max), (m33min, min), (v2max, max), (v2min, min)):
             i = serie.index(quien(serie))
             extras.extend(alrededor(xs, i, L))
-        extras = sorted(set(round(x, 5) for x in extras if 0.0 <= x <= L))
+        extras = sorted(set(round(acotar(x, L), 5) for x in extras))
         if extras:
             finos = {}
             for c in usadas:
                 try:
-                    finos[c] = R.member_forces_at_station(mid, c, extras)
+                    finos[c] = pedir(R, mid, c, extras, L)
                 except Exception:
                     finos = {}
                     break
