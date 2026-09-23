@@ -82,6 +82,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const [discrepan, setDiscrepan] = useState([])    // chips con otras medidas que RAM
   const [ruta, setRuta] = useState('')              // la ruta de Windows, mientras se edita
   const [avisoRuta, setAvisoRuta] = useState('')
+  // El camino normal es la API de RAM; los cuatro reportes de texto siguen
+  // ahí, pero detrás de su pestaña para que no estorben.
+  const [pestana, setPestana] = useState(puedeRecordar() ? 'ram' : 'manual')
   // abierto es estado propio: si dependiera de rutaRam, el panel se plegaría
   // solo en cuanto se guarda la ruta — justo mientras se está usando
   const [configAbierta, setConfigAbierta] = useState(!useBeamStore.getState().rutaRam)
@@ -251,43 +254,17 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   // porque va en caja de arena. Así que la ruta se pega aquí una vez por
   // proyecto: aquí es natural pegarla, y aquí la escribimos nosotros en el
   // .py sin que se pueda romper.
-  function generarScript({ enCarpeta = false } = {}) {
+  function generarScript() {
     const r = generarScriptRam(ruta, { proyecto: projectName })
     if (!r.ok) { setAvisoRuta(r.aviso); return }
     setAvisoRuta('')
     setRutaRam(r.ruta)
-    if (enCarpeta) {
-      escribirEnCarpeta(r).catch((e) => {
-        if (e?.name !== 'AbortError') setAvisoRuta(`No se pudo escribir en la carpeta: ${e.message}`)
-      })
-      return
-    }
     const url = URL.createObjectURL(new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url; a.download = r.nombre
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
     setMsg(`${r.nombre} descargado. Déjalo en «${nombreCarpeta(r.ruta)}» y ábrelo en la consola de Python de RAM.`)
-  }
-
-  /** Si el navegador da permiso de escritura, lo deja en la carpeta y ya */
-  async function escribirEnCarpeta(r) {
-    // si todavía no hay carpeta elegida, se elige ahora: no hace falta haber
-    // sincronizado antes para poder dejar el script en su sitio
-    let h = carpeta
-    if (!h) { h = await elegirCarpeta(); setCarpeta(h) }
-    const permiso = await h.requestPermission?.({ mode: 'readwrite' })
-    if (permiso && permiso !== 'granted') {
-      setAvisoRuta('El navegador no dio permiso para escribir en la carpeta; usa «Generar» y muévelo tú.')
-      return
-    }
-    const fh = await h.getFileHandle(r.nombre, { create: true })
-    const w = await fh.createWritable()
-    await w.write(r.texto)
-    await w.close()
-    const texto = `${r.nombre} escrito en «${h.name}». Ábrelo en la consola de Python de RAM y Ctrl+R.`
-    setMsg(texto)
-    onToast?.(texto, 'ok')
   }
 
   /** Adopta en los chips las medidas de la sección que RAM analizó */
@@ -402,22 +379,52 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--color-border)' }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>Cargar reportes de RAM</span>
+          <span style={{ fontSize: 15, fontWeight: 800 }}>Cargar el modelo de RAM</span>
           <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
-            Nombra cada archivo como su chip (T-5.txt, C-1.txt) y elige la carpeta: el contenido decide qué es cada uno.
+            {pestana === 'ram'
+              ? 'Corre sincronizar.py en la consola de Python de RAM y dale a Sincronizar: entra el modelo entero.'
+              : 'Nombra cada archivo como su chip (T-5.txt, C-1.txt): el contenido decide qué es cada uno.'}
           </span>
           <button onClick={onClose} data-testid="cerrar-centro" style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-tx3)' }}>×</button>
         </div>
 
         <div style={{ padding: 14, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}>
-            {puedeRecordar() && (
-              <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="sincronizar" onClick={sincronizar} disabled={!!ocupado}>
-                {ocupado || (carpeta ? '🔄 Sincronizar con RAM' : '🔄 Elegir la carpeta y sincronizar…')}
+          {/* ── Las dos maneras de meter el modelo ── */}
+          <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--color-border)' }}>
+            {[
+              ['ram', '⚡ Desde RAM', 'El script y la carpeta: entra todo de un clic'],
+              ['manual', '📄 Método manual', 'Los cuatro reportes de texto, uno por uno'],
+            ].map(([id, texto, ayuda]) => (
+              <button key={id} data-testid={`tab-${id}`} title={ayuda} onClick={() => setPestana(id)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '6px 12px', fontSize: 12,
+                  fontWeight: pestana === id ? 800 : 500,
+                  color: pestana === id ? 'var(--color-tx)' : 'var(--color-tx3)',
+                  borderBottom: `2px solid ${pestana === id ? 'var(--color-accent)' : 'transparent'}`,
+                  marginBottom: -1,
+                }}>
+                {texto}
               </button>
-            )}
-            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-carpeta" onClick={abrirCarpeta}>🗂 Elegir una carpeta…</button>
-            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-todo" onClick={() => abrir(null)}>📂 Archivos sueltos…</button>
+            ))}
+            <span style={{ marginLeft: 'auto', alignSelf: 'center', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>
+              {sections.length} trabe(s) · {columns.length} columna(s)
+            </span>
+          </div>
+
+          {pestana === 'ram' ? (
+          <>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}>
+            {puedeRecordar()
+              ? (
+                <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="sincronizar" onClick={sincronizar} disabled={!!ocupado}>
+                  {ocupado || (carpeta ? '🔄 Sincronizar con RAM' : '🔄 Elegir la carpeta y sincronizar…')}
+                </button>
+              )
+              : (
+                <span style={{ fontSize: 11, color: '#92400e' }}>
+                  Este navegador no sabe recordar una carpeta. Abre la app en Chrome o Edge, o usa el <b>método manual</b>.
+                </span>
+              )}
             <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
               {carpeta
                 ? <>Carpeta recordada: <b>{carpeta.name}</b>{sync?.at ? ` · sincronizada ${hace(sync.at)}` : ''}. Corre el script en RAM y dale a sincronizar.</>
@@ -429,9 +436,6 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 olvidar
               </button>
             )}
-            <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>
-              {sections.length} trabe(s) · {columns.length} columna(s)
-            </span>
           </div>
 
           {/* ── Configurar RAM: la carpeta de este proyecto ── */}
@@ -445,13 +449,15 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 : <span style={{ fontWeight: 400, color: '#92400e', marginLeft: 8, fontSize: 10.5 }}>sin configurar</span>}
             </summary>
             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-tx2)', lineHeight: 1.6 }}>
-              Pega aquí la ruta de la carpeta del proyecto —la misma que eliges arriba para sincronizar— y
-              la app te arma el <b>sincronizar.py</b> con esa ruta ya dentro. La ruta se guarda con el
-              proyecto, así que al cambiar de obra cambia sola.
-              <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 2 }}>
-                En el explorador: clic derecho sobre la carpeta con Mayús → <b>Copiar como ruta</b>.
-                (Hay que pegarla porque el navegador nunca revela la ruta real de lo que eliges, y el
-                Python de RAM no puede abrir un explorador.)
+              Pega aquí la ruta de la carpeta del proyecto y la app te arma el <b>sincronizar.py</b> con esa
+              ruta ya dentro. Se guarda con el proyecto, así que al cambiar de obra cambia sola.
+              <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 4, lineHeight: 1.65 }}>
+                <b>Es la misma carpeta que eliges arriba, pero no es el mismo gesto</b>, y por eso hay que
+                hacer los dos: el botón de arriba le da al <b>navegador</b> permiso para <b>leer</b> ahí
+                (se recuerda, pero el navegador nunca te dice la ruta real de lo que elegiste); esta ruta
+                es el texto que va <b>dentro</b> del .py para que <b>RAM</b> sepa dónde <b>escribir</b> el
+                modelo.json — y el Python de RAM no puede abrir un explorador para preguntártelo.
+                <div style={{ marginTop: 2 }}>Para copiarla: en el explorador, clic derecho sobre la carpeta con Mayús → <b>Copiar como ruta</b>.</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
                 <input data-testid="ruta-ram" value={ruta} onChange={(e) => { setRuta(e.target.value); setAvisoRuta('') }}
@@ -465,13 +471,6 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                   disabled={!esRutaWindows(ruta)} onClick={() => generarScript()}>
                   ⬇ Generar sincronizar.py
                 </button>
-                {puedeRecordar() && (
-                  <button className="btn btn-secondary" style={{ fontSize: 10.5 }} data-testid="generar-en-carpeta"
-                    disabled={!esRutaWindows(ruta)} onClick={() => generarScript({ enCarpeta: true })}
-                    title={carpeta ? `Lo escribe en «${carpeta.name}», sin pasar por Descargas` : 'Elige la carpeta y lo deja ahí, sin pasar por Descargas'}>
-                    …o dejarlo en {carpeta ? `«${carpeta.name}»` : 'la carpeta'}
-                  </button>
-                )}
               </div>
               {avisoRuta && <div data-testid="aviso-ruta" style={{ color: '#c62828', fontSize: 10.5, marginTop: 5 }}>{avisoRuta}</div>}
               {esRutaWindows(ruta) && carpeta && nombreCarpeta(ruta) !== carpeta.name && (
@@ -483,7 +482,34 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               )}
             </div>
           </details>
+          </>
+          ) : (
+          <>
+          {/* ── El método de antes: un .txt por chip, a mano ── */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}>
+            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-carpeta" onClick={abrirCarpeta}>🗂 Elegir una carpeta…</button>
+            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-todo" onClick={() => abrir(null)}>📂 Archivos sueltos…</button>
+            <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
+              Una lectura y ya: esta carpeta <b>no</b> se recuerda. También puedes soltar los archivos aquí encima.
+            </span>
+          </div>
 
+          {REPORTES.map((r) => (
+            <Slot key={r.id} r={r} estado={estados[r.id]} onCargar={() => abrir(r.id)} />
+          ))}
+
+          <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.6 }}>
+            <b>Cómo conviene guardarlos:</b> una carpeta por proyecto con una subcarpeta por tipo de reporte
+            (<span style={{ fontFamily: 'var(--font-mono)' }}>COLUMNAS · LONGITUDINAL · MAXIMOS</span>) y, dentro, un .txt por chip
+            (<span style={{ fontFamily: 'var(--font-mono)' }}>T-5.txt</span>, <span style={{ fontFamily: 'var(--font-mono)' }}>C-1.txt</span>).
+            Eliges la carpeta de arriba y entra todo: cada trabe recibe su reporte a lo largo <b>y</b> su máximo exacto, que es lo que hace falta
+            para que el momento de diseño no se quede corto. La geometría puede ir suelta en la carpeta raíz.
+            Un mismo .txt puede traer varios reportes juntos: la app los separa y se queda con el mejor de cada cosa.
+          </div>
+          </>
+          )}
+
+          {/* Los avisos salen de sincronizar, pero se quedan a la vista en las dos pestañas */}
           {discrepan.length > 0 && (
             <div data-testid="aviso-medidas" style={{ padding: '9px 12px', borderRadius: 9, background: '#fdecea', border: '1px solid #ef9a9a', fontSize: 11.5, color: '#7f1d1d', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <span>
@@ -516,20 +542,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
             </div>
           )}
 
-          {REPORTES.map((r) => (
-            <Slot key={r.id} r={r} estado={estados[r.id]} onCargar={() => abrir(r.id)} />
-          ))}
-
           {msg && <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' }} data-testid="centro-msg">{msg}</div>}
-
-          <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.6 }}>
-            <b>Cómo conviene guardarlos:</b> una carpeta por proyecto con una subcarpeta por tipo de reporte
-            (<span style={{ fontFamily: 'var(--font-mono)' }}>COLUMNAS · LONGITUDINAL · MAXIMOS</span>) y, dentro, un .txt por chip
-            (<span style={{ fontFamily: 'var(--font-mono)' }}>T-5.txt</span>, <span style={{ fontFamily: 'var(--font-mono)' }}>C-1.txt</span>).
-            Eliges la carpeta de arriba una sola vez y entra todo: cada trabe recibe su reporte a lo largo <b>y</b> su máximo exacto, que es lo que hace falta
-            para que el momento de diseño no se quede corto. La geometría puede ir suelta en la carpeta raíz.
-            Un mismo .txt puede traer varios reportes juntos: la app los separa y se queda con el mejor de cada cosa.
-          </div>
         </div>
       </div>
 
