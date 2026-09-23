@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import AgrupacionPlanta from './AgrupacionPlanta'
 import {
-  aprovechamiento, seccionDeGrupo, mismasEnOtrosNiveles, VIGAS_CATALOGO, grupoNuevo, renumerar,
+  aprovechamiento, seccionDeGrupo, mismasEnOtrosNiveles, VIGAS_CATALOGO, grupoNuevo, renumerar, buscarMiembros,
 } from '../core/agrupacion'
 
 // Ver una propuesta en planta y, en el acomodo manual, mover trabes entre
@@ -46,8 +46,11 @@ function Nombre({ valor, onCambio, testid, disabled }) {
 }
 
 export default function AgrupacionManual({
-  A, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, girar,
+  A, R, geo, P, editable, manual, cambiar, sel, setSel, verifDe, onAjustar, deshacer, nHist, girar,
 }) {
+  const [busca, setBusca] = useState('')
+  const [hallazgo, setHallazgo] = useState(null)   // lo que encontró la última búsqueda
+  const [foco, setFoco] = useState(null)           // trabes a enfocar y hacer parpadear en la planta
   const elemPor = useMemo(() => new Map(A.elementos.map((e) => [e.id, e])), [A])
   const filas = editable ? P.todos : P.grupos
   const grupoDe = useMemo(() => {
@@ -70,7 +73,31 @@ export default function AgrupacionManual({
       `le basta ${corto(e.minima?.sec)}${e.minima?.fuera ? ' (ni ésa alcanza)' : ''} · hoy ${e.hoy.b && e.hoy.h ? `${e.hoy.b}×${e.hoy.h}` : e.hoy.seccion}`,
     ]
     out.push(x ? `en ${x.g.nombre} (${corto(x.g.sec)}) al ${pct(aprovechamiento(e, x.g.sec))}` : 'sin asignar: en RAM no se toca')
+    out.push(`miembros: ${e.miembros.length > 14 ? `${e.miembros.slice(0, 14).join(', ')}…` : e.miembros.join(', ')}`)
     return out
+  }
+
+  // ── buscar por miembro de RAM ──
+  const buscar = (sumar) => {
+    const r = buscarMiembros(R, A.elementos, busca)
+    setHallazgo(r)
+    if (!r.elems.length) return
+    setSel(sumar ? new Set([...sel, ...r.elems]) : new Set(r.elems))
+    setFoco({ ids: r.elems, n: Date.now() })
+  }
+  const mensaje = () => {
+    const h = hallazgo
+    if (!h.pedidos) return { txt: 'Escribe uno o más números de miembro: 97, 120-124…', mal: true }
+    const partes = []
+    if (h.encontrados.length && h.encontrados.length <= 3) {
+      for (const f of h.encontrados) {
+        const x = grupoDe.get(f.elem)
+        partes.push(`${f.miembro} → trabe ${f.elem} · N${geo.porId.get(f.elem)?.nivel ?? '?'} · ${x ? `en ${x.g.nombre}` : 'sin asignar'}`)
+      }
+    } else if (h.encontrados.length) partes.push(`${h.encontrados.length} miembros → ${h.elems.length} trabe(s) seleccionada(s)`)
+    const fuera = h.fuera.slice(0, 3).map((f) => `${f.miembro}: ${f.motivo}`)
+    if (h.fuera.length > 3) fuera.push(`y ${h.fuera.length - 3} más que no están`)
+    return { txt: [...partes, ...fuera].join(' · '), mal: !h.encontrados.length }
   }
 
   const selIds = [...sel].filter((id) => elemPor.has(id))
@@ -104,7 +131,18 @@ export default function AgrupacionManual({
   return (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <div style={{ flex: '1 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} girar={girar} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <input data-testid="agr-buscar" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar miembro de RAM: 97, 120-124"
+            onKeyDown={(e) => { if (e.key === 'Enter') buscar(e.shiftKey) }}
+            title="Número de miembro de RAM; varios con coma o espacio, o un rango 120-124. Enter selecciona su trabe; Mayús+Enter la suma a la selección"
+            style={{ width: 250, fontSize: 12, fontFamily: 'var(--font-mono)', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-bg)', color: 'inherit' }} />
+          <button className="btn btn-secondary" data-testid="agr-buscar-ir" style={btn} onClick={() => buscar(false)}>🔍 buscar</button>
+          {hallazgo && (() => {
+            const m = mensaje()
+            return <span data-testid="agr-buscar-msg" style={{ fontSize: 11, color: m.mal ? '#c62828' : 'var(--color-tx2)' }}>{m.txt}</span>
+          })()}
+        </div>
+        <AgrupacionPlanta geo={geo} estilo={estilo} sel={sel} onSel={setSel} info={info} girar={girar} foco={foco} />
 
         {selElems.length > 0 && (
           <div data-testid="agr-seleccion" style={{ border: `1px solid ${'#f59e0b'}`, borderRadius: 9, padding: '8px 10px', background: 'var(--color-bg)' }}>

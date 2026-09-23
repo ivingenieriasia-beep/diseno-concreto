@@ -327,7 +327,7 @@ export default function AgrupacionView({ onToast }) {
       {A && geo && mostrada && (
         <Paso n="3" titulo={elegida === 'manual' ? 'Acomodar a mano' : 'Verla en planta'}
           extra={elegida === 'manual' ? 'selecciona trabes en la planta y mándalas a un grupo' : 'los colores son sus grupos; la línea punteada roja, una trabe que no cabe'}>
-          <AgrupacionManual A={A} geo={geo} P={mostrada} editable={elegida === 'manual'} manual={manual} cambiar={cambiar}
+          <AgrupacionManual A={A} R={fuente.R} geo={geo} P={mostrada} editable={elegida === 'manual'} manual={manual} cambiar={cambiar}
             sel={sel} setSel={setSel} verifDe={(g) => verifDe(mostrada, g)} onAjustar={() => ajustar(mostrada)}
             deshacer={deshacer} nHist={hist.length} girar={girar} />
         </Paso>

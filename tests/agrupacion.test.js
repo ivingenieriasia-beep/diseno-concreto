@@ -7,7 +7,7 @@ import {
   inventario, elementos, candidatas, capacidad, aprovechamiento, seccionMinima,
   proponerAgrupacion, verificarGrupo, UMBRALES,
   manualDesde, manualVacio, grupoNuevo, armarManual, renumerar, problemasDeNombres,
-  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO, flechasDeEjes, GIRO_RAM,
+  planos, mismasEnOtrosNiveles, VIGAS_CATALOGO, flechasDeEjes, GIRO_RAM, leerMiembros, buscarMiembros,
 } from '../src/core/agrupacion.js'
 import { generarAplicarAgrupacion } from '../src/core/ramScript.js'
 import { SECCIONES_RAM } from '../src/core/catalogoRam.js'
@@ -211,5 +211,35 @@ describe('acomodo manual', () => {
     const a = planos(R, A.elementos, { giro: 0 }).bounds, b = planos(R, A.elementos).bounds
     expect(b.w).toBeCloseTo(a.h, 6)
     expect(b.h).toBeCloseTo(a.w, 6)
+  })
+})
+
+describe('buscar por miembro', () => {
+  const A = proponerAgrupacion(R, ['T5', 'T6', 'T4', 'T7'])
+
+  it('lee listas, rangos y #', () => {
+    expect(leerMiembros('97, 120-123 #130 x')).toEqual(['97', '120', '121', '122', '123', '130'])
+    expect(leerMiembros('12…10')).toEqual(['10', '11', '12'])
+    expect(leerMiembros('')).toEqual([])
+  })
+
+  it('cualquier tramo encuentra su trabe continua', () => {
+    const e = A.elementos.find((x) => x.miembros.length > 2)
+    const r = buscarMiembros(R, A.elementos, `${e.miembros[1]} ${e.miembros[2]}`)
+    expect(r.elems).toEqual([e.id])
+    expect(r.encontrados).toHaveLength(2)
+    expect(r.fuera).toEqual([])
+  })
+
+  it('y si no, dice por qué: no existe, es columna o su grupo no se agrupa', () => {
+    const col = R.grupos.find((g) => g.nombre === 'C1').perfil.members[0].id
+    const otro = R.grupos.find((g) => g.nombre === 'T4').perfil.members[0].id
+    const sinT4 = proponerAgrupacion(R, ['T5', 'T6', 'T7'])
+    const r = buscarMiembros(R, sinT4.elementos, `999999 ${col} ${otro}`)
+    expect(r.elems).toEqual([])
+    const m = Object.fromEntries(r.fuera.map((x) => [x.miembro, x.motivo]))
+    expect(m['999999']).toMatch(/no existe/)
+    expect(m[String(col)]).toMatch(/columna/)
+    expect(m[String(otro)]).toMatch(/«T4» no está marcado/)
   })
 })

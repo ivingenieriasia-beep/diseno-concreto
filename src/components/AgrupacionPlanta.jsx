@@ -8,7 +8,7 @@ import { GIRO_RAM } from '../core/agrupacion'
 const SEL = '#f59e0b'
 const COLUMNA = '#8b93a3'
 
-function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover }) {
+function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover, destello }) {
   const svgRef = useRef(null)
   const drag = useRef(null)
   const [ventana, setVentana] = useState(null)
@@ -89,6 +89,11 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover }) {
               onPointerEnter={(ev) => setHover({ id, x: ev.clientX, y: ev.clientY })}
               onPointerMove={(ev) => setHover({ id, x: ev.clientX, y: ev.clientY })}
               onPointerLeave={() => setHover(null)} style={{ cursor: 'pointer' }}>
+              {destello?.has(id) && (
+                <path d={d} stroke={SEL} strokeWidth={22} strokeLinecap="round" fill="none" vectorEffect="non-scaling-stroke" pointerEvents="none">
+                  <animate attributeName="stroke-opacity" values="0.9;0.1;0.9" dur="0.6s" repeatCount="3" />
+                </path>
+              )}
               {on && <path d={d} stroke={SEL} strokeWidth={10} opacity={0.55} strokeLinecap="round" fill="none" vectorEffect="non-scaling-stroke" />}
               <path d={d} stroke={st.color} strokeWidth={on ? 3.8 : 2.8} strokeDasharray={st.dash} strokeLinecap="round" fill="none" vectorEffect="non-scaling-stroke" />
               {st.mal && <path d={d} stroke="#c62828" strokeWidth={1.3} strokeDasharray="1 4" strokeLinecap="round" fill="none" vectorEffect="non-scaling-stroke" />}
@@ -117,10 +122,24 @@ function Planta({ N, geo, vb, fs, estilo, sel, onSel, nombres, setHover }) {
   )
 }
 
-export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar }) {
+export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar, foco }) {
   const [nivel, setNivel] = useState(null)          // null = todos
   const [nombres, setNombres] = useState(true)
   const [hover, setHover] = useState(null)
+  const [destello, setDestello] = useState(null)
+
+  // lo que se buscó: al nivel donde está (si se ve uno solo), a la vista y parpadeando
+  useEffect(() => {
+    if (!foco?.ids?.length || !geo) return
+    const niveles = new Set(foco.ids.map((id) => geo.porId.get(id)?.nivel).filter(Boolean))
+    setNivel((nv) => (nv === null || niveles.has(nv) ? nv : niveles.size === 1 ? [...niveles][0] : null))
+    setDestello(new Set(foco.ids))
+    const t1 = setTimeout(() => {
+      document.querySelector(`[data-testid="agr-trabe-${CSS.escape(foco.ids[0])}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 60)
+    const t2 = setTimeout(() => setDestello(null), 1900)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [foco]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const esc = (ev) => { if (ev.key === 'Escape') onSel(new Set()) }
@@ -165,7 +184,7 @@ export default function AgrupacionPlanta({ geo, estilo, sel, onSel, info, girar 
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: nivel ? '1fr' : 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
         {visibles.map((N) => (
-          <Planta key={N.n} N={N} geo={geo} vb={vb} fs={fs} estilo={estilo} sel={sel} onSel={onSel} nombres={nombres} setHover={setHover} />
+          <Planta key={N.n} N={N} geo={geo} vb={vb} fs={fs} estilo={estilo} sel={sel} onSel={onSel} nombres={nombres} setHover={setHover} destello={destello} />
         ))}
       </div>
       {hover && (

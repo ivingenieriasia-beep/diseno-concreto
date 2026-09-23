@@ -489,3 +489,52 @@ export function mismasEnOtrosNiveles(geo, ids, { tol = 0.1 } = {}) {
   }
   return out
 }
+
+// ── Buscar por miembro ───────────────────────────────────────
+
+/** «97, 120-124 #130» → ['97','120',…,'124','130'] (sin repetir; rangos de hasta 500) */
+export function leerMiembros(texto) {
+  const out = []
+  for (const t of String(texto || '').split(/[\s,;]+/)) {
+    const r = t.match(/^#?(\d+)\s*(?:-|–|\.\.|…)\s*#?(\d+)$/)
+    if (r) {
+      const [a, b] = [+r[1], +r[2]].sort((x, y) => x - y)
+      for (let i = a; i <= Math.min(b, a + 499); i++) out.push(String(i))
+      continue
+    }
+    const n = t.match(/^#?(\d+)$/)
+    if (n) out.push(String(+n[1]))
+  }
+  return [...new Set(out)]
+}
+
+/**
+ * En qué trabe continua quedó cada miembro buscado y, si en ninguna, por qué.
+ * @returns { encontrados:[{ miembro, elem }], elems:[ids sin repetir], fuera:[{ miembro, motivo }] }
+ */
+export function buscarMiembros(R, elems, texto) {
+  const ids = leerMiembros(texto)
+  const deMiembro = new Map()
+  for (const e of elems) for (const m of e.miembros) deMiembro.set(String(m), e.id)
+  const G = geometria(R)
+  const grupoDe = new Map()
+  for (const g of R.grupos || []) for (const m of g.perfil.members) grupoDe.set(String(m.id), g.nombre)
+  const encontrados = [], fuera = []
+  for (const id of ids) {
+    if (deMiembro.has(id)) { encontrados.push({ miembro: id, elem: deMiembro.get(id) }); continue }
+    const r = G.porId.get(id)
+    const a = r && G.nodes.get(r.nj), b = r && G.nodes.get(r.nk)
+    let motivo
+    if (!r) motivo = 'no existe en el modelo'
+    else if (!a || !b) motivo = 'no tiene nudos en el modelo'
+    else {
+      const k = memberKind(a, b, G.up)
+      if (k === 'columna') motivo = `es una columna${grupoDe.has(id) ? ` (${grupoDe.get(id)})` : ''}`
+      else if (k !== 'trabe') motivo = 'no es horizontal: no se agrupa'
+      else if (grupoDe.has(id)) motivo = `su grupo «${grupoDe.get(id)}» no está marcado en «Qué agrupar»`
+      else motivo = 'no llegó con resultados del análisis'
+    }
+    fuera.push({ miembro: id, motivo })
+  }
+  return { encontrados, elems: [...new Set(encontrados.map((x) => x.elem))], fuera, pedidos: ids.length }
+}

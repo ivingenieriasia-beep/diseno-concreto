@@ -433,7 +433,8 @@
   <h3>Seleccionar trabes</h3>
   <table>
     <thead><tr><th style="width:36%">Gesto</th><th>Qué hace</th></tr></thead>
-    <tr><td>Clic en una trabe</td><td>La selecciona (sólo ésa).</td></tr>
+    <tr><td><b>Buscar miembro de RAM</b> (arriba de la planta)</td><td>Escribe el número de miembro de RAM (varios con coma, o un rango <code>120-124</code>) y <kbd>Enter</kbd>: selecciona la trabe continua donde está, la muestra en su nivel y la hace parpadear. <kbd>Mayús</kbd>+<kbd>Enter</kbd> la suma a la selección. Si no la encuentra dice por qué: no existe, es columna o su grupo no está marcado en «Qué agrupar».</td></tr>
+    <tr><td>Clic en una trabe</td><td>La selecciona (sólo ésa). Al pasar el mouse se ven sus números de miembro.</td></tr>
     <tr><td><kbd>Mayús</kbd> o <kbd>Ctrl</kbd> + clic</td><td>La agrega o la quita de la selección.</td></tr>
     <tr><td>Arrastrar en un hueco</td><td>Selección por ventana: las trabes cuyo tramo cae dentro. Con <kbd>Mayús</kbd>, se suman.</td></tr>
     <tr><td><b>todo el nivel</b></td><td>Todas las trabes de ese nivel.</td></tr>
@@ -584,6 +585,7 @@
     <tr><td>«medidas deducidas de los nombres»</td><td>El <code>sincronizar.py</code> es de una versión anterior.</td><td>Genera el script otra vez.</td></tr>
     <tr><td>«Las demandas son de otra sección»</td><td>RAM analizó con otras medidas que las del proyecto.</td><td>Ver capítulo 4. Si dice «invertida», el error está en RAM.</td></tr>
     <tr><td>Una trabe continua sale partida</td><td>En RAM sus tramos no comparten nudo o no son colineales.</td><td>Revísalo en la vista del modelo (Longitudinal) y corrige la geometría en RAM.</td></tr>
+    <tr><td>Un miembro que buscas en Agrupación no aparece</td><td>El buscador dice por qué: no existe, es columna, no es horizontal o su grupo no está marcado.</td><td>Si es su grupo, márcalo en <b>Qué agrupar</b>.</td></tr>
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
     <tr><td>El aplicar dice que falta una sección</td><td>No se cambió nada: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar.</td></tr>
   </table>
@@ -647,6 +649,7 @@
     <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> (en RAM)</td><td>Correr el script abierto en la consola de Python.</td></tr>
     <tr><td><kbd>Mayús</kbd> + clic derecho</td><td>En el explorador de Windows: <b>Copiar como ruta</b>.</td></tr>
     <tr><td><kbd>Mayús</kbd> / <kbd>Ctrl</kbd> + clic, <kbd>Esc</kbd></td><td>En la planta de Agrupación: sumar o quitar trabes, y limpiar.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Mayús</kbd>+<kbd>Enter</kbd></td><td>En el buscador de miembros de Agrupación: seleccionar su trabe, o sumarla.</td></tr>
   </table>
 </section>
 
