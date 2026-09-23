@@ -183,21 +183,21 @@ def resolver_carpeta():
         if guardada != d:
             cfg['carpeta'] = d
             _guardar_config(cfg)
-        return d, u'la de CARPETA, en el script'
+        return d, u'la de CARPETA, en el script', True
     delTxt = _leer_txt()
     if delTxt and os.path.isdir(delTxt):
         if guardada != delTxt:
             cfg['carpeta'] = delTxt
             _guardar_config(cfg)
-        return delTxt, u'la de carpeta.txt'
+        return delTxt, u'la de carpeta.txt', True
     if delTxt:
         log(u'  (carpeta.txt apunta a %r, que no existe)' % delTxt)
     if guardada and os.path.isdir(guardada):
-        return guardada, u'recordada de la vez anterior'
+        return guardada, u'recordada de la vez anterior', True
     delModelo = carpeta_del_modelo()
     if delModelo:
-        return delModelo, u'la del modelo (no hay CARPETA puesta)'
-    return os.path.join(os.path.expanduser('~'), 'Desktop'), u'el Escritorio, a falta de algo mejor'
+        return delModelo, u'la del modelo, a falta de configuración', False
+    return os.path.join(os.path.expanduser('~'), 'Desktop'), u'el Escritorio, a falta de algo mejor', False
 
 
 # ── Compactar una curva sin perder los picos ──────────────────
@@ -566,9 +566,9 @@ def exportar(destino, log=log):
 
 
 def main():
-    destino, comoSalio = resolver_carpeta()
+    destino, comoSalio, configurada = resolver_carpeta()
     log(u'Destino: %s  (%s)' % (destino, comoSalio))
-    if u'carpeta.txt' not in comoSalio and u'CARPETA' not in comoSalio:
+    if not configurada:
         ruta = _plantilla_txt()
         log(u'')
         log(u'  ┌─ Para que caiga donde la app la busca, pega la ruta en:')
