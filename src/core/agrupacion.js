@@ -22,7 +22,7 @@
 import { chainMembers, sectionDims } from './geometry'
 import { buildElement, memberProfile } from './longitudinal'
 import { calcCortante, beta1 } from './sectionCalculator'
-import { memberKind, detectUpAxis } from './modelView'
+import { memberKind, detectUpAxis, planAxes } from './modelView'
 import { SECCIONES_RAM } from './catalogoRam'
 import { proponerTrabe } from './propuesta'
 
@@ -69,10 +69,19 @@ export function capacidad(b, h, { fc = 250, fy = 4200, r = RECUB, L = 5 } = {}) 
   return { MR, Vr }
 }
 
+// El acomodo manual lo recalcula en cada clic: se guarda por elemento
+const USOS = new WeakMap()
+
 /** Qué tanto usaría el elemento esa sección: 1 = justo */
 export function aprovechamiento(e, s) {
-  const c = capacidad(s.b, s.h, { L: e.L })
-  return Math.max(e.Mu / c.MR, e.Vu / c.Vr)
+  let m = USOS.get(e)
+  if (!m) USOS.set(e, (m = new Map()))
+  const k = `${s.b}|${s.h}`
+  if (!m.has(k)) {
+    const c = capacidad(s.b, s.h, { L: e.L })
+    m.set(k, Math.max(e.Mu / c.MR, e.Vu / c.Vr))
+  }
+  return m.get(k)
 }
 
 /** La sección de menos concreto que le basta al elemento */
@@ -263,4 +272,204 @@ export function verificarGrupo(R, grupo) {
     envelope: { points, invertir: false },
   }
   return proponerTrabe(t, R.model)
+}
+
+// ── Acomodo manual ───────────────────────────────────────────
+// El ingeniero acomoda las trabes a su criterio, partiendo de una propuesta
+// o de cero. Mismo resultado que una propuesta, así que la verificación y el
+// aplicar_agrupacion.py son los mismos.
+//
+//   manual = {
+//     base:   de qué propuesta partió (texto),
+//     grupos: [{ id, nombre, sec, c }]   sec: nombre del catálogo, o null =
+//             automática (la de menos concreto que les basta a todas); c: color
+//     de:     { idDelElemento → idDelGrupo }   (lo que no está, sin asignar)
+//   }
+
+/** Todas las vigas del catálogo, para fijar una sección a mano */
+export const VIGAS_CATALOGO = SECCIONES_RAM
+  .filter((s) => s.tipo === 'viga')
+  .sort((a, b) => a.b - b.b || a.h - b.h)
+
+/** La sección de menos concreto que les basta a todas; si ninguna, la que menos se pasa */
+export function seccionDeGrupo(elems, cands) {
+  for (const s of cands) if (elems.every((e) => aprovechamiento(e, s) <= 1 + 1e-9)) return { sec: s, fuera: false }
+  const peor = (s) => Math.max(...elems.map((e) => aprovechamiento(e, s)))
+  return { sec: [...cands].sort((a, b) => peor(a) - peor(b))[0] || null, fuera: true }
+}
+
+/** Un acomodo a partir de una propuesta: mismos grupos, secciones automáticas */
+export function manualDesde(P) {
+  const grupos = P.grupos.map((g, i) => ({ id: `g${i + 1}`, nombre: g.nombre, sec: null, c: i }))
+  const de = {}
+  P.grupos.forEach((g, i) => { for (const e of g.elems) de[e.id] = `g${i + 1}` })
+  return { base: P.nombre, grupos, de }
+}
+
+/** Un acomodo vacío: todas las trabes sin asignar */
+export const manualVacio = () => ({ base: 'cero', grupos: [], de: {} })
+
+/** El siguiente id y el primer color libre para un grupo nuevo */
+export function grupoNuevo(manual, nombre) {
+  let n = 1
+  while (manual.grupos.some((g) => g.id === `g${n}`)) n++
+  const usados = new Set(manual.grupos.map((g) => g.c))
+  let c = 0
+  while (usados.has(c)) c++
+  if (!nombre) {
+    let t = 1
+    while (manual.grupos.some((g) => g.nombre === `T${t}`)) t++
+    nombre = `T${t}`
+  }
+  return { id: `g${n}`, nombre, sec: null, c }
+}
+
+/**
+ * El acomodo, con la misma forma que una propuesta.
+ * @returns { id:'manual', nombre, grupos (sólo los que tienen trabes), todos, sueltos, concreto }
+ */
+export function armarManual(elems, cands, manual) {
+  const porGrupo = new Map(manual.grupos.map((g) => [g.id, []]))
+  const sueltos = []
+  for (const e of elems) {
+    const gid = manual.de[e.id]
+    if (gid && porGrupo.has(gid)) porGrupo.get(gid).push(e)
+    else sueltos.push(e)
+  }
+  const todos = manual.grupos.map((g) => {
+    const es = porGrupo.get(g.id)
+    const fija = g.sec ? VIGAS_CATALOGO.find((s) => s.nombre === g.sec) || null : null
+    const base = { id: g.id, nombre: g.nombre, c: g.c, auto: !fija, elems: es }
+    if (!es.length) {
+      return { ...base, sec: fija, vacio: true, us: [], uMin: 0, uMax: 0, L: 0, concreto: 0, miembros: [], fuera: false }
+    }
+    let sec = fija, fuera = false
+    if (!fija) ({ sec, fuera } = seccionDeGrupo(es, cands))
+    const us = es.map((e) => (sec ? aprovechamiento(e, sec) : Infinity))
+    if (fija) fuera = us.some((u) => u > 1 + 1e-9)
+    const L = es.reduce((s, e) => s + e.L, 0)
+    return {
+      ...base, sec, fuera, vacio: false, us,
+      uMin: Math.min(...us), uMax: Math.max(...us), L,
+      concreto: sec ? (L * sec.b * sec.h) / 1e4 : 0,
+      miembros: es.flatMap((e) => e.miembros),
+    }
+  })
+  const grupos = todos.filter((g) => !g.vacio)
+  return {
+    id: 'manual', nombre: 'Manual', base: manual.base,
+    grupos, todos, sueltos,
+    concreto: grupos.reduce((s, g) => s + g.concreto, 0),
+  }
+}
+
+/** T1…Tn de la sección más grande a la más chica (como las propuestas); los vacíos al final */
+export function renumerar(manual, armado) {
+  const info = new Map(armado.todos.map((g) => [g.id, g]))
+  const orden = [...manual.grupos].sort((a, b) => {
+    const A = info.get(a.id), B = info.get(b.id)
+    if (A.vacio !== B.vacio) return A.vacio ? 1 : -1
+    const sa = A.sec ? area(A.sec) : 0, sb = B.sec ? area(B.sec) : 0
+    return sb - sa || (B.sec?.h || 0) - (A.sec?.h || 0) || B.L - A.L
+  })
+  return { ...manual, grupos: orden.map((g, i) => ({ ...g, nombre: `T${i + 1}` })) }
+}
+
+/**
+ * Lo que impide aplicar un acomodo: nombres vacíos o repetidos, o que ya
+ * usa en el modelo un grupo que no se está agrupando (se mezclarían).
+ */
+export function problemasDeNombres(grupos, ocupados = []) {
+  const out = []
+  const vistos = new Map()
+  const fuera = new Set(ocupados.map((n) => n.trim().toUpperCase()))
+  for (const g of grupos) {
+    const n = (g.nombre || '').trim()
+    if (!n) { out.push('Hay un grupo sin nombre.'); continue }
+    const k = n.toUpperCase()
+    if (vistos.has(k)) out.push(`«${n}» está dos veces.`)
+    else vistos.set(k, true)
+    if (fuera.has(k)) out.push(`«${n}» ya existe en el modelo en un grupo que no se está agrupando.`)
+  }
+  return [...new Set(out)]
+}
+
+// ── Las plantas, para ver y acomodar ─────────────────────────
+
+/**
+ * Geometría en planta de cada elemento, por nivel. Coordenadas de dibujo
+ * (y hacia abajo): x = primer eje horizontal; el segundo hacia abajo, como
+ * se ve desde arriba con Y vertical (zAbajo), o hacia arriba.
+ * @returns { up, ejes, niveles:[{ v, n, ids }], porId: Map id → { segs, z, nivel, caja, cx, cy }, columnas, bounds }
+ */
+export function planos(R, elems, { tol = 0.05, zAbajo = true } = {}) {
+  const G = geometria(R)
+  const [h, k] = planAxes(G.up)
+  const sk = zAbajo ? 1 : -1
+  const porId = new Map()
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  const ver = (x, y) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y) }
+  for (const e of elems) {
+    const segs = []
+    let zs = 0, nz = 0, cx = 0, cy = 0, lt = 0
+    for (const id of e.miembros) {
+      const r = G.porId.get(String(id))
+      const a = r && G.nodes.get(r.nj), b = r && G.nodes.get(r.nk)
+      if (!a || !b) continue
+      const s = [a[h], sk * a[k], b[h], sk * b[k]]
+      segs.push(s)
+      ver(s[0], s[1]); ver(s[2], s[3])
+      zs += a[G.up] + b[G.up]; nz += 2
+      const l = Math.hypot(s[2] - s[0], s[3] - s[1]) || 1e-6
+      cx += ((s[0] + s[2]) / 2) * l; cy += ((s[1] + s[3]) / 2) * l; lt += l
+    }
+    if (!segs.length) continue
+    const xs = segs.flatMap((s) => [s[0], s[2]]), ys = segs.flatMap((s) => [s[1], s[3]])
+    porId.set(e.id, {
+      segs, z: zs / nz, cx: cx / lt, cy: cy / lt,
+      caja: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)],
+    })
+  }
+  // niveles: las alturas de las trabes, juntando las que están a menos de tol
+  const niveles = []
+  for (const [id, g] of [...porId].sort((a, b) => a[1].z - b[1].z)) {
+    let N = niveles.find((n) => Math.abs(n.v - g.z) <= tol)
+    if (!N) niveles.push((N = { v: g.z, ids: [] }))
+    N.ids.push(id)
+  }
+  niveles.forEach((N, i) => {
+    N.n = i + 1
+    N.v = Math.round(N.v * 1000) / 1000
+    for (const id of N.ids) porId.get(id).nivel = N.n
+  })
+  // columnas, para ubicarse: un punto en cada nivel que tocan
+  const columnas = []
+  for (const r of G.rows) {
+    const a = G.nodes.get(r.nj), b = G.nodes.get(r.nk)
+    if (!a || !b || memberKind(a, b, G.up) !== 'columna') continue
+    const z1 = Math.min(a[G.up], b[G.up]), z2 = Math.max(a[G.up], b[G.up])
+    for (const N of niveles) {
+      if (N.v < z1 - 0.25 || N.v > z2 + 0.25) continue
+      columnas.push({ nivel: N.n, x: a[h], y: sk * a[k] })
+    }
+  }
+  if (!porId.size) { minX = 0; maxX = 1; minY = 0; maxY = 1 }
+  return {
+    up: G.up, ejes: [h, k], zAbajo, niveles, porId, columnas,
+    bounds: { minX, minY, maxX, maxY, w: Math.max(maxX - minX, 0.1), h: Math.max(maxY - minY, 0.1) },
+  }
+}
+
+/** Las trabes que caen en el mismo lugar en planta, en los otros niveles (la misma trabe en N1, N2, N3…) */
+export function mismasEnOtrosNiveles(geo, ids, { tol = 0.1 } = {}) {
+  const out = new Set(ids)
+  for (const id of ids) {
+    const g = geo.porId.get(id)
+    if (!g) continue
+    for (const [otro, o] of geo.porId) {
+      if (out.has(otro)) continue
+      if (o.caja.every((v, i) => Math.abs(v - g.caja[i]) <= tol)) out.add(otro)
+    }
+  }
+  return out
 }

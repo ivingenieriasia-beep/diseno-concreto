@@ -28,8 +28,8 @@ export const MODULOS = [
     nombre: 'Agrupación',
     tipo: 'pestana',
     icono: 'grupos',
-    resumen: 'De un modelo sin agrupar a unas pocas T: tres propuestas con su sección y su armado, y el script para aplicarlas en RAM.',
-    palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1'],
+    resumen: 'De un modelo sin agrupar a unas pocas T: tres propuestas o tu propio acomodo en planta, con su sección, su armado y el script para aplicarlo en RAM.',
+    palabras: ['agrupacion', 'agrupar', 'grupos', 'secciones', 'trabes', 'ram', 'propuesta', 'iteracion', 'estructuracion', 't1', 'manual', 'acomodo', 'planta'],
   },
   {
     id: 'bdglobal',
