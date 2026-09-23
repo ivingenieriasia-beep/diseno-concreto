@@ -96,3 +96,18 @@ npm run dev     # servidor de desarrollo
 npm test        # suite de pruebas
 npm run build   # build de un solo archivo a dist/
 ```
+
+### Versión y novedades
+
+La versión vive en `src/core/constants.js` (`APP_VERSION`); `package.json` y el
+pie del manual van a la par (las pruebas lo revisan). Al pasar el cursor por
+`vX.Y` en la barra sale el log de novedades, que se escribe en
+`src/core/novedades.js`:
+
+- Cada entrega (3.0, 3.1…) va arriba de la anterior, con sus tarjetas
+  grandes (`destacados`, pueden llevar imagen de `src/assets/novedades/`) y la
+  lista corta (`cambios`: `nuevo`, `mejora` o `arreglo`).
+- El log se reinicia con el número entero: al pasar a la 4 se escribe una
+  entrega `4.0` y la barra sólo muestra lo de la 4, con su «¡Nueva
+  actualización! Auxiliar IV v4».
+- Subir la versión sin escribir su entrega hace fallar las pruebas.

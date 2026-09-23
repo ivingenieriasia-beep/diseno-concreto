@@ -37,6 +37,12 @@ describe('la versión sale de un solo sitio', () => {
     expect(sueltos).toEqual([])
   })
 
+  it('el manual lleva la misma', () => {
+    const manual = readFileSync(join(raiz, 'manual/manual.html'), 'utf-8')
+    expect(manual).toContain(`Manual del equipo · v${APP_VERSION}`)
+    expect(manual).toContain(`<b>Versión ${APP_VERSION}</b>`)
+  })
+
   it('todo el que la usa la importa', () => {
     const malos = []
     for (const f of archivos) {
