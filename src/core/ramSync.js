@@ -15,7 +15,9 @@
 
 const DB = 'iv_fs'
 const STORE = 'handles'
+const DATOS = 'datos'
 const CLAVE = 'carpeta_ram'
+const CLAVE_MODELO = 'modelo_ram'
 const META = 'iv_ram_sync_v1'
 
 /** ¿El navegador puede recordar la carpeta? (Chrome/Edge sí; Firefox/Safari no) */
@@ -25,23 +27,46 @@ export const puedeRecordar = () => typeof window !== 'undefined' && typeof windo
 function abrirDB() {
   return new Promise((res, rej) => {
     if (typeof indexedDB === 'undefined') return rej(new Error('sin indexedDB'))
-    const req = indexedDB.open(DB, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
+    const req = indexedDB.open(DB, 2)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
+      if (!db.objectStoreNames.contains(DATOS)) db.createObjectStore(DATOS)
+    }
     req.onsuccess = () => res(req.result)
     req.onerror = () => rej(req.error)
   })
 }
 
-async function idb(modo, fn) {
+async function idb(modo, fn, store = STORE) {
   const db = await abrirDB()
   try {
     return await new Promise((res, rej) => {
-      const tx = db.transaction(STORE, modo)
-      const req = fn(tx.objectStore(STORE))
+      const tx = db.transaction(store, modo)
+      const req = fn(tx.objectStore(store))
       req.onsuccess = () => res(req.result)
       req.onerror = () => rej(req.error)
     })
   } finally { db.close() }
+}
+
+// ── El modelo de RAM ──────────────────────────────────────────
+// Casi un mega de estaciones no cabe en localStorage junto con el proyecto
+// (el autoguardado tiene ~5 MB para todo), así que vive aquí. Se guarda tal
+// cual lo escribió el script: si mañana la app lee un campo más, está.
+export async function guardarModelo(datos, archivo = '') {
+  try {
+    await idb('readwrite', (s) => s.put({ archivo, at: Date.now(), datos }, CLAVE_MODELO), DATOS)
+    return true
+  } catch { return false }
+}
+
+export async function modeloGuardado() {
+  try { return (await idb('readonly', (s) => s.get(CLAVE_MODELO), DATOS)) || null } catch { return null }
+}
+
+export async function olvidarModelo() {
+  try { await idb('readwrite', (s) => s.delete(CLAVE_MODELO), DATOS) } catch { /* da igual */ }
 }
 
 export async function guardarCarpeta(handle) {
@@ -79,7 +104,7 @@ export async function elegirCarpeta() {
   return handle
 }
 
-const LEIBLE = /\.(txt|csv|xlsx)$/i
+const LEIBLE = /\.(json|txt|csv|xlsx)$/i
 
 /**
  * Recorre la carpeta y sus subcarpetas (COLUMNAS / LONGITUDINAL / MAXIMOS…).

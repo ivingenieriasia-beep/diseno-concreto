@@ -89,6 +89,15 @@ const useColumnStore = create((set, get) => ({
     set({ selectedIdx: idx, form: { ...defaultColumn(), ...col } })
   },
 
+  /** Añade una columna ya rellenada (la crea el modelo de RAM, por ejemplo) */
+  addColumn: (col) => {
+    const nombre = (col?.nombre || '').trim() || `C-${++counter}`
+    const nueva = { ...defaultColumn(nombre), ...col, nombre }
+    const columns = [...get().columns, nueva]
+    set({ columns, selectedIdx: columns.length - 1, form: { ...nueva } })
+    return columns.length - 1
+  },
+
   createColumn: () => {
     counter++
     const col = defaultColumn(`C-${counter}`)

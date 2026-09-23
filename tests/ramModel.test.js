@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo } from '../src/core/ramModel.js'
+import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../src/core/ramModel.js'
 import { analyzeGroup, perfilCompleto } from '../src/core/longitudinal.js'
 import { attachGeometry } from '../src/core/geometry.js'
 
@@ -107,5 +107,36 @@ describe('modelo.json de la API de RAM', () => {
   it('el resumen dice de un vistazo qué entró', () => {
     expect(resumenModeloRam(R)).toMatch(/5 grupo\(s\) · 79 miembros/)
     expect(resumenModeloRam(R)).toMatch(/picos exactos/)
+  })
+})
+
+// ── Los grupos que el proyecto todavía no tiene ──────────────
+describe('crear las secciones que faltan desde el modelo', () => {
+  const R = parseModeloRam(TXT)
+  const de = (n) => seccionSugerida(R.grupos.find((g) => g.nombre === n))
+
+  it('el nombre del chip sale del modelo, con su guion', () => {
+    expect(de('T5').nombre).toBe('T-5')
+    expect(de('C1').nombre).toBe('C-1')
+    expect(seccionSugerida({ nombre: 'T2A', clave: 't2a', seccion: 'RcBeam 15X25' }).nombre).toBe('T-2A')
+    expect(seccionSugerida({ nombre: 'N1', clave: 'n1', seccion: 'RcBeam 10x25' }).nombre).toBe('N-1')
+  })
+
+  it('y las dimensiones de la etiqueta de RAM', () => {
+    expect(de('T5')).toMatchObject({ ancho: 20, peralte: 25, esColumna: false })
+    expect(de('T6')).toMatchObject({ ancho: 20, peralte: 30, esColumna: false })
+    expect(de('T4')).toMatchObject({ ancho: 20, peralte: 35, esColumna: false })
+  })
+
+  it('distingue columnas aunque la etiqueta no diga COL', () => {
+    expect(de('C1')).toMatchObject({ ancho: 36, peralte: 36, esColumna: true })
+    expect(seccionSugerida({ nombre: 'C2', clave: 'c2', seccion: '15 x 15' }).esColumna).toBe(true)
+    expect(seccionSugerida({ nombre: 'C4', clave: 'c4', seccion: 'COL  25 X 10' }))
+      .toMatchObject({ ancho: 25, peralte: 10, esColumna: true })
+  })
+
+  it('una etiqueta sin medidas no inventa dimensiones', () => {
+    expect(seccionSugerida({ nombre: 'X9', clave: 'x9', seccion: 'lo que sea' }))
+      .toMatchObject({ nombre: 'X-9', ancho: null, peralte: null })
   })
 })

@@ -70,6 +70,9 @@ const useBeamStore = create((set, get) => ({
   sections: [],
   selectedIdx: -1,
   model: null,    // { archivo, rows:[{member,nj,nk,seccion,…}], nodes:{id:{x,y,z}} }
+  // Reacciones de los nudos con apoyo, del modelo de RAM. Todavía no las usa
+  // nadie: son el insumo del módulo de cimentación.
+  reacciones: [],
   longFocus: null, // { member, fallan:[ids], ts } — «bastonear» desde la envolvente
   form: defaultSection(),
   calcAlert: false,
@@ -173,6 +176,7 @@ const useBeamStore = create((set, get) => ({
   // Geometría del modelo de RAM (nudos + miembros): es del modelo, no de una
   // trabe, así que se carga una vez y la usan todas las secciones.
   setModel: (model) => set({ model }),
+  setReacciones: (reacciones) => set({ reacciones: reacciones || [] }),
 
   // Pide abrir Longitudinal centrado en un miembro (lo dispara la envolvente)
   setLongFocus: (v) => set({ longFocus: v ? { ...v, ts: Date.now() } : null }),

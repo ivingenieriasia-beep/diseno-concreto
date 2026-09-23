@@ -1,9 +1,14 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { REPORTES, clasificarLote } from '../core/ramReports'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
+import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../core/ramModel'
+import {
+  puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta,
+  guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
+} from '../core/ramSync'
 
 // Centro de carga: un solo lugar para meter todo lo que sale de RAM, con el
 // manual al lado — qué reporte pedir, con qué parámetros y qué llena cada uno.
@@ -55,35 +60,51 @@ export default function LoadCenter({ onClose, onToast }) {
   const setPerfilAt = useBeamStore((s) => s.setPerfilAt)
   const model = useBeamStore((s) => s.model)
   const setModel = useBeamStore((s) => s.setModel)
+  const setReacciones = useBeamStore((s) => s.setReacciones)
+  const addSection = useBeamStore((s) => s.addSection)
   const columns = useColumnStore((s) => s.columns)
   const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
+  const addColumn = useColumnStore((s) => s.addColumn)
   const inputRef = useRef(null)
   const dirRef = useRef(null)
   const [msg, setMsg] = useState('')
   const [drop, setDrop] = useState(false)
   const [filtro, setFiltro] = useState(null)   // id del slot que abrió el diálogo
+  const [carpeta, setCarpeta] = useState(null)      // handle recordado
+  const [sync, setSync] = useState(ultimaSync())
+  const [ocupado, setOcupado] = useState('')
+  const [faltan, setFaltan] = useState([])          // grupos del modelo sin chip
+
+  // La carpeta se eligió una vez y el navegador la recuerda entre sesiones
+  useEffect(() => { carpetaGuardada().then(setCarpeta) }, [])
 
   const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
 
   // ── Estado de cada casilla ──
   const estados = useMemo(() => {
     const conPerfil = sections.filter((s) => s.perfil?.members?.length)
+    // 'ram-api' es mejor que cualquier reporte impreso: las estaciones las puso
+    // el script donde hacían falta y el pico viene exacto. No es «rejilla fija».
+    const api = conPerfil.filter((s) => s.perfil.formato === 'ram-api')
     const acc = conPerfil.filter((s) => s.perfil.formato === 'acciones')
-    const est = conPerfil.filter((s) => s.perfil.formato !== 'acciones')
+    const est = conPerfil.filter((s) => !['ram-api', 'acciones'].includes(s.perfil.formato))
     const envT = sections.filter((s) => s.envelope?.points?.length)
     const envC = columns.filter((c) => c.envelope?.points?.length)
     const nEl = model?.rows?.length && nodes.size
       ? sections.reduce((n, s) => Math.max(n, attachGeometry(s.perfil, model)?.geom?.chains?.length || 0), 0)
       : 0
     return {
-      acciones: acc.length
-        ? { tono: 'ok', txt: `${acc.length} trabe(s): ${acc.map((s) => s.nombre).join(', ')}` }
-        : { tono: 'pend', txt: 'sin cargar' },
+      acciones: api.length
+        ? { tono: 'ok', txt: `${api.length} trabe(s) desde la API de RAM — ya no hace falta este reporte: ${api.map((s) => s.nombre).join(', ')}` }
+        : acc.length
+          ? { tono: 'ok', txt: `${acc.length} trabe(s): ${acc.map((s) => s.nombre).join(', ')}` }
+          : { tono: 'pend', txt: 'sin cargar' },
       estaciones: est.length
         ? { tono: 'warn', txt: `${est.length} trabe(s) con la rejilla fija: ${est.map((s) => s.nombre).join(', ')} — mejor el de puntos de inflexión` }
-        : { tono: 'pend', txt: 'sin cargar (opcional si ya tienes el de arriba)' },
+        : { tono: 'pend', txt: api.length ? 'no hace falta: el modelo entra por la API' : 'sin cargar (opcional si ya tienes el de arriba)' },
       maximos: envT.length || envC.length
-        ? { tono: 'ok', txt: `${envT.length} trabe(s) y ${envC.length} columna(s)` }
+        ? { tono: 'ok', txt: `${envT.length} trabe(s) y ${envC.length} columna(s)`
+            + (api.length ? ' — los de la API vienen con el pico exacto' : '') }
         : { tono: 'pend', txt: 'sin cargar' },
       geometria: model?.rows?.length
         ? { tono: 'ok', txt: `${model.archivo || 'cargada'} · ${model.rows.length} miembros · ${nodes.size} nudos${nEl ? ` · ${nEl} elementos` : ''}` }
@@ -95,23 +116,41 @@ export default function LoadCenter({ onClose, onToast }) {
   // `files` = [{ file, carpeta }]. La carpeta (COLUMNAS / LONGITUDINAL /
   // MAXIMOS) no decide el tipo de reporte — eso lo dice el contenido — pero
   // sirve de desempate cuando una trabe y una columna se llaman igual.
-  async function cargar(files) {
+  async function cargar(files, prefijo = '') {
     if (!files.length) return
     const archivos = []
     const noLeidos = []
     for (const { file: f, carpeta } of files) {
-      if (!/\.(txt|csv|xlsx)$/i.test(f.name)) continue          // en una carpeta puede haber de todo
+      if (!/\.(json|txt|csv|xlsx)$/i.test(f.name)) continue     // en una carpeta puede haber de todo
       try { archivos.push({ nombre: f.name, carpeta, texto: /\.xlsx$/i.test(f.name) ? '' : await f.text(), file: f }) } catch { noLeidos.push(f.name) }
     }
     if (!archivos.length) {
       // en OneDrive/Drive, un archivo «sólo en la nube» no se puede leer hasta bajarlo
       setMsg(noLeidos.length
         ? `No se pudo leer ${noLeidos.join(', ')} — si están en OneDrive, ábrelos una vez o márcalos «Conservar siempre en este dispositivo»`
-        : 'La carpeta no trae .txt ni .xlsx')
+        : 'La carpeta no trae .json, .txt ni .xlsx')
       return
     }
-    const clas = clasificarLote(archivos)
-    const notas = []
+    const notas = prefijo ? [prefijo] : []
+
+    // 0) el modelo.json del script manda: lo trae todo y con el pico exacto
+    const modelo = archivos.find((a) => /\.json$/i.test(a.nombre) && looksLikeModeloRam(a.texto))
+    if (modelo) {
+      const r = aplicarModelo(modelo.texto, modelo.nombre)
+      notas.push(r.nota)
+      if (r.discrepan?.length) {
+        notas.push(`⚠ MEDIDAS DISTINTAS a las analizadas: ${r.discrepan.join(' · ')}`)
+      }
+      for (const w of r.R?.warnings || []) notas.push(w)
+      const resto = archivos.filter((a) => a !== modelo && !/\.json$/i.test(a.nombre))
+      if (resto.length) notas.push(`${resto.length} archivo(s) de texto ignorados: el modelo.json ya los cubre`)
+      const texto0 = notas.join(' · ')
+      setMsg(texto0)
+      onToast?.(texto0, r.R?.ok && !r.discrepan?.length ? 'ok' : 'warn')
+      return
+    }
+
+    const clas = clasificarLote(archivos.filter((a) => !/\.json$/i.test(a.nombre)))
 
     // 1) geometría (es del proyecto, no de una trabe)
     const geos = archivos.filter((a) => clas.geometria.includes(a.nombre))
@@ -148,6 +187,94 @@ export default function LoadCenter({ onClose, onToast }) {
     const texto = notas.join(' · ')
     setMsg(texto)
     onToast?.(texto, clas.desconocidos.length ? 'warn' : 'ok')
+  }
+
+  // ── El modelo.json del script de RAM ─────────────────────
+  // Un solo archivo con geometría, esfuerzos y reacciones, y con el pico de
+  // cada miembro ya afinado. Los grupos vienen etiquetados por el propio
+  // modelo (T5, C1…), así que caen solos en su chip.
+  function aplicarModelo(texto, nombre) {
+    const R = parseModeloRam(texto, nombre)
+    if (!R.ok) return { nota: R.warnings[0], R }
+    setModel(R.model)
+    setReacciones(R.reacciones)
+    const { asignados, sinChip } = repartirModelo(R, { trabes: sections, columnas: columns })
+    // Si el chip tiene otras medidas que la sección analizada en RAM, las
+    // demandas que entran son de otra sección. Callarlo sería lo peor.
+    const discrepan = []
+    for (const a of asignados) {
+      const su = seccionSugerida(a.grupo)
+      if (!su.ancho) continue
+      const chip = a.tipo === 'trabe' ? sections[a.idx] : columns[a.idx]
+      const b = +(a.tipo === 'trabe' ? chip.ancho : chip.b) || 0
+      const h = +(a.tipo === 'trabe' ? chip.peralte : chip.h) || 0
+      if (b !== su.ancho || h !== su.peralte) {
+        discrepan.push(`${chip.nombre} es ${b}×${h} y en RAM es ${su.ancho}×${su.peralte} (${su.seccion})`)
+      }
+    }
+    for (const a of asignados) {
+      if (a.tipo === 'trabe') {
+        setPerfilAt(a.idx, a.grupo.perfil)
+        setEnvelopeAt(a.idx, { archivo: nombre, combo: a.grupo.perfil.combo, unidades: R.modelo.unidades, invertir: false, points: a.grupo.points })
+      } else {
+        setColEnvelopeAt(a.idx, { archivo: nombre, combo: a.grupo.perfil.combo, unidades: R.modelo.unidades, mapping: 'M33X', points: a.grupo.points })
+      }
+    }
+    setFaltan(sinChip)
+    guardarModelo(texto, nombre)          // en IndexedDB: no cabe en el autoguardado
+    const enChip = asignados.map((a) => a.grupo.nombre).join(', ')
+    return {
+      R,
+      discrepan,
+      nota: `${resumenModeloRam(R)} · aplicado a ${asignados.length} chip(s)${enChip ? `: ${enChip}` : ''}`
+        + (sinChip.length ? ` · ${sinChip.length} grupo(s) sin sección en el proyecto` : ''),
+    }
+  }
+
+  /** Crea de golpe las secciones que el modelo trae y el proyecto no */
+  function crearFaltantes() {
+    const hechos = []
+    for (const g of faltan) {
+      const s = seccionSugerida(g)
+      if (s.esColumna) {
+        const idx = addColumn({ nombre: s.nombre, ...(s.ancho ? { b: s.ancho, h: s.peralte } : {}) })
+        setColEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, mapping: 'M33X', points: g.points })
+      } else {
+        const idx = addSection({ nombre: s.nombre, ...(s.ancho ? { ancho: s.ancho, peralte: s.peralte } : {}) })
+        setPerfilAt(idx, g.perfil)
+        setEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, invertir: false, points: g.points })
+      }
+      hechos.push(`${s.nombre}${s.ancho ? ` (${s.ancho}×${s.peralte})` : ''}`)
+    }
+    setFaltan([])
+    const texto = `Creadas ${hechos.length} sección(es) desde el modelo: ${hechos.join(', ')}`
+    setMsg(texto)
+    onToast?.(texto, 'ok')
+  }
+
+  // ── Sincronizar: releer la carpeta recordada, de un clic ─────
+  async function sincronizar() {
+    setOcupado('Leyendo la carpeta…')
+    try {
+      let h = carpeta
+      if (!h) { h = await elegirCarpeta(); setCarpeta(h) }
+      const permiso = await permisoDe(h, true)
+      if (permiso !== 'granted') {
+        setOcupado('')
+        setMsg('El navegador no dio permiso para leer la carpeta. Vuelve a elegirla.')
+        return
+      }
+      const archivos = await recorrerCarpeta(h)
+      if (!archivos.length) {
+        setOcupado(''); setMsg(`No hay archivos legibles en «${h.name}».`); return
+      }
+      const c = cambios(archivos)
+      await cargar(archivos, resumenSync(c, archivos.length))
+      guardarSync(h.name, archivos)
+      setSync(ultimaSync())
+    } catch (e) {
+      if (e?.name !== 'AbortError') setMsg(`No se pudo sincronizar: ${e.message}`)
+    } finally { setOcupado('') }
   }
 
   const abrir = (id) => { setFiltro(id); inputRef.current?.click() }
@@ -213,15 +340,46 @@ export default function LoadCenter({ onClose, onToast }) {
 
         <div style={{ padding: 14, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}>
-            <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="cargar-carpeta" onClick={abrirCarpeta}>🗂 Elegir una carpeta…</button>
+            {puedeRecordar() && (
+              <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="sincronizar" onClick={sincronizar} disabled={!!ocupado}>
+                {ocupado || (carpeta ? '🔄 Sincronizar con RAM' : '🔄 Elegir la carpeta y sincronizar…')}
+              </button>
+            )}
+            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-carpeta" onClick={abrirCarpeta}>🗂 Elegir una carpeta…</button>
             <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-todo" onClick={() => abrir(null)}>📂 Archivos sueltos…</button>
             <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
-              o suéltalos aquí (la carpeta entera también). Carga de golpe COLUMNAS, LONGITUDINAL y MAXIMOS: el contenido decide qué es cada archivo.
+              {carpeta
+                ? <>Carpeta recordada: <b>{carpeta.name}</b>{sync?.at ? ` · sincronizada ${hace(sync.at)}` : ''}. Corre el script en RAM y dale a sincronizar.</>
+                : <>Corre <b>sincronizar.py</b> en la consola de Python de RAM y elige aquí la carpeta: se recuerda, y a partir de entonces es un clic.</>}
             </span>
+            {carpeta && (
+              <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: 'var(--color-tx3)', textDecoration: 'underline' }}
+                data-testid="olvidar-carpeta" onClick={() => { olvidarCarpeta(); setCarpeta(null); setSync(null) }}>
+                olvidar
+              </button>
+            )}
             <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>
               {sections.length} trabe(s) · {columns.length} columna(s)
             </span>
           </div>
+
+          {faltan.length > 0 && (
+            <div data-testid="faltan-secciones" style={{ padding: '9px 12px', borderRadius: 9, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 11.5, color: '#1e3a8a', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>
+                El modelo trae <b>{faltan.length} grupo(s)</b> que el proyecto todavía no tiene:{' '}
+                {faltan.map((g) => {
+                  const su = seccionSugerida(g)
+                  return `${su.nombre}${su.ancho ? ` (${su.ancho}×${su.peralte})` : ''} · ${g.n} miembros`
+                }).join(' — ')}.
+                RAM ya dice cómo se llaman y de qué tamaño son.
+              </span>
+              <button className="btn btn-primary" style={{ fontSize: 10.5, marginLeft: 'auto' }} data-testid="crear-faltantes" onClick={crearFaltantes}>
+                crear {faltan.length === 1 ? 'la sección' : `las ${faltan.length} secciones`}
+              </button>
+              <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: '#1e3a8a', textDecoration: 'underline' }}
+                onClick={() => setFaltan([])}>ahora no</button>
+            </div>
+          )}
 
           {REPORTES.map((r) => (
             <Slot key={r.id} r={r} estado={estados[r.id]} onCargar={() => abrir(r.id)} />

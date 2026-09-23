@@ -17,6 +17,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { claveNombre } from './bulkEnvelopes'
+import { sectionDims } from './geometry'
 
 /** Orden de los números de cada estación, tal como los escribe el script */
 const CAMPOS = ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax']
@@ -177,4 +178,26 @@ export function repartirModelo(r, { trabes = [], columnas = [] } = {}) {
     else sinChip.push(g)
   }
   return { asignados, sinChip }
+}
+
+/**
+ * Qué sección crearía este grupo si el proyecto todavía no la tiene.
+ * El modelo ya sabe casi todo: cómo se llama ('T5' → el chip 'T-5'), de qué
+ * tamaño es ('RcBeam 20x25' → 20×25) y si es trabe o columna.
+ * @returns { nombre, ancho, peralte, esColumna, seccion }
+ */
+export function seccionSugerida(grupo) {
+  const crudo = String(grupo?.nombre || '').trim()
+  // 'T5' → 'T-5' · 'T2A' → 'T-2A' · 'C1' → 'C-1' · 'N1' → 'N-1'
+  const m = /^([A-Za-z]+)[\s-]*(.+)$/.exec(crudo)
+  const nombre = m ? `${m[1].toUpperCase()}-${m[2].toUpperCase()}` : crudo
+  const seccion = String(grupo?.seccion || '')
+  const d = sectionDims(seccion)
+  // La etiqueta de RAM no siempre dice «COL», así que el nombre también cuenta
+  const esColumna = /col/i.test(seccion) || /^c\d/i.test(String(grupo?.clave || ''))
+  return {
+    nombre, seccion, esColumna,
+    ancho: d ? d.b : null,
+    peralte: d ? d.h : null,
+  }
 }
