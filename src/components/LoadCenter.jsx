@@ -6,6 +6,7 @@ import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
 import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida } from '../core/ramModel'
 import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta } from '../core/ramScript'
+import { proponerTrabe, proponerColumna } from '../core/propuesta'
 import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta,
   guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
@@ -80,6 +81,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const [ocupado, setOcupado] = useState('')
   const [faltan, setFaltan] = useState([])          // grupos del modelo sin chip
   const [discrepan, setDiscrepan] = useState([])    // chips con otras medidas que RAM
+  const [propuestas, setPropuestas] = useState([])  // armado propuesto a las secciones recién creadas
   const [ruta, setRuta] = useState('')              // la ruta de Windows, mientras se edita
   const [avisoRuta, setAvisoRuta] = useState('')
   // El camino normal es la API de RAM; los cuatro reportes de texto siguen
@@ -279,25 +281,49 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
     onToast?.(texto, 'ok')
   }
 
-  /** Crea de golpe las secciones que el modelo trae y el proyecto no */
-  function crearFaltantes() {
+  /**
+   * Crea de golpe las secciones que el modelo trae y el proyecto no — y no
+   * desnudas: cada una sale con un armado propuesto que cubre su envolvente,
+   * verificado con los mismos motores que luego la revisan.
+   */
+  async function crearFaltantes() {
     const hechos = []
-    for (const g of faltan) {
+    const props = []
+    const lista = faltan
+    setFaltan([])
+    for (const g of lista) {
       const s = seccionSugerida(g)
+      setOcupado(`Proponiendo el armado de ${s.nombre}…`)
+      await new Promise((r) => setTimeout(r, 0))     // que se pinte el avance entre grupos
+      let p = null
       if (s.esColumna) {
         const idx = addColumn({ nombre: s.nombre, ...(s.ancho ? { b: s.ancho, h: s.peralte } : {}) })
         setColEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, mapping: 'M33X', points: g.points })
+        try { p = proponerColumna(useColumnStore.getState().columns[idx]) } catch (e) { console.error(e) }
+        if (p && Object.keys(p.patch).length) patchColumnAt(idx, p.patch)
       } else {
         const idx = addSection({ nombre: s.nombre, ...(s.ancho ? { ancho: s.ancho, peralte: s.peralte } : {}) })
         setPerfilAt(idx, g.perfil)
         setEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, invertir: false, points: g.points })
+        const B = useBeamStore.getState()
+        try { p = proponerTrabe(B.sections[idx], B.model) } catch (e) { console.error(e) }
+        if (p && Object.keys(p.patch).length) patchSectionAt(idx, p.patch)
       }
-      hechos.push(`${s.nombre}${s.ancho ? ` (${s.ancho}×${s.peralte})` : ''}`)
+      const bh = s.ancho ? `${s.ancho}×${s.peralte}` : ''
+      hechos.push(`${s.nombre}${bh ? ` (${bh})` : ''}`)
+      props.push({
+        nombre: s.nombre, tipo: s.esColumna ? 'columna' : 'trabe', bh, n: g.n,
+        estado: p?.estado || 'sin', texto: p?.texto || 'sin envolvente: no hay con qué proponer',
+        motivos: p?.motivos || [], avisos: p?.avisos || [], kg: p?.kg || 0,
+      })
     }
-    setFaltan([])
-    const texto = `Creadas ${hechos.length} sección(es) desde el modelo: ${hechos.join(', ')}`
+    setOcupado('')
+    setPropuestas(props)
+    const nOk = props.filter((x) => x.estado === 'ok').length
+    const texto = `Creadas ${hechos.length} sección(es) desde el modelo con su armado propuesto: `
+      + `${nOk} pasan${nOk < props.length ? `, ${props.length - nOk} a revisar` : ''} · ${hechos.join(', ')}`
     setMsg(texto)
-    onToast?.(texto, 'ok')
+    onToast?.(texto, nOk === props.length ? 'ok' : 'warn')
   }
 
   // ── Sincronizar: releer la carpeta recordada, de un clic ─────
@@ -534,11 +560,41 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 }).join(' — ')}.
                 RAM ya dice cómo se llaman y de qué tamaño son.
               </span>
-              <button className="btn btn-primary" style={{ fontSize: 10.5, marginLeft: 'auto' }} data-testid="crear-faltantes" onClick={crearFaltantes}>
-                crear {faltan.length === 1 ? 'la sección' : `las ${faltan.length} secciones`}
+              <button className="btn btn-primary" style={{ fontSize: 10.5, marginLeft: 'auto' }} data-testid="crear-faltantes" onClick={crearFaltantes} disabled={!!ocupado}>
+                crear {faltan.length === 1 ? 'la sección' : `las ${faltan.length} secciones`} con su armado
               </button>
               <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: '#1e3a8a', textDecoration: 'underline' }}
                 onClick={() => setFaltan([])}>ahora no</button>
+            </div>
+          )}
+
+          {propuestas.length > 0 && (
+            <div data-testid="propuestas" style={{ padding: '9px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px solid var(--color-border)', fontSize: 11 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                <b style={{ fontSize: 12 }}>Armado propuesto</b>
+                <span style={{ color: 'var(--color-tx3)', fontSize: 10.5 }}>
+                  verificado con los mismos motores que Longitudinal y Columnas · queda marcado como propuesta hasta que lo toques
+                </span>
+                <button style={{ marginLeft: 'auto', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: 'var(--color-tx3)', textDecoration: 'underline' }}
+                  onClick={() => setPropuestas([])}>cerrar</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto 1fr', columnGap: 10, rowGap: 3, alignItems: 'baseline' }}>
+                {propuestas.map((p) => {
+                  const col = p.estado === 'ok' ? '#15803d' : p.estado === 'revisar' ? '#c62828' : 'var(--color-tx3)'
+                  return [
+                    <span key={`${p.nombre}-e`} data-testid={`propuesta-${p.nombre}`} data-estado={p.estado} style={{ color: col, fontWeight: 800 }}>
+                      {p.estado === 'ok' ? '✓' : p.estado === 'revisar' ? '✗' : '—'}
+                    </span>,
+                    <b key={`${p.nombre}-n`}>{p.nombre}</b>,
+                    <span key={`${p.nombre}-b`} style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>{p.bh}</span>,
+                    <span key={`${p.nombre}-t`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>
+                      {p.texto}{p.kg ? <span style={{ color: 'var(--color-tx3)' }}> · {p.kg.toFixed(0)} kg</span> : null}
+                      {p.motivos.map((m) => <div key={m} style={{ color: '#c62828', fontFamily: 'inherit' }}>✗ {m}</div>)}
+                      {p.avisos.map((m) => <div key={m} style={{ color: '#92400e', fontFamily: 'inherit' }}>⚠ {m}</div>)}
+                    </span>,
+                  ]
+                })}
+              </div>
             </div>
           )}
 

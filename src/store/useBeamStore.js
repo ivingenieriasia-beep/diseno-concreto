@@ -64,6 +64,46 @@ const clampBastones = (nb, nv) => {
   return Math.max(0, Math.min(b, v))
 }
 
+// Cada campo del armado tiene un gemelo en `calc`, y la calculadora, los
+// informes y el análisis longitudinal leen el de `calc`. Toda vía que escriba
+// el armado tiene que pasar por aquí: si no, la trabe se dibuja con un #4 y se
+// calcula con el #3 de antes.
+function conCalcAlDia(newForm, patch) {
+  // Un bastón por varilla como máximo (también al bajar la cantidad de varillas)
+  if ('cantSup' in patch || 'cantBastonSup' in patch) {
+    newForm.cantBastonSup = clampBastones(newForm.cantBastonSup, newForm.cantSup)
+  }
+  if ('cantInf' in patch || 'cantBastonInf' in patch) {
+    newForm.cantBastonInf = clampBastones(newForm.cantBastonInf, newForm.cantInf)
+  }
+  const cp = {}
+  if ('calSup' in patch) cp.varNNum = CAL_TO_NUM[patch.calSup] || 3
+  if ('cantSup' in patch) cp.varNCount = Number(patch.cantSup) || 0
+  if ('calInf' in patch) cp.varPNum = CAL_TO_NUM[patch.calInf] || 3
+  if ('cantInf' in patch) cp.varPCount = Number(patch.cantInf) || 0
+  if ('calBastonSup' in patch) cp.bastonNNum = CAL_TO_NUM[patch.calBastonSup] || 3
+  if ('cantBastonSup' in patch || 'cantSup' in patch) cp.bastonNCount = Number(newForm.cantBastonSup) || 0
+  if ('calBastonInf' in patch) cp.bastonPNum = CAL_TO_NUM[patch.calBastonInf] || 3
+  if ('cantBastonInf' in patch || 'cantInf' in patch) cp.bastonPCount = Number(newForm.cantBastonInf) || 0
+  if ('calEst' in patch) cp.varEstNum = CAL_TO_NUM[patch.calEst] || 2
+  if ('sepLcuarto' in patch) cp.SL4 = Number(patch.sepLcuarto) || null
+  if ('sepRest' in patch) cp.SLresto = Number(patch.sepRest) || null
+  if ('muPos' in patch) cp.MuP = Number(patch.muPos) || 0
+  if ('muNeg' in patch) cp.MuN = Number(patch.muNeg) || 0
+  if ('vu' in patch) cp.VuTon = Number(patch.vu) || 0
+  if (Object.keys(cp).length > 0) {
+    newForm.calc = { ...(newForm.calc || defaultCalc()), ...cp }
+  }
+  return newForm
+}
+
+// El armado que propone la app queda marcado hasta que alguien lo toca: el
+// catálogo de criterio sólo debe aprender de lo que un ingeniero decidió, no
+// de sus propias propuestas.
+const ARMADO = ['calInf', 'cantInf', 'calSup', 'cantSup', 'calBastonInf', 'cantBastonInf',
+  'calBastonSup', 'cantBastonSup', 'cantBastonPuntInf', 'cantBastonPuntSup', 'calEst', 'sepLcuarto', 'sepRest']
+const tocoArmado = (antes, despues) => ARMADO.some((k) => String(antes?.[k] ?? '') !== String(despues?.[k] ?? ''))
+
 let counter = 0
 
 const useBeamStore = create((set, get) => ({
@@ -87,33 +127,9 @@ const useBeamStore = create((set, get) => ({
 
   // Set form AND auto-save + sync form → calc
   setForm: (patch) => set((s) => {
-    const newForm = { ...s.form, ...patch }
-    // Un bastón por varilla como máximo (también al bajar la cantidad de varillas)
-    if ('cantSup' in patch || 'cantBastonSup' in patch) {
-      newForm.cantBastonSup = clampBastones(newForm.cantBastonSup, newForm.cantSup)
-    }
-    if ('cantInf' in patch || 'cantBastonInf' in patch) {
-      newForm.cantBastonInf = clampBastones(newForm.cantBastonInf, newForm.cantInf)
-    }
-    // Sync form → calc for rebar, moments, stirrups
-    const cp = {}
-    if ('calSup' in patch) cp.varNNum = CAL_TO_NUM[patch.calSup] || 3
-    if ('cantSup' in patch) cp.varNCount = Number(patch.cantSup) || 0
-    if ('calInf' in patch) cp.varPNum = CAL_TO_NUM[patch.calInf] || 3
-    if ('cantInf' in patch) cp.varPCount = Number(patch.cantInf) || 0
-    if ('calBastonSup' in patch) cp.bastonNNum = CAL_TO_NUM[patch.calBastonSup] || 3
-    if ('cantBastonSup' in patch || 'cantSup' in patch) cp.bastonNCount = Number(newForm.cantBastonSup) || 0
-    if ('calBastonInf' in patch) cp.bastonPNum = CAL_TO_NUM[patch.calBastonInf] || 3
-    if ('cantBastonInf' in patch || 'cantInf' in patch) cp.bastonPCount = Number(newForm.cantBastonInf) || 0
-    if ('calEst' in patch) cp.varEstNum = CAL_TO_NUM[patch.calEst] || 2
-    if ('sepLcuarto' in patch) cp.SL4 = Number(patch.sepLcuarto) || null
-    if ('sepRest' in patch) cp.SLresto = Number(patch.sepRest) || null
-    if ('muPos' in patch) cp.MuP = Number(patch.muPos) || 0
-    if ('muNeg' in patch) cp.MuN = Number(patch.muNeg) || 0
-    if ('vu' in patch) cp.VuTon = Number(patch.vu) || 0
-    if (Object.keys(cp).length > 0) {
-      newForm.calc = { ...(newForm.calc || defaultCalc()), ...cp }
-    }
+    const newForm = conCalcAlDia({ ...s.form, ...patch }, patch)
+    // quien edita el formulario es el ingeniero: el armado deja de ser propuesta
+    if (newForm.armadoPropuesto && !('armadoPropuesto' in patch) && tocoArmado(s.form, newForm)) newForm.armadoPropuesto = false
     if (s.selectedIdx >= 0 && s.selectedIdx < s.sections.length) {
       const updated = [...s.sections]
       updated[s.selectedIdx] = { ...newForm }
@@ -148,6 +164,9 @@ const useBeamStore = create((set, get) => ({
     if ('VuTon' in patch) newForm.vu = Number(patch.VuTon) || ''
     if ('SL4' in patch && patch.SL4 !== null) newForm.sepLcuarto = Number(patch.SL4)
     if ('SLresto' in patch && patch.SLresto !== null) newForm.sepRest = Number(patch.SLresto)
+    // La calculadora reimporta el armado al abrirse (mismos valores: no cuenta);
+    // si de verdad lo cambia, es una decisión del ingeniero.
+    if (newForm.armadoPropuesto && tocoArmado(s.form, newForm)) newForm.armadoPropuesto = false
     if (s.selectedIdx >= 0 && s.selectedIdx < s.sections.length) {
       const updated = [...s.sections]
       updated[s.selectedIdx] = { ...newForm }
@@ -189,7 +208,7 @@ const useBeamStore = create((set, get) => ({
   /** Cambia campos de una sección por índice (sin tener que seleccionarla) */
   patchSectionAt: (idx, patch) => set((s) => {
     if (idx < 0 || idx >= s.sections.length) return {}
-    const sections = s.sections.map((x, i) => (i === idx ? { ...x, ...patch } : x))
+    const sections = s.sections.map((x, i) => (i === idx ? conCalcAlDia({ ...x, ...patch }, patch) : x))
     return { sections, form: s.selectedIdx === idx ? { ...sections[idx] } : s.form }
   }),
 

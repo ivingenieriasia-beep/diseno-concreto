@@ -26,6 +26,14 @@ const defaultColumn = (nombre = '') => ({
   envelope: null, // { archivo, combo, mapping, points:[...] }
 })
 
+// El armado que propone la app queda marcado hasta que el ingeniero lo toca
+// (el catálogo de criterio sólo aprende de decisiones, no de propuestas).
+const armadoDe = (c) => JSON.stringify([c?.nLechos, (c?.lechos || []).map((L) => [+L.n || 0, String(L.num)]), c?.estriboNum])
+const revisado = (antes, despues) => {
+  if (despues.armadoPropuesto && armadoDe(antes) !== armadoDe(despues)) despues.armadoPropuesto = false
+  return despues
+}
+
 let counter = 0
 
 const useColumnStore = create((set, get) => ({
@@ -44,6 +52,7 @@ const useColumnStore = create((set, get) => ({
       lechos.length = n
       newForm.lechos = lechos
     }
+    if (!('armadoPropuesto' in patch)) revisado(s.form, newForm)
     if (s.selectedIdx >= 0 && s.selectedIdx < s.columns.length) {
       const updated = [...s.columns]
       updated[s.selectedIdx] = { ...newForm }
@@ -54,7 +63,7 @@ const useColumnStore = create((set, get) => ({
 
   setLecho: (idx, patch) => set((s) => {
     const lechos = (s.form.lechos || []).map((L, i) => (i === idx ? { ...L, ...patch } : L))
-    const newForm = { ...s.form, lechos }
+    const newForm = revisado(s.form, { ...s.form, lechos })
     if (s.selectedIdx >= 0 && s.selectedIdx < s.columns.length) {
       const updated = [...s.columns]
       updated[s.selectedIdx] = { ...newForm }
