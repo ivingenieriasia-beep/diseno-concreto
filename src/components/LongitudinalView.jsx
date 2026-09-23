@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
-import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios, extraDe, compartidosCon } from '../core/longitudinal'
+import { parseRamStations, looksLikeStations, analyzeGroup, optimizeBase, applyBase, unitLabel, bastonesDe, bastonesDeVarios, extraDe, compartidosCon, perfilCompleto } from '../core/longitudinal'
 import { parseNodeXlsx, parseGeometryReport, attachGeometry, sectionMismatches } from '../core/geometry'
 import { elevationSvg, diagramSvg, elevationsGridSvg } from '../core/longitudinalSvg'
 import { svgToDxf } from '../core/svgToDxf'
@@ -12,7 +12,7 @@ const fmt = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—'
 const TD = { padding: '4px 8px', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap', fontSize: 11 }
 const TH = { padding: '5px 8px', background: '#1a2040', color: '#fff', fontSize: 10, textAlign: 'left', position: 'sticky', top: 0, zIndex: 1 }
 
-function Pill({ tone, children }) {
+function Pill({ tone, children, title }) {
   const st = {
     ok: { bg: '#e8f5e9', fg: '#15803d', bd: '#a5d6a7' },
     bad: { bg: '#fdecea', fg: '#c62828', bd: '#ef9a9a' },
@@ -20,7 +20,7 @@ function Pill({ tone, children }) {
     info: { bg: '#eff6ff', fg: '#1d4ed8', bd: '#bfdbfe' },
     muted: { bg: 'var(--color-panel)', fg: 'var(--color-tx3)', bd: 'var(--color-border)' },
   }[tone || 'muted']
-  return <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 99, fontFamily: 'var(--font-mono)', background: st.bg, color: st.fg, border: `1px solid ${st.bd}`, whiteSpace: 'nowrap' }}>{children}</span>
+  return <span title={title} style={{ fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 99, fontFamily: 'var(--font-mono)', background: st.bg, color: st.fg, border: `1px solid ${st.bd}`, whiteSpace: 'nowrap' }}>{children}</span>
 }
 
 const smaxWarn = (r) => (r.shear.extremos.okSmax === false || r.shear.centro.okSmax === false)
@@ -82,28 +82,8 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
 
   // ── Geometría del modelo (compartida) → longitudes, secciones y elementos ──
   const nodes = useMemo(() => new Map(Object.entries(model?.nodes || {})), [model])
-  // Envolvente por miembro de la sección (otro reporte de RAM): entra al
-  // análisis como referencia, para que el diseño no quede por debajo de ella.
-  const envRef = useMemo(() => {
-    const pts = form.envelope?.points
-    if (!pts?.length) return null
-    const out = {}
-    for (const p of pts) {
-      const k = String(p.member)
-      const a = out[k] || { m33max: -Infinity, m33min: Infinity, v2: 0 }
-      a.m33max = Math.max(a.m33max, p.m33 ?? 0)
-      a.m33min = Math.min(a.m33min, p.m33 ?? 0)
-      a.v2 = Math.max(a.v2, Math.abs(p.v2 ?? 0))
-      out[k] = a
-    }
-    return out
-  }, [form.envelope])
-
-  // perfil + geometría: lo que ven el análisis y la tabla
-  const perfilFull = useMemo(() => {
-    const p = attachGeometry(perfil, model)
-    return p ? { ...p, envRef } : p
-  }, [perfil, model, envRef])
+  // perfil + geometría + envolvente: lo que ven el análisis y la tabla
+  const perfilFull = useMemo(() => perfilCompleto({ perfil, envelope: form.envelope }, model), [perfil, form.envelope, model])
   const chains = perfilFull?.geom?.chains || []
 
   const group = useMemo(() => {
@@ -140,6 +120,11 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     const { kInf, kSup } = extraDe(r)
     if (kInf || kSup) {
       return <Pill tone="info">+{[kInf && `${kInf} abajo`, kSup && `${kSup} arriba`].filter(Boolean).join(' / ')} puntual</Pill>
+    }
+    if (r.alFilo) {
+      return <Pill tone="warn" title={`Pasa por poco: sobra ${(r.holgura.v * 100).toFixed(1)} % en ${r.holgura.que}, y el pico sale de las estaciones impresas del reporte (no del bloque de máximos), así que el real puede ser mayor.`}>
+        ✓ al filo ({(r.holgura.v * 100).toFixed(r.holgura.v < 0.1 ? 1 : 0)} % en {r.holgura.que})
+      </Pill>
     }
     return <Pill tone="ok">✓ con el diseño</Pill>
   }
@@ -231,7 +216,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
         const env = parseRamEnvelope(text)
         if (env.points.length) {
           setEnvelope({ archivo: f.name, combo: env.combo, unidades: env.unidades, invertir: false, points: env.points })
-          notas.push(`${f.name}: máximos por miembro (${new Set(env.points.map((p) => p.member)).size}) → envolvente de la sección; para el análisis a lo largo exporta «Envolvente de esfuerzos» por estaciones`)
+          notas.push(`${f.name}: máximos por miembro (${new Set(env.points.map((p) => p.member)).size}) → envolvente de la sección, y el pico exacto para el análisis a lo largo (las estaciones impresas se quedan cortas)`)
           continue
         }
         notas.push(`${f.name}: no se reconoció (ni esfuerzos ni geometría)`)
@@ -267,14 +252,22 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
       members: P.members, L: Lprev || 0, Lpor: perfil?.Lpor || {}, formato: P.formato || 'estaciones',
       invertir: !!perfil?.invertir, minLen: perfil?.minLen ?? 0.6,
       porElemento: perfil?.porElemento ?? true,
+      conMaximos: P.conMaximos || 0,
     }
     setPerfil(nuevo)
-    // La envolvente de sección (máximos por miembro) sale del mismo reporte
-    setEnvelope({ archivo: nombre, combo: P.combo, unidades: P.unidades, invertir: !!perfil?.invertir, points: P.points, fromStations: true })
+    // La envolvente de sección sale del mismo reporte… salvo que ya haya una
+    // cargada de un «Máximos esfuerzos en miembros»: ésa trae el pico exacto y
+    // no se pisa con una muestra de estaciones.
+    if (!form.envelope?.points?.length || form.envelope.fromStations) {
+      setEnvelope({ archivo: nombre, combo: P.combo, unidades: P.unidades, invertir: !!perfil?.invertir, points: P.points, fromStations: true })
+    }
     setSel(null)
     const enM = P.members.filter((m) => m.Lreport).length
     const tipo = P.formato === 'acciones' ? 'acciones discriminadas (puntos de inflexión)' : 'envolvente por estaciones'
-    return { perfil: nuevo, nota: `${nombre}: ${tipo} · ${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ''}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}` }
+    const max = P.conMaximos === P.members.length ? ' · con el bloque de máximos (picos exactos)'
+      : P.conMaximos ? ` · sólo ${P.conMaximos} de ${P.members.length} traen el bloque de máximos`
+        : ' · SIN el bloque de máximos: los picos salen de las estaciones impresas'
+    return { perfil: nuevo, nota: `${nombre}: ${tipo} · ${P.members.length} miembros · ${P.members[0].stations.length} estaciones${P.combo ? ` · ${P.combo}` : ''}${enM ? ` · ${enM} con longitud en el reporte` : ''}${max}${P.warnings.length ? ` · ${P.warnings[0]}` : ''}` }
   }
 
   const onInput = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; cargarArchivos(fs) }
@@ -295,7 +288,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
     let inner = '', W = 0, H = 0, n = 0
     for (const t of list) {
       let g = null
-      try { g = analyzeGroup(t, t === form ? perfilFull : attachGeometry(t.perfil, model)) } catch { continue }
+      try { g = analyzeGroup(t, t === form ? perfilFull : perfilCompleto(t, model)) } catch { continue }
       if (!g?.patterns?.length) continue
       const e = elevationsGridSvg(t, g, 14)
       inner += `<g transform="translate(0,${H.toFixed(1)})">${e.inner}</g>`
@@ -452,7 +445,7 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
           </div>
         )}
 
-        {msg && <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>{msg}</div>}
+        {msg && <div data-testid="perfil-msg" style={{ fontSize: 10.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>{msg}</div>}
 
         {foco && (
           <div style={{ fontSize: 11, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -553,6 +546,18 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
                 {' '}El diseño <b>ya usa el mayor de los dos</b> (el perfil se escala), pero conviene reexportar el de estaciones para ver dónde cae ese pico.
               </div>
             )}
+            {group.nFilo > 0 && (
+              <div data-testid="aviso-filo" style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>
+                  <b>{group.nFilo} elemento(s) pasan por muy poco</b> y su pico sale sólo de las estaciones impresas de <b>{perfil.archivo}</b>
+                  {perfil.members[0]?.stations?.length ? ` (${perfil.members[0].stations.length} por miembro)` : ''}.
+                  El pico real casi nunca cae en una estación: en un modelo real lo impreso se queda corto hasta un 12 %, así que un margen de
+                  {' '}{(Math.min(...group.results.filter((r) => r.alFilo).map((r) => r.holgura.v)) * 100).toFixed(1)} % no verifica nada.
+                  Carga del mismo grupo el reporte <b>«Máximos esfuerzos en miembros»</b>, que sí trae el pico exacto, o vuelve a correr el análisis con más estaciones.
+                </span>
+                <button className="btn btn-secondary" style={{ fontSize: 10 }} data-testid="cargar-maximos" onClick={abrir}>cargar «Máximos esfuerzos en miembros»</button>
+              </div>
+            )}
             {!capsOk && <div style={{ fontSize: 11, color: '#c62828', background: '#fdecea', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px' }}>
               El armado corrido no cumple por sí solo (As mín, As máx o b mín): MR+ {fmt(group.caps.MRP)} · MR− {fmt(group.caps.MRN)} t·m. Sube el armado corrido antes de repartir bastones.
             </div>}
@@ -566,6 +571,10 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
               <span style={{ color: '#1d4ed8' }} title="Piden bastón puntual en algún tramo, además del armado del corte">{group.nBast} piden bastón puntual</span>
               {group.nInsuf > 0 && <span style={{ color: '#c62828' }}>{group.nInsuf} insuficientes</span>}
               {group.nShear > 0 && <span style={{ color: '#c62828' }}>{group.nShear} fallan por cortante</span>}
+              {group.nFilo > 0 && <span style={{ color: '#92400e' }} data-testid="al-filo"
+                title="Pasan por muy poco y el pico sale sólo de las estaciones impresas: el reporte no trae el bloque de máximos, así que el pico real puede ser mayor que el que se ve aquí">
+                ⚠ {group.nFilo} al filo
+              </span>}
               {group.results.some(smaxWarn) && <span style={{ color: '#92400e' }} title="La separación de estribos supera d/2 (o d/4 con cortante alto) en alguna zona; la NTC la limita cuando se requieren estribos">⚠ {group.results.filter(smaxWarn).length} con s &gt; s máx</span>}
               <span style={{ color: 'var(--color-tx3)' }}
                 title={`Base del análisis: lo que la trabe lleva en TODA su longitud — ${form.cantInf}#${form.calInf}/${form.cantSup}#${form.calSup} corridas${(kCorr.inf || kCorr.sup) ? ` + ${kCorr.inf}/${kCorr.sup} bastón corrido` : ''}. Lo que se reparte encima son bastones puntuales.`}>

@@ -23,8 +23,7 @@ import { generateDetailedReport } from './core/generateDetailedHTML'
 import { initGlobalDB, getDB, getStats, onDBChange } from './core/globalDB'
 import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, listRecents, timeAgo, debounce, isEmptyProject } from './core/autosave'
 import { buildDcheck } from './core/dcheckExport'
-import { analyzeGroup } from './core/longitudinal'
-import { attachGeometry } from './core/geometry'
+import { analyzeGroup, perfilCompleto } from './core/longitudinal'
 
 function download(content, filename, mime = 'text/plain') {
   const blob = new Blob([content], { type: mime })
@@ -192,10 +191,11 @@ export default function App() {
   }, [projectName, dxfScale, sections, columns, packCargas, fileName])
 
   // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
-  // geometría pegada, el análisis va por elemento completo (y las zonas de
-  // estribos se miden sobre el claro real, no sobre cada tramo suelto).
+  // geometría pegada el análisis va por elemento completo (y las zonas de
+  // estribos se miden sobre el claro real, no sobre cada tramo suelto), y con
+  // la envolvente pegada el diseño no queda por debajo de lo que RAM reporta.
   const seccionesConGeometria = useMemo(
-    () => sections.map((s) => (s.perfil?.members?.length ? { ...s, perfil: attachGeometry(s.perfil, model) } : s)),
+    () => sections.map((s) => (s.perfil?.members?.length ? { ...s, perfil: perfilCompleto(s, model) } : s)),
     [sections, model],
   )
 
@@ -297,7 +297,7 @@ export default function App() {
     for (const t of sections) {
       if (!t.perfil?.members?.length) continue
       n++
-      try { const g = analyzeGroup(t, attachGeometry(t.perfil, model)); if (!g.allOk || !g.caps.okBase) bad++ } catch { bad++ }
+      try { const g = analyzeGroup(t, perfilCompleto(t, model)); if (!g.allOk || !g.caps.okBase) bad++ } catch { bad++ }
     }
     return { n, bad }
   }, [sections, model])

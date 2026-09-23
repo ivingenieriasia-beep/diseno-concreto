@@ -154,5 +154,10 @@ export function parseRamActions(text) {
     points.push({ id: `${mb.id}-Min`, member: mb.id, tipo: 'Min', ...mn, P: -mn.axial, combo: combos.join(' / ') })
   }
 
-  return { members, points, combos, combo: combos.join(' / '), unidades, archivo, warnings, formato: 'acciones' }
+  // ¿Vino además el bloque «Máximos esfuerzos en miembros»? Es el único que
+  // trae el pico exacto: las estaciones impresas son una muestra y casi siempre
+  // se quedan cortas (en un modelo real, hasta un 12 %).
+  const conMaximos = members.filter((mb) => mb.repMax && mb.repMin).length
+
+  return { members, points, combos, combo: combos.join(' / '), unidades, archivo, warnings, formato: 'acciones', conMaximos }
 }

@@ -20,11 +20,16 @@
 
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { CAL_TO_NUM } from './constants'
+import { attachGeometry } from './geometry'
 
 const NUM = /(-?\d+(?:[.,]\d+)?)\s+([A-Za-z0-9+*_.-]+)/g
 // El bloque "Máximos esfuerzos en miembros" no lleva la columna del caso (ec)
 const NUMS = /[-+]?\d+(?:[.,]\d+)?/g
 const KG_PER_M_PER_CM2 = 0.785 // acero 7850 kg/m³ → 0.785 kg por metro por cm²
+// Margen por debajo del cual «pasa» no significa nada si el pico viene sólo de
+// las estaciones impresas: en el reporte de acciones de un modelo real, lo
+// impreso se queda corto hasta un 12 % contra el bloque de máximos.
+export const FILO = 0.12
 
 export const fmt2 = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d))
 /** Etiqueta de una unidad de análisis: miembro de RAM o elemento (cadena de miembros) */
@@ -160,7 +165,8 @@ export function parseRamStations(text) {
     points.push({ id: `${mb.id}-Min`, member: mb.id, tipo: 'Min', ...mn, P: -mn.axial, combo })
   }
 
-  return { combo, unidades, archivo, members: valid, points, warnings, formato: 'estaciones' }
+  const conMaximos = valid.filter((mb) => mb.repMax && mb.repMin).length
+  return { combo, unidades, archivo, members: valid, points, warnings, formato: 'estaciones', conMaximos }
 }
 
 /** ¿El texto es un reporte por estaciones (y no el de máximos por miembro)? */
@@ -275,6 +281,11 @@ export function memberProfile(member, L, invertir = false, { ajustar = true, ref
     vu: Math.max(repPropio?.vu ?? 0, repRef?.vu ?? 0),
     fuentes: [repPropio && 'reporte', repRef && 'envolvente'].filter(Boolean),
   } : null
+  // ¿El pico está respaldado por un máximo EXACTO de RAM? Sólo lo están el
+  // bloque «Máximos esfuerzos en miembros» del propio reporte y una envolvente
+  // por miembro que venga de otro archivo. Una envolvente armada con estas
+  // mismas estaciones repite la muestra y no añade nada.
+  const exacto = !!repPropio || !!(ref && ref.exacta !== false)
 
   // lo que dan las estaciones impresas, tal cual, antes de cualquier ajuste
   const crudo = {
@@ -311,7 +322,7 @@ export function memberProfile(member, L, invertir = false, { ajustar = true, ref
   }
 
   return {
-    L: len, stations: st, rep, ajuste, crudo,
+    L: len, stations: st, rep, ajuste, crudo, exacto,
     muPmax: Math.max(0, ...st.map((s) => s.muP)),
     muNmax: Math.max(0, ...st.map((s) => s.muN)),
     vuMax: Math.max(0, ...st.map((s) => s.vu)),
@@ -680,7 +691,27 @@ export function analyzeMember(member, caps, { L, invertir = false, minLen, ajust
   const status = insuf ? 'insuficiente' : (inf.bars.length || sup.bars.length) ? 'baston' : 'ok'
   const sig = (bars, tag) => bars.map((b) => `${tag}${b.k}@${b.x0.toFixed(2)}-${b.x1.toFixed(2)}`).join('|')
   const signature = [sig(inf.bars, 'I'), sig(sup.bars, 'S')].filter(Boolean).join('/') || 'base'
-  return { id: member.id, L: profile.L, profile, inf, sup, shear, shearFail, status, signature, supports, members: member.members || null, isElement: !!member.isElement }
+  // ── Qué tan justo pasa ──
+  // Las estaciones de RAM son una MUESTRA: el pico real cae casi siempre entre
+  // dos de ellas y sólo el bloque «Máximos esfuerzos en miembros» lo trae
+  // exacto. Si no vino ese bloque, un elemento que pasa por un pelo no está
+  // verificado: el pico que falta puede ser justo el que no cabe.
+  const holguras = []
+  const rel = (cap, dem) => (cap > 1e-9 ? (cap - dem) / cap : dem > 1e-9 ? -1 : 1)
+  if (!inf.bars.length && profile.muPmax > 1e-9) holguras.push({ que: 'MR+', v: rel(caps.MRP, profile.muPmax) })
+  if (!sup.bars.length && profile.muNmax > 1e-9) holguras.push({ que: 'MR−', v: rel(caps.MRN, profile.muNmax) })
+  for (const z of [['Vr extremos', shear.extremos], ['Vr centro', shear.centro]]) {
+    if (z[1].Vr && z[1].Vu > 1e-9) holguras.push({ que: z[0], v: rel(z[1].Vr, z[1].Vu) })
+  }
+  holguras.sort((a, b) => a.v - b.v)
+  const holgura = holguras.length ? holguras[0] : null
+  const muestreado = !profile.exacto       // el pico sale sólo de las estaciones impresas
+  const alFilo = status !== 'insuficiente' && !shearFail && muestreado && !!holgura && holgura.v < FILO
+  return {
+    id: member.id, L: profile.L, profile, inf, sup, shear, shearFail, status, signature, supports,
+    holgura, muestreado, alFilo,
+    members: member.members || null, isElement: !!member.isElement,
+  }
 }
 
 /**
@@ -726,7 +757,33 @@ export function refDeUnidad(mb, perfil) {
     if (!e) continue
     r = r ? { m33max: Math.max(r.m33max, e.m33max), m33min: Math.min(r.m33min, e.m33min), v2: Math.max(r.v2, e.v2) } : { ...e }
   }
-  return r
+  // exacta = viene de otro reporte de RAM (máximos por miembro). Si se armó con
+  // las mismas estaciones del perfil no aporta nada: repite la muestra.
+  return r ? { ...r, exacta: perfil?.envExacta !== false } : null
+}
+
+/**
+ * Todo lo que el análisis a lo largo necesita de una sección, en un solo sitio:
+ * las estaciones del reporte + la geometría del modelo (que une los tramos en
+ * elementos y mide el claro real) + la envolvente por miembro cargada en la
+ * sección (para que el diseño no quede por debajo de lo que RAM reporta).
+ * El módulo y los informes llaman a esto mismo, así que no pueden discrepar.
+ */
+export function perfilCompleto(t, model) {
+  const p = attachGeometry(t?.perfil, model)
+  if (!p) return p
+  const pts = t?.envelope?.points
+  if (!pts?.length) return p
+  const envRef = {}
+  for (const q of pts) {
+    const k = String(q.member)
+    const a = envRef[k] || { m33max: -Infinity, m33min: Infinity, v2: 0 }
+    a.m33max = Math.max(a.m33max, q.m33 ?? 0)
+    a.m33min = Math.min(a.m33min, q.m33 ?? 0)
+    a.v2 = Math.max(a.v2, Math.abs(q.v2 ?? 0))
+    envRef[k] = a
+  }
+  return { ...p, envRef, envExacta: !t.envelope.fromStations }
 }
 
 // ── 6. Grupo completo, patrones y acero ───────────────────────
@@ -769,12 +826,14 @@ export function analyzeGroup(t, perfil) {
   const nBast = results.filter((r) => r.status === 'baston').length
   const nInsuf = results.filter((r) => r.status === 'insuficiente').length
   const nShear = results.filter((r) => r.shearFail).length
+  const nFilo = results.filter((r) => r.alFilo).length
+  const nMuestreado = results.filter((r) => r.muestreado).length
   const kMaxInf = Math.max(0, ...results.flatMap((r) => r.inf.bars.map((b) => b.k)))
   const kMaxSup = Math.max(0, ...results.flatMap((r) => r.sup.bars.map((b) => b.k)))
 
   return {
     caps, results, patterns,
-    n: results.length, nOk, nBast, nInsuf, nShear,
+    n: results.length, nOk, nBast, nInsuf, nShear, nFilo, nMuestreado,
     kMaxInf, kMaxSup,
     acero: { base: kgBase, bastones: kgBast, total: kgBase + kgBast, uniforme: kgUniforme, ahorro: kgUniforme != null ? kgUniforme - (kgBase + kgBast) : null, mTotal },
     uniforme,

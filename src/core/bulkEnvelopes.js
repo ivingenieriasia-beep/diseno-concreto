@@ -65,6 +65,7 @@ export function repartirEnvolventes(archivos, destinos = {}) {
         perfil: {
           archivo: a.nombre, combo: P.combo, unidades: P.unidades, formato: P.formato || 'estaciones',
           members: P.members, L: 0, Lpor: {}, invertir: false, minLen: 0.6, porElemento: true,
+          conMaximos: P.conMaximos || 0,
         },
         miembros: P.members.length, puntos: P.points.length, combo: P.combo,
       }

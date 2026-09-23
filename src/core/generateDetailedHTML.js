@@ -498,7 +498,9 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
         const bars = (arr, cal) => arr.length ? arr.map((b) => `${b.k}#${cal} L=${fmt(b.len, 2)} @${fmt(b.x0, 2)}${b.ancla ? ` ⟂${b.ancla}` : ''}`).join(' · ') : '—'
         const est = (r) => r.status === 'insuficiente' ? '<span style="color:#dc2626;font-weight:700">✗ insuficiente</span>'
           : r.shearFail ? '<span style="color:#dc2626;font-weight:700">✗ cortante</span>'
-            : r.status === 'baston' ? '<span style="color:#1d4ed8;font-weight:700">bastón puntual</span>' : '<span style="color:#15803d;font-weight:700">✓ corridas</span>'
+            : r.status === 'baston' ? '<span style="color:#1d4ed8;font-weight:700">bastón puntual</span>'
+              : r.alFilo ? `<span style="color:#92400e;font-weight:700">✓ al filo (${(r.holgura.v * 100).toFixed(r.holgura.v < 0.1 ? 1 : 0)} % en ${r.holgura.que})</span>`
+                : '<span style="color:#15803d;font-weight:700">✓ corridas</span>'
         const filas = G.results.map((r) => `<tr>
           <td>${esc0(unitLabel(r))}${r.isElement ? `<div style="font-size:9px;color:#6b7280">${r.members.length} miembros de RAM</div>` : ''}</td><td>${fmt(r.L, 2)}</td><td>${fmt(r.profile.muPmax, 2)}</td><td>${fmt(r.profile.muNmax, 2)}</td><td>${fmt(r.profile.vuMax, 2)}</td>
           <td style="color:#2563a8">${esc0(bars(r.inf.bars, t.calBastonInf))}</td><td style="color:#c94f2a">${esc0(bars(r.sup.bars, t.calBastonSup))}</td><td>${est(r)}</td></tr>`).join('')
@@ -517,6 +519,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
           <div class="nota" style="background:#f5f3ff;border-color:#ddd6fe;color:#3b0764">
             ${unidadesTexto(G)} del reporte «${esc0(t.perfil.archivo || '')}»${t.perfil.combo ? ` (${esc0(t.perfil.combo)})` : ''}:
             <b>${G.nOk}</b> pasan con las corridas, <b>${G.nBast}</b> requieren bastón${G.nInsuf ? `, <b style="color:#dc2626">${G.nInsuf} insuficientes</b>` : ''}${G.nShear ? `, <b style="color:#dc2626">${G.nShear} fallan por cortante</b>` : ''}.
+            ${G.nFilo ? `<br><b style="color:#92400e">${G.nFilo} pasan por muy poco y su pico sale sólo de las estaciones impresas</b>: el máximo real cae casi siempre entre dos estaciones, así que ese margen no verifica nada. Carga el reporte «Máximos esfuerzos en miembros» del mismo grupo, que trae el pico exacto.` : ''}
             MR+ base ${fmt(G.caps.MRP, 2)} · MR− base ${fmt(G.caps.MRN, 2)} t·m (corridas${(G.caps.kCorrInf || G.caps.kCorrSup) ? ` + ${G.caps.kCorrInf}/${G.caps.kCorrSup} bastón corrido` : ''}) · Ld bastón ${fmt(G.caps.inf.Ld.Ld, 0)}/${fmt(G.caps.sup.Ld.Ld, 0)} cm · prolongación ≥ máx(d, 12db) = ${fmt(G.caps.inf.ext, 0)} cm.
             Acero: <b>${fmt(G.acero.total, 0)} kg</b> (${fmt(G.acero.base, 0)} corridas + ${fmt(G.acero.bastones, 0)} bastones puntuales). ${ahorro}
             ${!G.caps.okBase ? '<br><b style="color:#dc2626">El armado corrido no cumple por sí solo (As mín / As máx / b mín).</b>' : ''}

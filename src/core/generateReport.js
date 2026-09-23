@@ -662,13 +662,14 @@ export function generateReport(sections, projectName = '', columns = []) {
       let G = null
       try { G = analyzeGroup(t, t.perfil) } catch { /* sin datos */ }
       if (G) {
-        const bad = G.nInsuf + G.nShear > 0 || !G.caps.okBase
+        const bad = G.nInsuf + G.nShear > 0 || !G.caps.okBase || G.nFilo > 0
         doc.setFontSize(6.5)
         setColor(doc, bad ? COL.warn : COL.ok)
         const ah = G.acero.ahorro != null ? ` | ${G.acero.ahorro >= 0 ? 'ahorro' : 'exceso'} ${Math.abs(G.acero.ahorro).toFixed(0)} kg vs uniforme` : ''
         doc.text(
           `Longitudinal: ${unidadesTexto(G, { largo: false })} - ${G.nOk} con corridas, ${G.nBast} con baston` +
           (G.nInsuf ? `, ${G.nInsuf} insuficientes` : '') + (G.nShear ? `, ${G.nShear} cortante` : '') +
+          (G.nFilo ? `, ${G.nFilo} al filo (pico solo de estaciones: falta el reporte de maximos)` : '') +
           ` | acero ${G.acero.total.toFixed(0)} kg${ah}` + (!G.caps.okBase ? ' | corridas no cumplen As min/b min' : ''),
           tblX, cardY + cardH - 9.5,
         )

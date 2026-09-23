@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseRamStations, memberProfile, analyzeGroup, refDeUnidad, miembrosCompartidos, compartidosCon } from '../src/core/longitudinal.js'
 import { beamEnvelopeByMember, parseRamEnvelope } from '../src/core/ramParser.js'
+import { parseRamActions } from '../src/core/ramActions.js'
 import { attachGeometry } from '../src/core/geometry.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -105,9 +106,11 @@ describe('T-5: la envolvente cargada gobierna sobre las estaciones', () => {
   it('un elemento toma la envolvente de todos sus tramos', () => {
     const envRef = { 22: { m33max: 0.92, m33min: -4.36, v2: 3.22 }, 31: { m33max: 0.35, m33min: -4.5, v2: 3.64 } }
     const el = { id: 'E 22…31', isElement: true, members: [{ id: '22' }, { id: '31' }] }
-    expect(refDeUnidad(el, { envRef })).toEqual({ m33max: 0.92, m33min: -4.5, v2: 3.64 })
-    expect(refDeUnidad({ id: '22' }, { envRef })).toEqual({ m33max: 0.92, m33min: -4.36, v2: 3.22 })
+    expect(refDeUnidad(el, { envRef })).toEqual({ m33max: 0.92, m33min: -4.5, v2: 3.64, exacta: true })
+    expect(refDeUnidad({ id: '22' }, { envRef })).toEqual({ m33max: 0.92, m33min: -4.36, v2: 3.22, exacta: true })
     expect(refDeUnidad({ id: '99' }, { envRef })).toBeNull()
+    // si la envolvente se armó con estas mismas estaciones, no aporta un máximo exacto
+    expect(refDeUnidad({ id: '22' }, { envRef, envExacta: false }).exacta).toBe(false)
   })
 })
 
@@ -205,5 +208,82 @@ describe('cortante: por tramo suelto vs por elemento completo', () => {
     const delInforme = analyzeGroup(secc, conGeo)   // así los llama App tras pegar la geometría
     expect(delInforme.nShear).toBe(delModulo.nShear)
     expect(delInforme.n).toBe(delModulo.n)
+  })
+})
+
+// ── El pico real casi nunca cae en una estación impresa ──────────
+// RAM dibuja el máximo exacto del miembro (M33 = −6.03), pero el reporte de
+// acciones sólo imprime unas cuantas estaciones y la mayor de ellas puede ser
+// −5.84. La única fuente del pico exacto es el bloque «Máximos esfuerzos en
+// miembros»; sin él, «pasa» por un 1 % no significa nada.
+describe('picos entre estaciones: lo impreso se queda corto', () => {
+  const ACC = readFileSync(join(here, 'fixtures', 'T5_acciones.txt'), 'utf-8')
+
+  it('en un modelo real, las estaciones impresas quedan por debajo del máximo en la mayoría de los miembros', () => {
+    const A = parseRamActions(ACC)
+    expect(A.conMaximos).toBe(A.members.length)     // este .txt sí trae el bloque
+    let cortos = 0, peor = 1
+    for (const mb of A.members) {
+      const stN = Math.max(0, ...mb.stations.map((s) => -s.m33.min))
+      const stP = Math.max(0, ...mb.stations.map((s) => s.m33.max))
+      const repN = Math.max(0, -Math.min(mb.repMin.m33, mb.repMax.m33))
+      const repP = Math.max(0, Math.max(mb.repMin.m33, mb.repMax.m33))
+      if (repN > stN + 1e-6 || repP > stP + 1e-6) {
+        cortos++
+        peor = Math.max(peor, repN / (stN || repN || 1), repP / (stP || repP || 1))
+      }
+    }
+    console.log(`miembros donde lo impreso se queda corto: ${cortos}/${A.members.length} · el peor, ×${peor.toFixed(3)}`)
+    expect(cortos).toBeGreaterThan(A.members.length / 2)
+    expect(peor).toBeGreaterThan(1.1)               // hasta un 12 % por debajo
+  })
+
+  const secc = {
+    nombre: 'T-5A', ancho: 20, peralte: 25, recub: 3, fc: 250,
+    calSup: '4', cantSup: 4, calInf: '3', cantInf: 3, calBastonSup: '4', cantBastonSup: 3,
+    calBastonInf: '3', cantBastonInf: 0, calEst: '3', sepLcuarto: 8, sepRest: 16,
+    calc: { fy: 4200, varEstNum: 3, nramas: 2 },
+  }
+  // un miembro cuyo pico impreso (5.84) queda justo debajo del MR− de la trabe
+  const m12 = {
+    id: '12', Lreport: 7.97,
+    stations: [0, 0.25, 0.5, 0.85, 1].map((p, i) => ({
+      pos: p,
+      m33: { max: [0, 0.46, 0.30, -3.0, -5.84][i], min: [0, 0.46, 0.30, -3.0, -5.84][i] },
+      v2: { max: 4.86, min: -4.86 },
+    })),
+  }
+
+  it('lo marca «al filo» en vez de darlo por bueno', () => {
+    const G = analyzeGroup(secc, { members: [m12], L: 7.97 })
+    const r = G.results[0]
+    expect(r.status).toBe('ok')                  // con el armado corrido le alcanza…
+    expect(r.muestreado).toBe(true)              // …pero el pico sale sólo de las estaciones
+    expect(r.alFilo).toBe(true)
+    expect(r.holgura.que).toBe('MR−')
+    expect(r.holgura.v).toBeLessThan(0.05)       // pasa por menos del 5 %
+    expect(G.nFilo).toBe(1)
+  })
+
+  it('con el máximo exacto cargado deja de ser una suposición', () => {
+    const conMax = analyzeGroup(secc, {
+      members: [m12], L: 7.97,
+      envRef: { 12: { m33max: 0.46, m33min: -6.03, v2: 4.86 } },   // «Máximos esfuerzos en miembros»
+    })
+    const r = conMax.results[0]
+    expect(r.profile.muNmax).toBeCloseTo(6.03, 6)  // ahora sí se diseña con el 6.03
+    expect(r.muestreado).toBe(false)
+    expect(r.alFilo).toBe(false)
+    expect(conMax.nFilo).toBe(0)
+    expect(r.sup.bars.length).toBeGreaterThan(0)   // y resulta que sí pedía bastón
+  })
+
+  it('una envolvente armada con las mismas estaciones no cuenta como máximo exacto', () => {
+    const G = analyzeGroup(secc, {
+      members: [m12], L: 7.97,
+      envRef: { 12: { m33max: 0.46, m33min: -5.84, v2: 4.86 } }, envExacta: false,
+    })
+    expect(G.results[0].muestreado).toBe(true)
+    expect(G.nFilo).toBe(1)
   })
 })
