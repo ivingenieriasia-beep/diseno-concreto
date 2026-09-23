@@ -58,6 +58,7 @@ export default function LoadCenter({ onClose, onToast }) {
   const columns = useColumnStore((s) => s.columns)
   const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
   const inputRef = useRef(null)
+  const dirRef = useRef(null)
   const [msg, setMsg] = useState('')
   const [drop, setDrop] = useState(false)
   const [filtro, setFiltro] = useState(null)   // id del slot que abrió el diálogo
@@ -91,11 +92,23 @@ export default function LoadCenter({ onClose, onToast }) {
   }, [sections, columns, model, nodes])
 
   // ── Carga: el contenido decide qué es cada archivo ──
+  // `files` = [{ file, carpeta }]. La carpeta (COLUMNAS / LONGITUDINAL /
+  // MAXIMOS) no decide el tipo de reporte — eso lo dice el contenido — pero
+  // sirve de desempate cuando una trabe y una columna se llaman igual.
   async function cargar(files) {
     if (!files.length) return
     const archivos = []
-    for (const f of files) {
-      try { archivos.push({ nombre: f.name, texto: /\.xlsx$/i.test(f.name) ? '' : await f.text(), file: f }) } catch { /* ignora */ }
+    const noLeidos = []
+    for (const { file: f, carpeta } of files) {
+      if (!/\.(txt|csv|xlsx)$/i.test(f.name)) continue          // en una carpeta puede haber de todo
+      try { archivos.push({ nombre: f.name, carpeta, texto: /\.xlsx$/i.test(f.name) ? '' : await f.text(), file: f }) } catch { noLeidos.push(f.name) }
+    }
+    if (!archivos.length) {
+      // en OneDrive/Drive, un archivo «sólo en la nube» no se puede leer hasta bajarlo
+      setMsg(noLeidos.length
+        ? `No se pudo leer ${noLeidos.join(', ')} — si están en OneDrive, ábrelos una vez o márcalos «Conservar siempre en este dispositivo»`
+        : 'La carpeta no trae .txt ni .xlsx')
+      return
     }
     const clas = clasificarLote(archivos)
     const notas = []
@@ -124,12 +137,13 @@ export default function LoadCenter({ onClose, onToast }) {
       const r = repartirEnvolventes(esf, { trabes: sections, columnas: columns })
       for (const a of r.asignados) {
         if (a.tipo === 'trabe') {
-          setEnvelopeAt(a.idx, a.env)
+          if (a.env) setEnvelopeAt(a.idx, a.env)
           if (a.perfil) setPerfilAt(a.idx, a.perfil)
-        } else setColEnvelopeAt(a.idx, a.env)
+        } else if (a.env) setColEnvelopeAt(a.idx, a.env)
       }
       notas.push(resumenReparto(r))
     }
+    if (noLeidos.length) notas.push(`no se pudieron abrir (¿sólo en la nube?): ${noLeidos.join(', ')}`)
     if (clas.desconocidos.length) notas.push(`no se reconocieron: ${clas.desconocidos.join(', ')}`)
     const texto = notas.join(' · ')
     setMsg(texto)
@@ -137,7 +151,42 @@ export default function LoadCenter({ onClose, onToast }) {
   }
 
   const abrir = (id) => { setFiltro(id); inputRef.current?.click() }
-  const onInput = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; cargar(fs) }
+  const abrirCarpeta = () => { setFiltro(null); dirRef.current?.click() }
+  // webkitRelativePath = "MAXIMOS/T-5.txt": la carpeta que contiene al archivo
+  const carpetaDe = (f) => {
+    const p = (f.webkitRelativePath || '').split('/')
+    return p.length > 1 ? p[p.length - 2] : ''
+  }
+  const onInput = (e) => {
+    const fs = [...(e.target.files || [])].map((f) => ({ file: f, carpeta: carpetaDe(f) }))
+    e.target.value = ''
+    cargar(fs)
+  }
+
+  // Soltar una carpeta: hay que recorrer el árbol a mano (las entradas del
+  // dataTransfer se invalidan en cuanto se hace await, así que se toman todas
+  // de golpe antes de empezar).
+  async function deSoltar(dt) {
+    const entries = [...(dt.items || [])].map((i) => i.webkitGetAsEntry?.()).filter(Boolean)
+    const sueltos = [...(dt.files || [])]
+    if (!entries.some((e) => e.isDirectory)) return sueltos.map((f) => ({ file: f, carpeta: '' }))
+    const out = []
+    const leer = async (entry, carpeta) => {
+      if (entry.isFile) {
+        const f = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null)
+        if (f) out.push({ file: f, carpeta })
+      } else if (entry.isDirectory) {
+        const rd = entry.createReader()
+        for (;;) {
+          const lote = await new Promise((res) => rd.readEntries(res, () => res([])))
+          if (!lote.length) break
+          for (const e of lote) await leer(e, entry.name)
+        }
+      }
+    }
+    for (const e of entries) await leer(e, e.isDirectory ? e.name : '')
+    return out
+  }
 
   return (
     <div
@@ -147,7 +196,7 @@ export default function LoadCenter({ onClose, onToast }) {
       <div
         onDragOver={(e) => { e.preventDefault(); if (!drop) setDrop(true) }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDrop(false) }}
-        onDrop={(e) => { e.preventDefault(); setDrop(false); cargar([...(e.dataTransfer?.files || [])]) }}
+        onDrop={async (e) => { e.preventDefault(); setDrop(false); cargar(await deSoltar(e.dataTransfer)) }}
         style={{
           width: 'min(900px, calc(100vw - 32px))', maxHeight: '84vh', display: 'flex', flexDirection: 'column',
           background: 'var(--color-panel)', border: `1px solid ${drop ? 'var(--color-accent)' : 'var(--color-border)'}`,
@@ -157,15 +206,18 @@ export default function LoadCenter({ onClose, onToast }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--color-border)' }}>
           <span style={{ fontSize: 15, fontWeight: 800 }}>Cargar reportes de RAM</span>
           <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
-            Nombra cada archivo como su chip (T-5.txt, C-1.txt) y suéltalos todos aquí: el contenido decide qué es cada uno.
+            Nombra cada archivo como su chip (T-5.txt, C-1.txt) y elige la carpeta: el contenido decide qué es cada uno.
           </span>
           <button onClick={onClose} data-testid="cerrar-centro" style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-tx3)' }}>×</button>
         </div>
 
         <div style={{ padding: 14, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: 9, background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}>
-            <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="cargar-todo" onClick={() => abrir(null)}>📂 Elegir todos los archivos…</button>
-            <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>o suéltalos en esta ventana. Puedes mezclar esfuerzos, máximos y geometría.</span>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="cargar-carpeta" onClick={abrirCarpeta}>🗂 Elegir una carpeta…</button>
+            <button className="btn btn-secondary" style={{ fontSize: 12 }} data-testid="cargar-todo" onClick={() => abrir(null)}>📂 Archivos sueltos…</button>
+            <span style={{ fontSize: 11, color: 'var(--color-tx3)' }}>
+              o suéltalos aquí (la carpeta entera también). Carga de golpe COLUMNAS, LONGITUDINAL y MAXIMOS: el contenido decide qué es cada archivo.
+            </span>
             <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx3)' }}>
               {sections.length} trabe(s) · {columns.length} columna(s)
             </span>
@@ -178,7 +230,11 @@ export default function LoadCenter({ onClose, onToast }) {
           {msg && <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' }} data-testid="centro-msg">{msg}</div>}
 
           <div style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.6 }}>
-            <b>El orden que conviene:</b> primero la <b>geometría</b> (una vez por proyecto), luego los <b>esfuerzos a lo largo</b> de cada tipo de trabe y, si los exportaste aparte, los <b>máximos</b> de trabes y columnas.
+            <b>Cómo conviene guardarlos:</b> una carpeta por proyecto con una subcarpeta por tipo de reporte
+            (<span style={{ fontFamily: 'var(--font-mono)' }}>COLUMNAS · LONGITUDINAL · MAXIMOS</span>) y, dentro, un .txt por chip
+            (<span style={{ fontFamily: 'var(--font-mono)' }}>T-5.txt</span>, <span style={{ fontFamily: 'var(--font-mono)' }}>C-1.txt</span>).
+            Eliges la carpeta de arriba una sola vez y entra todo: cada trabe recibe su reporte a lo largo <b>y</b> su máximo exacto, que es lo que hace falta
+            para que el momento de diseño no se quede corto. La geometría puede ir suelta en la carpeta raíz.
             Un mismo .txt puede traer varios reportes juntos: la app los separa y se queda con el mejor de cada cosa.
           </div>
         </div>
@@ -187,6 +243,9 @@ export default function LoadCenter({ onClose, onToast }) {
       <input ref={inputRef} data-testid="centro-files" type="file" multiple
         accept={filtro === 'geometria' ? '.txt,.csv,.xlsx,text/plain' : '.txt,.csv,text/plain'}
         style={{ display: 'none' }} onChange={onInput} />
+      {/* webkitdirectory no es un atributo de React: se pone sobre el nodo */}
+      <input data-testid="centro-dir" type="file" multiple style={{ display: 'none' }} onChange={onInput}
+        ref={(el) => { dirRef.current = el; if (el) { el.webkitdirectory = true; el.directory = true } }} />
     </div>
   )
 }

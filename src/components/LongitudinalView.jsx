@@ -51,7 +51,7 @@ function Paso({ n, titulo, listo, detalle, onClick, onQuitar, hint }) {
  * La geometría del modelo (nudos + miembros) se carga una sola vez y la
  * comparten todas las trabes del proyecto.
  */
-export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
+export default function LongitudinalView({ dxfScale = 1, projectName = '', onAbrirCentro }) {
   const form = useBeamStore((s) => s.form)
   const sections = useBeamStore((s) => s.sections)
   const selectedIdx = useBeamStore((s) => s.selectedIdx)
@@ -398,6 +398,12 @@ export default function LongitudinalView({ dxfScale = 1, projectName = '' }) {
           <button className="btn btn-primary" style={{ fontSize: 11 }} onClick={abrir} data-testid="cargar-ram">
             📂 Cargar reportes de RAM
           </button>
+          {onAbrirCentro && (
+            <button className="btn btn-secondary" style={{ fontSize: 11 }} onClick={onAbrirCentro} data-testid="abrir-centro-long"
+              title="Carga de golpe una carpeta entera de reportes y se reparten entre todos los chips">
+              🗂 Carpeta de todo el proyecto…
+            </button>
+          )}
           <Paso n="1" titulo="Esfuerzos por estaciones" listo={hayEsfuerzos} onClick={abrir}
             hint="RAM: Miembros → Acciones discriminadas y puntos de inflexión (o, en su defecto, Envolvente de esfuerzos por estaciones) de todos los miembros de este tipo de trabe"
             detalle={hayEsfuerzos ? `${perfil.archivo} · ${perfil.members.length} miembros${perfil.combo ? ` · ${perfil.combo}` : ''}` : '.txt de la envolvente por estaciones'}

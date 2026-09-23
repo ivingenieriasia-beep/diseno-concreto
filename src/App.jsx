@@ -310,7 +310,7 @@ export default function App() {
   }), [longStats.n, dbCount, losasCarga.length, tablerosCarga.length])
 
   const vistaModulo = {
-    longitudinal: <LongitudinalView dxfScale={dxfScale} projectName={projectName} />,
+    longitudinal: <LongitudinalView dxfScale={dxfScale} projectName={projectName} onAbrirCentro={() => setCentro(true)} />,
     bdglobal: <BDGlobalView />,
     pesos: <LoadsView onToast={showToast} />,
   }
