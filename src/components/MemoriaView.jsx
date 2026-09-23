@@ -3,6 +3,8 @@
 // Extracted from DisenoVigas_2.html (MemoriaFlexion + MemoriaCortante)
 // ══════════════════════════════════════════════════════════════
 
+import { APP_VERSION } from '../core/constants'
+
 function fmt(v, dec = 4) {
   if (v === null || v === undefined || isNaN(v)) return '—'
   return Number(v).toFixed(dec)
@@ -486,7 +488,7 @@ export default function MemoriaView({ nombre, fc, fy, b, h, r, MuP, MuN, resP, r
         {/* Footer */}
         <div style={{ borderTop: '2px solid #4ecac4', paddingTop: 10, marginTop: 24,
           fontSize: 10, color: '#9ca3af', textAlign: 'right' }}>
-          IV Ingenierías · Auxiliar IV NTC-2023 · (q conforme NTC-2017, ver nota)
+          IV Ingenierías · Auxiliar IV v{APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)
         </div>
       </div>
     </div>

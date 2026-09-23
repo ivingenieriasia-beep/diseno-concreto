@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { timeAgo } from '../core/autosave'
+import { APP_VERSION } from '../core/constants'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 
 const SCALE_PRESETS = [
@@ -84,7 +85,7 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
           Auxiliar IV
         </span>
         <span style={{ fontSize: 11, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>
-          v0.2
+          v{APP_VERSION}
         </span>
       </div>
 

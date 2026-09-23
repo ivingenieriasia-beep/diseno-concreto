@@ -4,7 +4,7 @@
 
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
-import { CAL_TO_NUM } from './constants'
+import { CAL_TO_NUM, APP_VERSION } from './constants'
 import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
@@ -533,7 +533,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     }
 
     // Footer per section
-    sectionsHTML += `<div style="border-top:2px solid #4ecac4;padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">IV Ingenierías · Auxiliar IV v0.2 NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
+    sectionsHTML += `<div style="border-top:2px solid #4ecac4;padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">IV Ingenierías · Auxiliar IV v${APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
     sectionsHTML += '</div>'
   })
 
@@ -607,7 +607,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     ${colSummaryHTML}
     ${leyendaHTML}
     <div style="margin-top:14px;font-size:10px;color:#9ca3af">
-      Generado con Auxiliar IV v0.2 — ${dateStr}<br>
+      Generado con Auxiliar IV v${APP_VERSION} — ${dateStr}<br>
       Trabes: ${sections.length} · Columnas: ${columns.length}${envStats.total ? ` · Ejemplares del modelo revisados: ${envStats.total}` : ''}
     </div>
   </div>`

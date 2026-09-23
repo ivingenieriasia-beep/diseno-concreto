@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
-import { DIAM, CAL_TO_NUM } from './constants'
+import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, calcEstribos, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
@@ -796,7 +796,7 @@ export function generateReport(sections, projectName = '', columns = []) {
   y += 6
   doc.setFontSize(7)
   setColor(doc, COL.tx3)
-  doc.text('Generado con Auxiliar IV - Detallador de elementos de concreto', marginL, y)
+  doc.text(`Generado con Auxiliar IV v${APP_VERSION} - Detallador de elementos de concreto`, marginL, y)
   doc.text(`Trabes: ${sections.length}  |  Columnas: ${columns.length}  |  P\u00E1ginas: ${pageNum}`, marginL, y + 3.5)
 
   // ── Watermark + Footer on each page ──
