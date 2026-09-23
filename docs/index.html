@@ -802,9 +802,10 @@ Qué hace, y qué no:
   · FUSIONA, no sustituye: lo que ya tenías se queda. Si una fila se llama
     igual que una del catálogo, manda la del catálogo (así se corrige el
     F'C 250 que traía f'c = 281 de la plantilla US).
-  · Antes de tocar nada guarda una copia de las tablas originales en
-    AppData / AuxiliarIV / respaldo_tablas. La caja de arena de RAM no deja
-    borrar archivos, así que el respaldo nunca se pisa: el primero se queda.
+  · Antes de tocar nada deja en el Escritorio una copia de cada tabla
+    original («Respaldo RAM - Sections - Personales - Vigas de Concreto.sec»…).
+    El primer respaldo nunca se pisa. Para deshacer: copia esos archivos de
+    vuelta a su carpeta, quitándoles el prefijo.
   · No toca el grupo NTC ni los de la instalación.
 
 Ábrelo con Abrir Script… (pegado en el editor se descompone la sangría) y
@@ -1151,14 +1152,25 @@ def invertidas(filas):
     return out
 
 
+def carpeta_de_respaldo():
+    u"""
+    Una carpeta que YA exista: dentro de RAM no se pueden crear carpetas
+    (os.mkdir y os.remove valen None en su caja de arena). El Escritorio
+    existe siempre y es donde se ve.
+    """
+    casa = os.path.expanduser('~')
+    for sub in ('Desktop', 'Escritorio', os.path.join('OneDrive', 'Escritorio'), os.path.join('OneDrive', 'Desktop')):
+        d = os.path.join(casa, sub)
+        if os.path.isdir(d):
+            return d
+    return casa
+
+
 def respaldar(db, relativa, crudo):
-    base = os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'AuxiliarIV', 'respaldo_tablas')
-    destino = os.path.join(base, relativa)
+    nombre = u'Respaldo RAM - ' + u' - '.join(relativa.replace(os.sep, '/').split('/'))
+    destino = os.path.join(carpeta_de_respaldo(), nombre)
     if os.path.isfile(destino):
         return destino, False           # el primer respaldo es el bueno: no se pisa
-    carpeta = os.path.dirname(destino)
-    if not os.path.isdir(carpeta):
-        os.makedirs(carpeta)
     with open(destino, 'wb') as f:
         f.write(crudo)
     return destino, True
@@ -1173,8 +1185,9 @@ def instalar_tabla(db, tipo, nombre_archivo, leo, enc_omision, nuevas):
             os.makedirs(carpeta)
             log(u'  grupo Personales creado en %s' % tipo)
         except Exception as e:
-            log(u'  !! no se pudo crear %s: %s' % (carpeta, e))
-            log(u'     créala a mano (carpeta «Personales») y vuelve a correr esto.')
+            # dentro de RAM os.mkdir vale None: no hay forma de crear carpetas
+            log(u'  !! no se pudo crear %s (%s)' % (carpeta, e))
+            log(u'     créala a mano (una carpeta llamada «Personales») y vuelve a correr esto.')
             return False
     previo = leer_tabla(ruta)
     if previo:
@@ -1847,9 +1860,10 @@ Qué hace, y qué no:
   · FUSIONA, no sustituye: lo que ya tenías se queda. Si una fila se llama
     igual que una del catálogo, manda la del catálogo (así se corrige el
     F'C 250 que traía f'c = 281 de la plantilla US).
-  · Antes de tocar nada guarda una copia de las tablas originales en
-    AppData / AuxiliarIV / respaldo_tablas. La caja de arena de RAM no deja
-    borrar archivos, así que el respaldo nunca se pisa: el primero se queda.
+  · Antes de tocar nada deja en el Escritorio una copia de cada tabla
+    original («Respaldo RAM - Sections - Personales - Vigas de Concreto.sec»…).
+    El primer respaldo nunca se pisa. Para deshacer: copia esos archivos de
+    vuelta a su carpeta, quitándoles el prefijo.
   · No toca el grupo NTC ni los de la instalación.
 
 Ábrelo con Abrir Script… (pegado en el editor se descompone la sangría) y
@@ -2196,14 +2210,25 @@ def invertidas(filas):
     return out
 
 
+def carpeta_de_respaldo():
+    u"""
+    Una carpeta que YA exista: dentro de RAM no se pueden crear carpetas
+    (os.mkdir y os.remove valen None en su caja de arena). El Escritorio
+    existe siempre y es donde se ve.
+    """
+    casa = os.path.expanduser('~')
+    for sub in ('Desktop', 'Escritorio', os.path.join('OneDrive', 'Escritorio'), os.path.join('OneDrive', 'Desktop')):
+        d = os.path.join(casa, sub)
+        if os.path.isdir(d):
+            return d
+    return casa
+
+
 def respaldar(db, relativa, crudo):
-    base = os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'AuxiliarIV', 'respaldo_tablas')
-    destino = os.path.join(base, relativa)
+    nombre = u'Respaldo RAM - ' + u' - '.join(relativa.replace(os.sep, '/').split('/'))
+    destino = os.path.join(carpeta_de_respaldo(), nombre)
     if os.path.isfile(destino):
         return destino, False           # el primer respaldo es el bueno: no se pisa
-    carpeta = os.path.dirname(destino)
-    if not os.path.isdir(carpeta):
-        os.makedirs(carpeta)
     with open(destino, 'wb') as f:
         f.write(crudo)
     return destino, True
@@ -2218,8 +2243,9 @@ def instalar_tabla(db, tipo, nombre_archivo, leo, enc_omision, nuevas):
             os.makedirs(carpeta)
             log(u'  grupo Personales creado en %s' % tipo)
         except Exception as e:
-            log(u'  !! no se pudo crear %s: %s' % (carpeta, e))
-            log(u'     créala a mano (carpeta «Personales») y vuelve a correr esto.')
+            # dentro de RAM os.mkdir vale None: no hay forma de crear carpetas
+            log(u'  !! no se pudo crear %s (%s)' % (carpeta, e))
+            log(u'     créala a mano (una carpeta llamada «Personales») y vuelve a correr esto.')
             return False
     previo = leer_tabla(ruta)
     if previo:
