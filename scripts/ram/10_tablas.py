@@ -3,11 +3,11 @@ u"""
 Auxiliar IV · Qué hay DENTRO de las tablas de secciones y materiales.
 
 La sonda 09 encontró dónde viven los grupos: una carpeta por grupo y un
-archivo por tabla, en
-  C:\\ProgramData\\Bentley\\Engineering\\RAM Elements\\26.0.1\\Database\\
-      Sections\\Personales\\Vigas de Concreto.sec
-      Sections\\Personales\\Columnas de Concreto.sec
-      Materials\\Personales\\Concreto.mat
+archivo por tabla, dentro de ProgramData / Bentley / Engineering /
+RAM Elements / 26.0.1 / Database:
+      Sections / Personales / Vigas de Concreto.sec
+      Sections / Personales / Columnas de Concreto.sec
+      Materials / Personales / Concreto.mat
 
 Esto vuelca su contenido completo (son de 0.1-0.2 KB), dice si la carpeta
 admite escritura, y busca de qué tabla salen los nombres que usa el modelo
@@ -87,7 +87,7 @@ p(u'=' * 74)
 p(u'Auxiliar IV — el contenido de las tablas de secciones y materiales')
 p(u'=' * 74)
 
-pd = os.path.join(os.environ.get('PROGRAMDATA') or u'C:\\ProgramData', 'Bentley', 'Engineering', 'RAM Elements')
+pd = os.path.join(os.environ.get('PROGRAMDATA') or u'C:/ProgramData', 'Bentley', 'Engineering', 'RAM Elements')
 versiones = [v for v in (os.listdir(pd) if os.path.isdir(pd) else []) if os.path.isdir(os.path.join(pd, v, 'Database'))]
 
 # ── 1. Las tablas del usuario, completas ────────────────────────
@@ -104,7 +104,7 @@ for v in sorted(versiones):
             if not os.path.isdir(carpeta):
                 continue
             p(u'')
-            p(u'  %s \\ %s   · carpeta %s' % (tipo, grupo, u'ESCRIBIBLE' if escribible(carpeta) else u'de sólo lectura'))
+            p(u'  %s / %s   · carpeta %s' % (tipo, grupo, u'ESCRIBIBLE' if escribible(carpeta) else u'de sólo lectura'))
             for f in sorted(os.listdir(carpeta)):
                 volcar(os.path.join(carpeta, f))
 
@@ -118,7 +118,7 @@ for tipo in ('Sections', 'Materials'):
         p(u'    %s: (no existe)' % raiz)
         continue
     grupos = sorted(os.listdir(raiz))
-    p(u'    %s\\: %s' % (raiz, u', '.join(grupos)))
+    p(u'    %s: %s' % (raiz, u', '.join(grupos)))
     for dirpath, _d, files in os.walk(raiz):
         for f in files:
             ruta = os.path.join(dirpath, f)
