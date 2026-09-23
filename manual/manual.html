@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Auxiliar IV con RAM Elements</title>
+<link rel="stylesheet" href="fuentes.css">
+<style>
+  :root {
+    --verde: #1a7a5e; --verde-2: #0f5c46; --verde-claro: #e6f2ed; --verde-linea: #b9dccd;
+    --tinta: #1c2320; --gris: #56615b; --gris-2: #87918b; --linea: #d9dfdb; --papel: #fff; --fondo: #f5f7f6;
+    --ambar: #9a4d06; --ambar-claro: #fdf3e2; --rojo: #a8231b; --rojo-claro: #fcebea;
+  }
+  /* Para regenerar el PDF: Chrome → Imprimir → Guardar como PDF, márgenes «Predeterminados»,
+     con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
+  @page {
+    size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v0.3"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+  }
+  @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: 'Instrument Sans', system-ui, sans-serif; color: var(--tinta); font-size: 10.2pt; line-height: 1.5; background: var(--papel); }
+  code, .mono, kbd { font-family: 'DM Mono', ui-monospace, monospace; font-size: 0.9em; }
+  code { background: var(--fondo); border: 1px solid var(--linea); border-radius: 3px; padding: 0 3px; white-space: nowrap; }
+  kbd { border: 1px solid #b8c0bb; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fff; white-space: nowrap; }
+  b, strong { font-weight: 700; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 17pt; }
+  li { margin-bottom: 3pt; }
+  li::marker { color: var(--verde); font-weight: 700; }
+
+  /* ── portada ── */
+  .portada { height: 11in; padding: 0.9in 0.85in 0.7in; display: flex; flex-direction: column; background: var(--verde); color: #fff; break-after: page; position: relative; overflow: hidden; }
+  .portada .marca { font-size: 10pt; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; opacity: 0.85; }
+  .portada h1 { font-size: 40pt; line-height: 1.04; margin: 1.5in 0 14pt; font-weight: 700; letter-spacing: -0.01em; max-width: 6in; }
+  .portada .sub { font-size: 15pt; line-height: 1.4; opacity: 0.92; max-width: 5.4in; }
+  .portada .pie { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10pt; opacity: 0.9; }
+  .portada .pie b { display: block; font-size: 12pt; }
+  .portada svg.fondo { position: absolute; right: -0.4in; top: 4.9in; opacity: 0.16; }
+
+  /* ── títulos ── */
+  h2 { font-size: 20pt; line-height: 1.15; margin: 0 0 4pt; font-weight: 700; color: var(--tinta); letter-spacing: -0.01em; break-after: avoid; }
+  h2 .n { color: var(--verde); margin-right: 8pt; }
+  .entrada { font-size: 11.5pt; color: var(--gris); margin: 0 0 14pt; max-width: 6.2in; break-after: avoid; }
+  thead { display: table-header-group; }
+  h3 { font-size: 12.5pt; margin: 16pt 0 5pt; color: var(--verde-2); font-weight: 700; break-after: avoid; }
+  h4 { font-size: 10.5pt; margin: 11pt 0 3pt; font-weight: 700; break-after: avoid; }
+  section.cap { margin-top: 26pt; }
+  section.salto { break-before: page; margin-top: 0; }
+  .sin-salto { break-inside: avoid; }
+
+  /* ── figuras ── */
+  figure { margin: 8pt 0 12pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--linea); border-radius: 6px; }
+  figure.media img { width: 72%; }
+  figure.chica img { width: 46%; }
+  figcaption { font-size: 8.6pt; color: var(--gris); margin-top: 4pt; }
+  figcaption b { color: var(--tinta); }
+
+  /* ── cajas ── */
+  .caja { border-radius: 7px; padding: 9pt 12pt; margin: 8pt 0 12pt; break-inside: avoid; }
+  .caja > :last-child { margin-bottom: 0; }
+  .caja .t { font-weight: 700; display: block; margin-bottom: 3pt; }
+  .oro { background: var(--verde-claro); border-left: 4px solid var(--verde); }
+  .ojo { background: var(--ambar-claro); border-left: 4px solid var(--ambar); }
+  .ojo .t { color: var(--ambar); }
+  .mal { background: var(--rojo-claro); border-left: 4px solid var(--rojo); }
+  .mal .t { color: var(--rojo); }
+  .nota { background: var(--fondo); border-left: 4px solid var(--gris-2); }
+
+  /* ── pasos numerados ── */
+  ol.pasos { list-style: none; padding: 0; counter-reset: p; }
+  ol.pasos > li { counter-increment: p; position: relative; padding-left: 27pt; margin-bottom: 7pt; }
+  ol.pasos > li::before { content: counter(p); position: absolute; left: 0; top: 0; width: 18pt; height: 18pt; border-radius: 50%; background: var(--verde); color: #fff; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; }
+
+  /* ── tablas ── */
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 12pt; font-size: 9pt; break-inside: auto; }
+  th { text-align: left; font-weight: 700; color: var(--verde-2); border-bottom: 1.5px solid var(--verde); padding: 4pt 6pt; vertical-align: bottom; }
+  td { border-bottom: 1px solid var(--linea); padding: 4pt 6pt; vertical-align: top; }
+  tr { break-inside: avoid; }
+  td.num, th.num { text-align: right; font-family: 'DM Mono', monospace; }
+
+  /* ── resumen de una página ── */
+  .ciclo { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; margin: 6pt 0 12pt; }
+  .ciclo .c { border: 1px solid var(--linea); border-radius: 8px; padding: 9pt 11pt; break-inside: avoid; }
+  .ciclo .c .cuando { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.12em; color: var(--verde); font-weight: 700; }
+  .ciclo .c h4 { margin: 2pt 0 4pt; font-size: 11pt; }
+  .ciclo .c ol { margin: 0; padding-left: 14pt; font-size: 9.4pt; }
+  .ciclo .ancho { grid-column: 1 / -1; }
+
+  /* ── diagrama de flujo ── */
+  .flujo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: stretch; margin: 10pt 0 4pt; }
+  .flujo .n { border: 1.5px solid var(--verde); border-radius: 8px; padding: 6pt 7pt; background: #fff; font-size: 8.4pt; line-height: 1.35; position: relative; margin-right: 14pt; }
+  .flujo .n:last-child { margin-right: 0; }
+  .flujo .n::after { content: '→'; position: absolute; right: -13pt; top: 50%; transform: translateY(-50%); color: var(--verde); font-weight: 700; font-size: 12pt; }
+  .flujo .n:last-child::after { content: none; }
+  .flujo .n b { display: block; font-size: 9.6pt; margin-bottom: 2pt; }
+  .flujo .n .d { color: var(--gris); }
+  .flujo .n.ram { background: var(--fondo); }
+  .vuelta { margin: 0 0 12pt; border: 1.5px dashed var(--verde-linea); border-radius: 8px; padding: 6pt 10pt; font-size: 8.8pt; color: var(--gris); }
+  .vuelta b { color: var(--tinta); }
+
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; }
+  .indice { columns: 3; column-gap: 18pt; margin: 4pt 0 0; padding: 0; list-style: none; font-size: 9.2pt; }
+  .indice li { break-inside: avoid; margin-bottom: 2pt; }
+  .indice li b { color: var(--verde); display: inline-block; width: 16pt; }
+  .etiqueta { display: inline-block; font-size: 7.6pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1pt 5pt; border-radius: 3pt; background: var(--verde); color: #fff; vertical-align: 1pt; }
+  .gris { color: var(--gris); }
+  .pequeno { font-size: 8.8pt; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════════════════ PORTADA ═════════════════════════ -->
+<div class="portada">
+  <div class="marca">IV Ingenierías · Estructuras</div>
+  <h1>Auxiliar IV con RAM Elements</h1>
+  <div class="sub">Manual de uso para el equipo: del modelo analizado en RAM a las secciones armadas, pasando por la agrupación de trabes.</div>
+  <svg class="fondo" width="520" height="520" viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="1.6">
+    <path d="M10 90V20M40 90V20M70 90V20M95 90V20"/>
+    <path d="M10 20h85M10 43h85M10 66h85M10 90h85"/>
+    <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
+  </svg>
+  <div class="pie">
+    <div><b>Versión 0.3</b>Septiembre de 2026</div>
+    <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
+  </div>
+</div>
+
+<!-- ═════════════════════════ LO ESENCIAL ═════════════════════════ -->
+<section>
+  <h2>Lo esencial en una página</h2>
+  <p class="entrada">Si sólo vas a leer una hoja, que sea ésta. El resto del manual explica cada paso, qué hace la app por dentro y qué hacer cuando algo no sale.</p>
+
+  <div class="ciclo">
+    <div class="c">
+      <div class="cuando">Una vez por computadora</div>
+      <h4>Instalar el catálogo en RAM</h4>
+      <ol>
+        <li>App: <b>📥 Reportes de RAM → ⚙ Configurar RAM → ⬇ instalar_catalogo.py</b>.</li>
+        <li>RAM: <b>Abrir Script…</b> → el archivo → <kbd>Ctrl</kbd>+<kbd>R</kbd>.</li>
+        <li>Si no aparecen las secciones, cierra y abre RAM.</li>
+      </ol>
+    </div>
+    <div class="c">
+      <div class="cuando">Una vez por proyecto</div>
+      <h4>Conectar la obra</h4>
+      <ol>
+        <li>App: <b>⚙ Configurar RAM</b> → pega la ruta de la carpeta → <b>⬇ Generar sincronizar.py</b>.</li>
+        <li><b>🔄 Elegir la carpeta y sincronizar…</b> → la misma carpeta.</li>
+      </ol>
+    </div>
+    <div class="c ancho">
+      <div class="cuando">Cada vez que reanalizas</div>
+      <h4>Sincronizar</h4>
+      <ol>
+        <li>RAM: analiza → <b>Abrir Script… → sincronizar.py → <kbd>Ctrl</kbd>+<kbd>R</kbd></b>. Escribe <code>modelo.json</code> en la carpeta de la obra.</li>
+        <li>App: <b>🔄 Sincronizar</b>. Entran las demandas de cada grupo; si hay grupos nuevos, <b>crear las secciones con su armado</b>; si hay miembros sin descripción, a <b>Agrupación</b>.</li>
+      </ol>
+    </div>
+    <div class="c ancho">
+      <div class="cuando">Al estructurar · modelo sin agrupar</div>
+      <h4>Agrupar las trabes</h4>
+      <ol>
+        <li>App: <b>Módulos → Agrupación</b>. Elige una de las tres propuestas o acomódala tú en planta (<b>✎ a mano</b>).</li>
+        <li><b>⬇ aplicar_agrupacion.py</b> → en RAM, <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b> → reanaliza → sincroniza. Repite una o dos veces: al cambiar secciones cambian los momentos.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="caja oro">
+    <span class="t">Tres reglas de oro</span>
+    <ol style="margin:0">
+      <li><b>Los scripts se abren, no se pegan.</b> En la consola de Python de RAM: <b>Abrir Script…</b> y <kbd>Ctrl</kbd>+<kbd>R</kbd>. Pegados en el editor se descompone la sangría y Python no los entiende.</li>
+      <li><b>La descripción de RAM es el nombre de la sección.</b> Un miembro con descripción <code>T-5</code> alimenta la sección <b>T-5</b> de la app. Cambiar descripciones en RAM es cambiar secciones.</li>
+      <li><b>La app propone, el ingeniero decide.</b> Todo lo propuesto (agrupación, secciones, armados) sale verificado con los mismos motores de la app, pero es un punto de partida: se revisa.</li>
+    </ol>
+  </div>
+
+  <h3 style="margin-top:10pt">Contenido</h3>
+  <ul class="indice">
+    <li><b>1</b>Cómo encaja todo</li>
+    <li><b>2</b>Preparar la computadora</li>
+    <li><b>3</b>Preparar un proyecto</li>
+    <li><b>4</b>El ciclo de todos los días</li>
+    <li><b>5</b>Agrupación de trabes</li>
+    <li><b>6</b>Acomodar la agrupación a mano</li>
+    <li><b>7</b>Crear las secciones con su armado</li>
+    <li><b>8</b>Revisar y detallar</li>
+    <li><b>9</b>Los criterios de la app</li>
+    <li><b>10</b>Problemas frecuentes</li>
+    <li><b>11</b>Práctica con el edificio de prueba</li>
+    <li><b>12</b>Referencia rápida</li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 1 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">1</span>Cómo encaja todo</h2>
+  <p class="entrada">RAM analiza; la app diseña. Entre los dos hay unos scripts de Python que corren dentro de RAM y un archivo, <code>modelo.json</code>, que los une.</p>
+
+  <div class="flujo">
+    <div class="n ram"><b>RAM Elements</b><span class="d">El modelo analizado: cada miembro con sección y descripción.</span></div>
+    <div class="n ram"><b>sincronizar.py</b><span class="d">En la consola de Python de RAM: lee geometría, secciones y resultados.</span></div>
+    <div class="n"><b>modelo.json</b><span class="d">En la carpeta de la obra. Es lo que la app lee.</span></div>
+    <div class="n"><b>Auxiliar IV</b><span class="d">Un grupo por descripción, con demandas y medidas reales.</span></div>
+    <div class="n"><b>Secciones</b><span class="d">Armado, alzados, verificación y memoria.</span></div>
+  </div>
+  <div class="vuelta">
+    <b>La vuelta:</b> cuando el modelo todavía no está agrupado, el módulo <b>Agrupación</b> propone las T, tú eliges o acomodas, y
+    <b>aplicar_agrupacion.py</b> les pone su descripción y su sección en RAM. Reanalizas, sincronizas y ya entran como secciones.
+  </div>
+
+  <h3>Qué hace cada script</h3>
+  <p>Todos los <code>.py</code> los genera la app; no hay que editarlos. Corren dentro de RAM, así que ven el modelo que tengas abierto.</p>
+  <table>
+    <thead><tr><th style="width:24%">Script</th><th>Qué hace</th><th style="width:28%">Qué toca</th></tr></thead>
+    <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
+    <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones y concretos en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
+    <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en el Escritorio.</td></tr>
+    <tr><td><b>edificio_prueba.py</b></td><td>Construye y analiza un edificio de práctica.</td><td>Sólo un modelo nuevo y vacío.</td></tr>
+  </table>
+
+  <div class="caja nota">
+    <span class="t">¿Por qué no se lee RAM directamente?</span>
+    Un navegador no puede entrar a un programa de Windows, y el Python de RAM no puede abrir ventanas. El archivo <code>modelo.json</code> en una carpeta
+    que los dos conocen es el puente: RAM lo escribe, la app lo lee.
+  </div>
+
+  <h3>Qué necesitas</h3>
+  <ul>
+    <li><b>Chrome o Edge</b> en la computadora. Son los que dejan a una página leer una carpeta que tú eliges (Firefox y Safari no).</li>
+    <li><b>RAM Elements</b> con su <b>consola de Python</b>. Los scripts se probaron en RAM Elements 26 (Python 3.13).</li>
+    <li>La app: <b>burgos2177-create.github.io/auxiliar-iv</b>. Los proyectos se guardan en el navegador y se pueden exportar a archivo.</li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 2 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">2</span>Preparar la computadora</h2>
+  <p class="entrada">Una sola vez por computadora, no por proyecto: el catálogo queda en la base de datos de RAM y lo ve cualquier modelo que abras ahí.</p>
+
+  <h3>Instalar el catálogo de secciones y concretos</h3>
+  <ol class="pasos">
+    <li>En la app, <b>📥 Reportes de RAM</b> (arriba a la derecha) → pestaña <b>⚡ Desde RAM</b> → abre <b>⚙ Configurar RAM para este proyecto</b> → <b>⬇ instalar_catalogo.py</b>.</li>
+    <li>En RAM, en la consola de Python: <b>Abrir Script…</b> → elige <code>instalar_catalogo.py</code> → <kbd>Ctrl</kbd>+<kbd>R</kbd>.</li>
+    <li>Lee lo que imprime: cuántas secciones y concretos agregó, cuáles ya estaban y dónde dejó el respaldo.</li>
+    <li>Si no aparecen en el grupo <b>Personales</b> al asignar secciones, cierra RAM y vuelve a abrirlo.</li>
+  </ol>
+
+  <div class="dos">
+    <div>
+      <h4>Secciones de trabe (21)</h4>
+      <p class="pequeno mono">10 X 25 · 15 X 20 · 15 X 25 · 15 X 30 · 15 X 35 · 15 X 40 · 15 X 45 · 20 X 20 · 20 X 25 · 20 X 30 · 20 X 35 · 20 X 40 · 20 X 45 · 20 X 50 · 25 X 20 · 25 X 25 · 25 X 30 · 25 X 35 · 25 X 40 · 25 X 45 · 25 X 50</p>
+      <h4>Secciones de columna (9)</h4>
+      <p class="pequeno mono">COL 15 X 15 · COL 15 X 20 · COL 15 X 25 · COL 20 X 20 · COL 20 X 25 · COL 25 X 10 · COL 25 X 25 · COL 30 X 30 · COL 36 X 36</p>
+      <p class="pequeno gris">Nombre «b X h» en cm, recubrimiento de 3 cm. Las columnas llevan el prefijo <b>COL</b> para que no choquen con una trabe de las mismas medidas.</p>
+    </div>
+    <div>
+      <h4>Concretos (5)</h4>
+      <table>
+        <thead><tr><th>Material</th><th class="num">f'c</th><th class="num">Ec (kg/cm²)</th><th>Clase NTC</th></tr></thead>
+        <tr><td><b>F'C 200</b></td><td class="num">200</td><td class="num">113 137</td><td>2 · 8 000√f'c</td></tr>
+        <tr><td><b>F'C 250</b></td><td class="num">250</td><td class="num">221 359</td><td>1 · 14 000√f'c</td></tr>
+        <tr><td><b>F'C 300</b></td><td class="num">300</td><td class="num">242 487</td><td>1</td></tr>
+        <tr><td><b>F'C 350</b></td><td class="num">350</td><td class="num">261 916</td><td>1</td></tr>
+        <tr><td><b>F'C 400</b></td><td class="num">400</td><td class="num">280 000</td><td>1</td></tr>
+      </table>
+      <p class="pequeno gris">Todos con ν = 0.2, 2.4 t/m³, α = 1×10⁻⁵ /°C, fy = fyt = 4 200 kg/cm², Es = 2.04×10⁶ kg/cm². Clase 1 con agregado calizo (14 000√f'c).</p>
+    </div>
+  </div>
+
+  <div class="caja oro">
+    <span class="t">Es seguro correrlo otra vez</span>
+    El instalador <b>fusiona</b>: agrega lo que falta y respeta lo que ya tengas. Antes de escribir deja un respaldo de cada tabla en el Escritorio
+    (<code>Respaldo RAM - Sections - Personales - …</code>) y nunca pisa el primer respaldo. Si no puede respaldar, no escribe.
+  </div>
+
+  <div class="caja ojo">
+    <span class="t">Los modelos que ya existían</span>
+    Cada modelo guarda su propia copia de los materiales. Si uno viejo trae un F'C 250 con otras propiedades (f'c 281, Fyt de 60 ksi, ν 0.3),
+    corrígelo en ese modelo o reasígnale el del catálogo; instalar el catálogo no cambia modelos ya hechos.
+  </div>
+</section>
+
+<!-- ═════════════════════════ 3 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">3</span>Preparar un proyecto</h2>
+  <p class="entrada">Una vez por obra. Se trata de que RAM sepa dónde escribir y de que la app tenga permiso para leer ahí: la misma carpeta, dos permisos.</p>
+
+  <ol class="pasos">
+    <li>Guarda el modelo de RAM en su carpeta de la obra; por costumbre, <code>…\PROCESO\Reportes de Secciones RAM</code>.</li>
+    <li>En la app abre el proyecto de la obra (o <b>+ Nueva</b>) → <b>📥 Reportes de RAM</b> → <b>⚡ Desde RAM</b> → <b>⚙ Configurar RAM para este proyecto</b>.</li>
+    <li>Copia la ruta de la carpeta: en el explorador de Windows, <kbd>Mayús</kbd> + clic derecho sobre la carpeta → <b>Copiar como ruta</b>. Pégala en el campo.</li>
+    <li><b>⬇ Generar sincronizar.py</b> y guárdalo en esa carpeta. Lleva la ruta dentro.</li>
+    <li>Arriba, <b>🔄 Elegir la carpeta y sincronizar…</b> → elige la misma carpeta. La app la recuerda; desde entonces sincronizar es un clic.</li>
+  </ol>
+
+  <figure>
+    <img src="img/configurar.png" alt="">
+    <figcaption><b>Reportes de RAM → Desde RAM.</b> Arriba el botón que da permiso al navegador; abajo la ruta que va dentro del script, y el instalador del catálogo.</figcaption>
+  </figure>
+
+  <div class="caja nota">
+    <span class="t">¿Por qué la carpeta se da dos veces?</span>
+    El botón <b>Elegir la carpeta</b> le da al <b>navegador</b> permiso para leer ahí, pero el navegador nunca le dice a la página la ruta real de lo que elegiste.
+    La ruta que pegas es el texto que va <b>dentro</b> del <code>sincronizar.py</code> para que <b>RAM</b> sepa dónde escribir, porque el Python de RAM no puede abrir un explorador para preguntarlo.
+  </div>
+
+  <h4>Cuándo volver a generar sincronizar.py</h4>
+  <ul>
+    <li>Si la obra cambia de carpeta (la ruta se guarda con el proyecto: al cambiar de proyecto cambia sola).</li>
+    <li>Cuando la app se actualice: el script también mejora (por ejemplo, las medidas reales de las secciones vienen del script nuevo). Si la app dice «medidas deducidas de los nombres», es un script viejo.</li>
+  </ul>
+  <p>Para apuntar la app a otra carpeta, usa <b>olvidar carpeta</b> junto al botón de sincronizar y vuelve a elegirla.</p>
+
+  <div class="caja nota">
+    <span class="t">Método manual</span>
+    La pestaña <b>📄 Método manual</b> guarda la forma antigua de cargar reportes (archivos de texto exportados de RAM por separado). Sigue funcionando,
+    pero el camino recomendado es <b>Desde RAM</b>.
+  </div>
+</section>
+
+<!-- ═════════════════════════ 4 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">4</span>El ciclo de todos los días</h2>
+  <p class="entrada">Cambias el modelo, analizas, sincronizas. La app se entera de las demandas nuevas y te avisa de lo que no cuadra.</p>
+
+  <ol class="pasos">
+    <li><b>En RAM, analiza.</b> El script lee resultados: sin análisis no hay demandas, o son las de antes.</li>
+    <li><b>Abrir Script… → sincronizar.py → <kbd>Ctrl</kbd>+<kbd>R</kbd>.</b> Imprime cuántos miembros y grupos leyó, la tabla de secciones con sus medidas reales y dónde dejó el <code>modelo.json</code>.</li>
+    <li><b>En la app, 🔄 Sincronizar.</b> Un clic: lee el <code>modelo.json</code> de la carpeta y actualiza el proyecto.</li>
+  </ol>
+
+  <h3>Qué entra</h3>
+  <ul>
+    <li>Un <b>grupo</b> por cada descripción de RAM, con todos sus miembros. El grupo <code>T-5</code> alimenta la sección <b>T-5</b>.</li>
+    <li>Las <b>demandas</b> de cada miembro por estaciones, con los picos exactos: momentos positivo y negativo, cortante; y para columnas, carga axial y momentos.</li>
+    <li>Las <b>medidas reales</b> de cada sección (b, h y recubrimiento) leídas de las tablas de RAM, no del nombre.</li>
+    <li>La geometría: nudos y miembros, para encadenar tramos en trabes continuas y dibujar el modelo.</li>
+  </ul>
+
+  <h3>Los avisos, y qué hacer con cada uno</h3>
+  <h4>Grupos que el proyecto todavía no tiene</h4>
+  <figure><img src="img/faltan.png" alt=""></figure>
+  <p><b>crear las N secciones con su armado</b> las da de alta con las medidas de RAM y un armado propuesto (capítulo 7). <b>ahora no</b> las deja para después.</p>
+
+  <h4>Las demandas son de otra sección</h4>
+  <figure><img src="img/aviso-invertida.png" alt=""></figure>
+  <p>El proyecto dice una sección y RAM analizó otra. Si el cambio fue a propósito en RAM, <b>usar las medidas de RAM</b>. Si RAM está mal
+  (como aquí, una sección que se llama 20×25 pero está dada de alta como 25×20), corrígela allá, reanaliza y sincroniza:
+  copiar las medidas sólo copiaría el error.</p>
+
+  <h4>Miembros sin descripción</h4>
+  <figure><img src="img/sin-descripcion.png" alt=""></figure>
+  <p>No se crea una sección con ellos: todavía no están agrupados. Ve a <b>Módulos → Agrupación</b> (capítulos 5 y 6).</p>
+</section>
+
+<!-- ═════════════════════════ 5 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">5</span>Agrupación de trabes</h2>
+  <p class="entrada">Al estructurar, todas las trabes suelen ser 15×20 y sin descripción. La agrupación propone unas pocas T, cada una con su sección, para iterar con un modelo estable y rigideces bien repartidas, con los menos diseños posibles.</p>
+
+  <div class="caja oro">
+    <span class="t">La idea</span>
+    Una T puede estar en varios niveles: lo que importa es que sus trabes pidan parecido. Entre más desbalanceadas estén las demandas,
+    más grupos hacen falta para no desperdiciar concreto. Por eso hay tres propuestas, de pocos grupos a ajustada, y además el acomodo a mano.
+  </div>
+
+  <p>Se abre en <b>Módulos → Agrupación</b> (o <kbd>Ctrl</kbd>+<kbd>K</kbd> y «agrupación»). Toma sola el último modelo sincronizado; también puedes cargar un <code>modelo.json</code>.</p>
+
+  <h3>Paso 1 · Qué agrupar</h3>
+  <figure><img src="img/agr-que.png" alt=""></figure>
+  <p>Cada casilla es un grupo de hoy (una descripción de RAM, o <b>(sin nombre)</b>). Vienen marcadas las trabes de 15 cm o más; las nervaduras y las columnas no.
+  Abajo, los <b>anchos que se pueden proponer</b>: el ancho suele mandarlo el muro o la columna, así que quita los que no quieras.</p>
+
+  <h3>Paso 2 · Las propuestas</h3>
+  <figure><img src="img/agr-propuestas.png" alt=""></figure>
+  <p>Cómo se arman:</p>
+  <ol>
+    <li>Los tramos colineales y seguidos se encadenan en <b>trabes continuas</b>: una trabe continua es una sola sección.</li>
+    <li>A cada trabe su <b>sección mínima</b>: la de menos concreto del catálogo que da el momento con una cuantía cómoda y el cortante con estribos que se pueden armar (criterios en el capítulo 9).</li>
+    <li>Las trabes con la misma sección mínima forman una clase. De la más grande a la más chica, una clase <b>sube</b> a la sección del grupo de arriba si cabe y si su trabe más cargada la aprovecharía al menos al umbral:
+      <b>Pocos grupos 50 %</b>, <b>Equilibrada 65 %</b>, <b>Ajustada 80 %</b>. Umbral más bajo, menos grupos y más concreto.</li>
+    <li>Cada grupo pasa por el mismo motor que arma las secciones (capítulo 7): si sale <b>✓</b>, se puede armar con esa sección.</li>
+  </ol>
+  <p>Cómo leer una tarjeta: número de grupos; <b>m³</b> de concreto en trabes y su cambio contra hoy (si hoy todo es 15×20, crece: es lo esperado); <b>kg</b> de acero del armado propuesto;
+  y por grupo su sección y el rango de <b>aprovechamiento</b> de sus trabes (100 % = justo). Un rango muy abierto, como 30–95 %, quiere decir que hay trabes ligeras pagando la sección de las pesadas.</p>
+
+  <h3>Paso 3 · Verla en planta</h3>
+  <figure><img src="img/agr-planta.png" alt=""></figure>
+  <p>La propuesta elegida se dibuja por nivel, cada grupo de su color, con las columnas en gris. Al pasar el mouse sobre una trabe se ven su longitud, sus demandas,
+  la sección que le basta y qué tanto aprovecha la de su grupo. Una línea <b style="color:var(--rojo)">punteada roja</b> encima es una trabe que no cabe en la sección de su grupo.</p>
+  <div class="caja nota">
+    <span class="t">Orientación: como RAM</span>
+    La planta es la vista desde arriba del mismo lado que la vista de RAM con Y vertical: <b>Z hacia la izquierda y X hacia abajo</b> (dice <code>X↓ Z← · como RAM</code>).
+    Con <b>↻ girar</b> se gira por cuartos de vuelta; nunca sale en espejo. La app recuerda cómo la dejaste.
+  </div>
+
+  <h3>Paso 4 · Aplicarla en RAM</h3>
+  <ol class="pasos">
+    <li><b>⬇ aplicar_agrupacion.py</b> baja el script con la propuesta elegida (o tu acomodo manual) dentro.</li>
+    <li>En RAM, con el modelo abierto: <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b>. Primero comprueba que todas las secciones existan (si falta una no cambia nada y te pide el catálogo),
+    deja en el Escritorio un <code>Deshacer agrupación &lt;fecha&gt;.py</code> y luego pone a cada miembro su descripción y su sección.</li>
+    <li><b>Reanaliza y sincroniza.</b> Ahora los miembros llegan con descripción: la app ofrece crear las T como secciones.</li>
+  </ol>
+  <div class="caja ojo">
+    <span class="t">Es una iteración, no la última palabra</span>
+    Las demandas son las del análisis con las secciones de <b>hoy</b>. Al cambiar secciones cambian las rigideces y con ellas los momentos. Aplica, reanaliza y
+    vuelve a abrir Agrupación: si los grupos siguen pasando, listo; si no, ajusta. Normalmente bastan una o dos vueltas.
+  </div>
+  <p><b>Si algo no convence:</b> cierra el modelo sin guardar y no pasó nada, o corre el <b>Deshacer</b> del Escritorio, que regresa cada miembro a la descripción y la sección que tenía.</p>
+</section>
+
+<!-- ═════════════════════════ 6 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">6</span>Acomodar la agrupación a mano</h2>
+  <p class="entrada">Cuando el criterio fino es tuyo: acomodar por ejes o por niveles, juntar lo que se va a construir igual o fijar un peralte que pide la arquitectura. Se hace en la app, no en RAM, y sale el mismo <code>aplicar_agrupacion.py</code>.</p>
+
+  <h3>Empezar</h3>
+  <ul>
+    <li><b>✎ a mano</b> en cualquier tarjeta copia esa propuesta al acomodo manual para moverle lo que no te convenza.</li>
+    <li><b>empezar de cero</b> deja todas las trabes sin asignar para armar los grupos tú.</li>
+  </ul>
+  <p>El acomodo aparece como cuarta tarjeta, <b>Manual</b>, con sus números y su verificación como las otras, y se edita en el paso 3.</p>
+
+  <figure>
+    <img src="img/agr-manual.png" alt="">
+    <figcaption><b>Acomodo manual.</b> Se tomó la trabe de fachada del nivel 1 con sus iguales de los otros niveles («las mismas en otros niveles») y se hizo un grupo nuevo, T5. La tabla de abajo es la selección.</figcaption>
+  </figure>
+
+  <h3>Seleccionar trabes</h3>
+  <table>
+    <thead><tr><th style="width:36%">Gesto</th><th>Qué hace</th></tr></thead>
+    <tr><td>Clic en una trabe</td><td>La selecciona (sólo ésa).</td></tr>
+    <tr><td><kbd>Mayús</kbd> o <kbd>Ctrl</kbd> + clic</td><td>La agrega o la quita de la selección.</td></tr>
+    <tr><td>Arrastrar en un hueco</td><td>Selección por ventana: las trabes cuyo tramo cae dentro. Con <kbd>Mayús</kbd>, se suman.</td></tr>
+    <tr><td><b>todo el nivel</b></td><td>Todas las trabes de ese nivel.</td></tr>
+    <tr><td><b>＋ las mismas en otros niveles</b></td><td>Agrega las trabes que están en el mismo lugar en planta en los demás niveles: la misma trabe en N1, N2, N3…</td></tr>
+    <tr><td>Clic en el cuadro de color de un grupo</td><td>Selecciona sus trabes.</td></tr>
+    <tr><td><kbd>Esc</kbd> o <b>limpiar</b></td><td>Ninguna.</td></tr>
+  </table>
+  <p>Con trabes seleccionadas aparece la tabla: nivel, longitud, Mu+, Mu−, Vu, la sección que le basta a cada una, su grupo y cuánto lo aprovecha.
+  Arriba dice qué sección piden <b>juntas</b>: si armaras un grupo sólo con ellas, ésa sería su sección.</p>
+
+  <h3>Acomodar</h3>
+  <table>
+    <thead><tr><th style="width:36%">Botón</th><th>Qué hace</th></tr></thead>
+    <tr><td><b>← aquí</b> (en un grupo)</td><td>Mueve las trabes seleccionadas a ese grupo.</td></tr>
+    <tr><td><b>＋ grupo nuevo con la selección</b></td><td>Crea el siguiente T libre con esas trabes.</td></tr>
+    <tr><td><b>sacar de su grupo</b></td><td>Las deja sin asignar. Al aplicar, en RAM no se tocan.</td></tr>
+    <tr><td><b>✕</b> (en un grupo)</td><td>Quita el grupo; sus trabes quedan sin asignar.</td></tr>
+    <tr><td>Nombre del grupo</td><td>Se escribe libre (T1, TR-2, TE…) y se guarda al salir del campo o con <kbd>Enter</kbd>. Es la descripción que tendrá en RAM.</td></tr>
+    <tr><td>Sección: <b>auto</b> o fija</td><td><b>auto</b> toma la de menos concreto que les basta a todas sus trabes, con los anchos permitidos. Si eliges una del catálogo queda fija, y las trabes que no quepan se marcan.</td></tr>
+    <tr><td><b>renumerar T1…</b></td><td>Renombra T1 a la sección más grande … Tn a la más chica, como las propuestas.</td></tr>
+    <tr><td><b>↶ deshacer</b></td><td>Regresa el último cambio (hasta 60).</td></tr>
+  </table>
+
+  <figure class="media">
+    <img src="img/agr-grupos.png" alt="">
+    <figcaption><b>Los grupos.</b> La tira muestra un punto por trabe según cuánto aprovecha la sección del grupo; la zona rosa es más de 100 %. A la derecha, el acero del armado propuesto con ✓ si pasa.</figcaption>
+  </figure>
+
+  <div class="caja oro">
+    <span class="t">Criterio para acomodar</span>
+    <ul style="margin:0">
+      <li>Una tira con los puntos juntos y a la derecha (70–95 %) es un grupo bien aprovechado. Puntos muy a la izquierda son trabes que podrían ir en un grupo más chico.</li>
+      <li>Juntar lo que se construye igual (la misma trabe en todos los niveles, los ejes de fachada) ahorra diseños y errores en obra aunque cueste un poco de concreto.</li>
+      <li>Fija la sección cuando la arquitectura manda el peralte; la tira te dice de inmediato qué trabe no cabe.</li>
+    </ul>
+  </div>
+
+  <h3>Guardar, aplicar y descartar</h3>
+  <ul>
+    <li>El acomodo se guarda en el navegador: si cierras la app o recargas, al volver con el mismo modelo sigue ahí. Después de aplicar y reanalizar también se conserva, y lo ves con las demandas nuevas.</li>
+    <li>La app no deja aplicar si hay un grupo sin nombre, un nombre repetido o un nombre que ya usa en el modelo un grupo que no se está agrupando (se mezclarían en RAM).</li>
+    <li><b>✕ descartar</b> en la tarjeta Manual lo tira.</li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 7 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">7</span>Crear las secciones con su armado</h2>
+  <p class="entrada">Cuando la sincronización trae grupos nuevos, la app los da de alta con las medidas de RAM y un armado propuesto, verificado con los mismos motores que Longitudinal y Columnas.</p>
+
+  <figure>
+    <img src="img/propuestas.png" alt="">
+    <figcaption><b>Armado propuesto</b> después de «crear las secciones con su armado».</figcaption>
+  </figure>
+
+  <ul>
+    <li><b style="color:#15803d">✓</b> pasa con ese armado. <b style="color:var(--rojo)">✗</b> no se encontró uno que pase con esa sección: hace falta más sección.</li>
+    <li><b style="color:var(--ambar)">⚠</b> pasa, pero con un aviso; el más común es «estribos muy juntos en los extremos: conviene más peralte».</li>
+    <li>El armado queda marcado <b>como propuesta</b> hasta que lo toques: cualquier cambio tuyo quita la marca, y a partir de ahí es tuyo.</li>
+  </ul>
+
+  <h3>Trabes</h3>
+  <p>Varillas corridas arriba y abajo con el mínimo que da el momento, bastones o puntuales donde hacen falta y estribos #2.5 (o #3) de dos ramas con su separación en L/4 y al centro.
+  El número de varillas corridas por lecho se limita por el ancho para que se pueda colar: hasta 3 en 25 cm, 4 en 35 cm, 5 en más.</p>
+  <h3>Columnas</h3>
+  <p>El arreglo con menos varillas que pasa, con cuantía entre 1 y 4 %, separación centro a centro no mayor de 20 cm y varilla #4 o mayor si un lado mide 20 cm o más.
+  Los estribos salen por zonas con la altura del modelo (capítulo 8).</p>
+
+  <div class="caja ojo">
+    <span class="t">Revisa siempre</span>
+    La propuesta es un buen punto de partida, no un diseño terminado: revisa detalles, anclajes y lo que tu criterio pida. Los ✗ y ⚠ son lo primero.
+  </div>
+</section>
+
+<!-- ═════════════════════════ 8 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">8</span>Revisar y detallar</h2>
+  <p class="entrada">Con las secciones creadas, el trabajo es el de siempre, ahora con las demandas del modelo ya dentro.</p>
+
+  <h3>Longitudinal</h3>
+  <p><b>Módulos → Longitudinal.</b> El alzado de cada trabe contra las demandas del modelo por estaciones: dónde hacen falta bastones y la envolvente desarrollada.
+  Ahí también se ve el modelo reconstruido (planta, frente, lado e isométrica) para ubicar una trabe o comprobar que los tramos se encadenaron como esperas.
+  La planta está orientada como RAM: Z a la izquierda y X hacia abajo.</p>
+
+  <h3>Columnas: estribos por zonas</h3>
+  <div class="dos">
+    <figure style="margin-top:0"><img src="img/columna-zonas.png" alt=""></figure>
+    <div>
+      <p>En la columna: calibre del estribo, separación en los <b>extremos</b> y al <b>centro</b>, longitud de la zona extrema y altura libre H.
+      <b>Según NTC</b> llena las tres con las reglas de abajo; puedes cambiarlas a mano.</p>
+      <ul class="pequeno">
+        <li><b>Centro:</b> s ≤ el menor de 850/√fy · db (varilla longitudinal), 48 · db (estribo) y la mitad del lado menor.</li>
+        <li><b>Extremos:</b> la mitad, en una longitud no menor que el lado mayor, H/6 y 60 cm.</li>
+        <li><b>Castillos</b> (lado menor de 20 cm): al centro el menor de 1.5 t y 20 cm (NTC-Mampostería); en los extremos la mitad, por criterio IV.</li>
+      </ul>
+      <p class="pequeno">Los informes, el dibujo y la memoria dicen las dos separaciones. Una columna sin zonas se sigue informando como antes.</p>
+    </div>
+  </div>
+
+  <h3>Verificar y entregar</h3>
+  <ul>
+    <li><b>Verificar → Resumido / Detallado</b>: el estado de todas las secciones.</li>
+    <li><b>Verificar → Memoria de cálculo</b> y <b>Exportar a Double Check</b> para la revisión cruzada.</li>
+    <li><b>Exportar DXF</b> o <b>SVG</b> para los planos.</li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 9 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">9</span>Los criterios de la app</h2>
+  <p class="entrada">Para saber qué está suponiendo la app cuando propone, y qué no revisa.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Tema</th><th>Criterio</th></tr></thead>
+    <tr><td><b>Materiales</b></td><td>f'c 250 kg/cm² y fy 4 200 kg/cm² para dimensionar la agrupación. Ec según NTC: clase 1 (f'c ≥ 250) 14 000√f'c con agregado calizo (11 000√f'c si es basáltico); clase 2 (200 ≤ f'c &lt; 250) 8 000√f'c.</td></tr>
+    <tr><td><b>Sección mínima de una trabe</b> (Agrupación)</td><td>Flexión: MR con ρ = ½ ρ balanceada, FR = 0.9, recubrimiento 3 cm; con eso se arma cómoda y es dúctil.
+      Cortante: estribos #2.5 de dos ramas a no menos de 8 cm; si el acero de cortante pasa de FR · 1.1√f'c · b · d la separación máxima baja a d/4, y en poco peralte eso ya no se arma: pide peralte. Sin pasar del cortante máximo de la sección.</td></tr>
+    <tr><td><b>Propuestas de agrupación</b></td><td>Una clase sube a la sección del grupo de arriba si todas sus trabes caben y la más cargada la aprovecharía al menos al 50, 65 u 80 %. Sólo trabes horizontales; sólo secciones del catálogo y de los anchos permitidos.</td></tr>
+    <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
+    <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
+    <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 8, con H del modelo.</td></tr>
+  </table>
+
+  <div class="caja mal">
+    <span class="t">Lo que NO revisa</span>
+    <ul style="margin:0">
+      <li><b>Deflexiones</b>: ni la agrupación ni las propuestas; revísalas en RAM o a mano.</li>
+      <li><b>Cortante en columnas</b>: la propuesta de columnas no lo revisa todavía.</li>
+      <li><b>Segunda iteración</b>: la agrupación usa las demandas del análisis con las secciones de hoy; por eso se aplica, se reanaliza y se vuelve a agrupar.</li>
+      <li><b>Zona extrema de castillos</b> a la mitad: es criterio de la oficina, no de la norma.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 10 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">10</span>Problemas frecuentes</h2>
+  <p class="entrada">Casi todos tienen que ver con cómo se corrió el script o con la carpeta.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Qué ves</th><th style="width:30%">Por qué</th><th>Qué hacer</th></tr></thead>
+    <tr><td><code>IndentationError</code> o <code>SyntaxError</code> en RAM</td><td>El script se pegó en el editor de la consola y se descompuso la sangría.</td><td><b>Abrir Script…</b> → el archivo → <kbd>Ctrl</kbd>+<kbd>R</kbd>. Nunca pegado.</td></tr>
+    <tr><td><code>'NoneType' object is not callable</code></td><td>Dentro de RAM, Python no puede borrar archivos ni crear carpetas. Un script viejo lo intentaba.</td><td>Baja el script otra vez desde la app; los actuales ya no lo hacen.</td></tr>
+    <tr><td><code>Section not found: "15 X 20"</code></td><td>En esa computadora no está instalado el catálogo.</td><td>Corre <b>instalar_catalogo.py</b> (capítulo 2) y, si hace falta, reinicia RAM.</td></tr>
+    <tr><td>La app no encuentra el <code>modelo.json</code></td><td>La ruta dentro de <code>sincronizar.py</code> no es la carpeta que elegiste en la app.</td><td>En <b>⚙ Configurar RAM</b> revisa la ruta, genera el script otra vez; o <b>olvidar carpeta</b> y elige la buena.</td></tr>
+    <tr><td>«no se pudo leer… ¿sólo en la nube?»</td><td>OneDrive tiene el archivo en la nube, no en la computadora.</td><td>Clic derecho en la carpeta → <b>Conservar siempre en este dispositivo</b>.</td></tr>
+    <tr><td>Demandas en cero, o las de antes</td><td>El modelo no se analizó después del último cambio.</td><td>Analiza en RAM y vuelve a correr <code>sincronizar.py</code>.</td></tr>
+    <tr><td>«medidas deducidas de los nombres»</td><td>El <code>sincronizar.py</code> es de una versión anterior.</td><td>Genera el script otra vez.</td></tr>
+    <tr><td>«Las demandas son de otra sección»</td><td>RAM analizó con otras medidas que las del proyecto.</td><td>Ver capítulo 4. Si dice «invertida», el error está en RAM.</td></tr>
+    <tr><td>Una trabe continua sale partida</td><td>En RAM sus tramos no comparten nudo o no son colineales.</td><td>Revísalo en la vista del modelo (Longitudinal) y corrige la geometría en RAM.</td></tr>
+    <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
+    <tr><td>El aplicar dice que falta una sección</td><td>No se cambió nada: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar.</td></tr>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 11 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">11</span>Práctica con el edificio de prueba</h2>
+  <p class="entrada">Para aprender el flujo completo sin tocar una obra: un script construye en RAM un edificio pequeño, todo en 15×20 y sin agrupar, como cuando se empieza a estructurar.</p>
+
+  <div class="caja nota">
+    <span class="t">El edificio</span>
+    3 niveles de 3.0 m, rejilla de 3 × 2 crujías con claros distintos (X: 4.0, 6.5 y 4.5 m; Z: 5.5 y 3.5 m).
+    36 columnas <code>COL 30 X 30</code> con descripción C1; 21 trabes continuas de 15×20 sin descripción, cada crujía en 4 tramos (204 miembros); concreto F'C 250.
+    Carga muerta y viva de losa por áreas tributarias, sismo estático en X y Z con sus dos signos, y las combinaciones de diseño. El script también lo analiza.
+  </div>
+
+  <ol class="pasos">
+    <li>Pide <code>edificio_prueba.py</code> (está en <code>scripts/ram</code> del repositorio de la app). En RAM: <b>Archivo → Nuevo</b>; el script se niega a trabajar sobre un modelo que ya tenga algo.</li>
+    <li><b>Abrir Script… → edificio_prueba.py → <kbd>Ctrl</kbd>+<kbd>R</kbd>.</b> Construye, carga y analiza. Si falta el catálogo, lo dice y no construye nada.</li>
+    <li><b>Guardar como…</b> en una carpeta de prueba, por ejemplo <code>Escritorio\Prueba Auxiliar</code>; nunca en la de una obra.</li>
+    <li>En la app, un proyecto nuevo → <b>Reportes de RAM → Configurar RAM</b> → la ruta de esa carpeta → <b>Generar sincronizar.py</b>; elige la carpeta.</li>
+    <li>En RAM, <b>sincronizar.py</b>; en la app, <b>🔄 Sincronizar</b>. Llegan 204 miembros sin descripción y el grupo C1: a las columnas, <b>ahora no</b> por el momento.</li>
+    <li><b>Módulos → Agrupación.</b> Quita el ancho de 15 cm, compara las tres propuestas, mira la planta y prueba el acomodo manual: por ejemplo, junta las trabes de fachada de los tres niveles en un grupo.</li>
+    <li><b>⬇ aplicar_agrupacion.py</b> → en RAM <b>Abrir Script… → <kbd>Ctrl</kbd>+<kbd>R</kbd></b> → reanaliza → sincroniza.</li>
+    <li>Ahora llegan T1…Tn y C1: <b>crear las secciones con su armado</b>. Revisa los ✓, ⚠ y ✗, abre Longitudinal y la memoria.</li>
+    <li>Vuelve a Agrupación con las demandas nuevas: ¿siguen pasando los grupos? Ésa es la segunda iteración.</li>
+  </ol>
+</section>
+
+<!-- ═════════════════════════ 12 ═════════════════════════ -->
+<section class="cap">
+  <h2><span class="n">12</span>Referencia rápida</h2>
+
+  <h3>Dónde queda cada cosa</h3>
+  <table>
+    <thead><tr><th style="width:30%">Qué</th><th>Dónde</th></tr></thead>
+    <tr><td>Catálogo de secciones</td><td class="mono pequeno">C:\ProgramData\Bentley\Engineering\RAM Elements\26.0.1\Database\Sections\Personales\Vigas de Concreto.sec y Columnas de Concreto.sec</td></tr>
+    <tr><td>Catálogo de concretos</td><td class="mono pequeno">…\Database\Materials\Personales\Concreto.mat</td></tr>
+    <tr><td>Respaldos del catálogo</td><td>Escritorio: <code>Respaldo RAM - …</code></td></tr>
+    <tr><td>Deshacer una agrupación</td><td>Escritorio: <code>Deshacer agrupación &lt;fecha&gt;.py</code></td></tr>
+    <tr><td>El modelo para la app</td><td>La carpeta de la obra: <code>modelo.json</code></td></tr>
+    <tr><td>Acomodo manual en curso</td><td>El navegador (se recupera al volver con el mismo modelo)</td></tr>
+  </table>
+
+  <h3>Palabras que usa la app</h3>
+  <table>
+    <thead><tr><th style="width:26%">Palabra</th><th>Qué quiere decir</th></tr></thead>
+    <tr><td><b>Grupo</b></td><td>Los miembros de RAM con la misma descripción. Cada grupo es una sección de la app.</td></tr>
+    <tr><td><b>Trabe continua</b></td><td>Tramos colineales y seguidos encadenados: una trabe, una sección.</td></tr>
+    <tr><td><b>Sección mínima</b></td><td>La de menos concreto del catálogo que le basta a una trabe.</td></tr>
+    <tr><td><b>Aprovechamiento</b></td><td>Demanda entre capacidad de dimensionamiento, lo mayor de flexión y cortante. 100 % es justo.</td></tr>
+    <tr><td><b>Armado propuesto</b></td><td>El que pone la app al crear una sección; se marca hasta que lo edites.</td></tr>
+    <tr><td><b>Estaciones</b></td><td>Los puntos a lo largo de cada miembro donde RAM da resultados.</td></tr>
+    <tr><td><b>sin nombre</b></td><td>Los miembros sin descripción en RAM: todavía no agrupados.</td></tr>
+  </table>
+
+  <h3>Atajos</h3>
+  <table>
+    <tr><td style="width:30%"><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Abrir un módulo desde cualquier lugar.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> (en RAM)</td><td>Correr el script abierto en la consola de Python.</td></tr>
+    <tr><td><kbd>Mayús</kbd> + clic derecho</td><td>En el explorador de Windows: <b>Copiar como ruta</b>.</td></tr>
+    <tr><td><kbd>Mayús</kbd> / <kbd>Ctrl</kbd> + clic, <kbd>Esc</kbd></td><td>En la planta de Agrupación: sumar o quitar trabes, y limpiar.</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
