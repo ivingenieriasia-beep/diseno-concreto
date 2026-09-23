@@ -178,7 +178,10 @@ describe('los papeles de los casos', () => {
   })
 })
 
-const SINC = '/tmp/claude-0/-home-user-auxiliar-iv/7f45cbaf-143e-556f-871a-d1cdf0d3e425/scratchpad/fakeflecha/destino/modelo_m.json'
+// Lo escribió sincronizar.py contra un RAM falso con física: el edificio de
+// prueba con trabes empotradas por crujía, asentamiento de columnas y giros
+// congruentes con las flechas.
+const SINC = join(here, 'fixtures', 'modelo_flechas.json')
 describe.skipIf(!existsSync(SINC))('con lo que escribe sincronizar.py (RAM falso con física)', () => {
   it('51 tramos, y cada flecha elástica es la de empotrada con su momento de extremo', () => {
     const R = parseModeloRam(readFileSync(SINC, 'utf-8'))

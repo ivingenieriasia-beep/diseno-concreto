@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import AgrupacionPlanta from './AgrupacionPlanta'
+import AgrupacionEscala from './AgrupacionEscala'
 import {
   aprovechamiento, seccionDeGrupo, mismasEnOtrosNiveles, VIGAS_CATALOGO, grupoNuevo, renumerar, buscarMiembros,
 } from '../core/agrupacion'
@@ -105,16 +106,45 @@ export default function AgrupacionManual({
   const pide = selElems.length ? seccionDeGrupo(selElems, A.cands) : null
 
   // ── acciones del acomodo ──
-  const mover = (gid) => cambiar((m) => ({ ...m, de: { ...m.de, ...Object.fromEntries(selIds.map((id) => [id, gid])) } }))
-  const nuevo = () => cambiar((m) => {
+  const mover = (gid, ids = selIds) => cambiar((m) => ({ ...m, de: { ...m.de, ...Object.fromEntries(ids.map((id) => [id, gid])) } }))
+  const nuevo = (ids = selIds) => cambiar((m) => {
     const g = grupoNuevo(m)
-    return { ...m, grupos: [...m.grupos, g], de: { ...m.de, ...Object.fromEntries(selIds.map((id) => [id, g.id])) } }
+    return { ...m, grupos: [...m.grupos, g], de: { ...m.de, ...Object.fromEntries(ids.map((id) => [id, g.id])) } }
   })
-  const soltar = () => cambiar((m) => {
+  const soltar = (ids = selIds) => cambiar((m) => {
     const de = { ...m.de }
-    for (const id of selIds) delete de[id]
+    for (const id of ids) delete de[id]
     return { ...m, de }
   })
+  // la escala: soltar puntos en una fila
+  const soltarEn = (ids, destino) => {
+    const ya = (id) => (destino === 'sueltos' ? !manual.de[id] : manual.de[id] === destino)
+    if (destino !== 'nuevo' && ids.every(ya)) return          // soltó donde ya estaban
+    if (destino === 'nuevo') nuevo(ids)
+    else if (destino === 'sueltos') soltar(ids)
+    else mover(destino, ids)
+    setSel(new Set(ids))
+  }
+  // dónde caerían unas trabes en un grupo: si es automático, con la sección que le quedaría
+  const destino = (es, g) => {
+    const todas = [...g.elems, ...es]
+    let sec = g.sec, crece = false, malo = false
+    if (g.auto !== false) {
+      const r = seccionDeGrupo(todas, A.cands)
+      crece = !!g.sec && r.sec?.nombre !== g.sec.nombre
+      sec = r.sec
+      malo = r.fuera
+    }
+    const us = sec ? es.map((e) => aprovechamiento(e, sec)) : []
+    if (g.auto === false) malo = us.some((u) => u > 1 + 1e-9)
+    const top = Math.max(...us)
+    const texto = !sec ? '' : malo
+      ? (g.auto === false ? `no cabe en ${corto(sec)}` : 'ninguna sección alcanza')
+      : !g.elems.length ? `quedaría ${corto(sec)}`
+        : crece ? `${g.nombre} subiría a ${corto(sec)}` : `cabe · ${pct(top)}`
+    return { us, texto, crece, malo }
+  }
+  const [conEscala, setConEscala] = useState(true)
   const borrar = (gid) => cambiar((m) => ({
     ...m, grupos: m.grupos.filter((g) => g.id !== gid),
     de: Object.fromEntries(Object.entries(m.de).filter(([, v]) => v !== gid)),
@@ -129,6 +159,20 @@ export default function AgrupacionManual({
   const anchos = [...new Set(VIGAS_CATALOGO.map((s) => s.b))]
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
+          <b style={{ fontSize: 12 }}>Escala de aprovechamiento</b>
+          <span style={{ fontSize: 10.5, color: 'var(--color-tx3)' }}>qué tanto usa cada trabe la sección de su grupo; la selección es la misma que en la planta</span>
+          <button className="btn btn-secondary" data-testid="agr-escala-ver" style={{ fontSize: 10, padding: '1px 8px', marginLeft: 'auto' }} onClick={() => setConEscala((v) => !v)}>
+            {conEscala ? 'ocultar' : 'mostrar'}
+          </button>
+        </div>
+        {conEscala && (
+          <AgrupacionEscala filas={filas} sueltos={editable ? P.sueltos : []} editable={editable} sel={sel} setSel={setSel} info={info}
+            uDe={(e, g) => (g.sec ? aprovechamiento(e, g.sec) : Infinity)} colorDe={colorGrupo} destino={destino} onSoltarEn={soltarEn} />
+        )}
+      </div>
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <div style={{ flex: '1 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -193,10 +237,10 @@ export default function AgrupacionManual({
       <div data-testid="agr-panel-grupos" style={{ flex: '0 1 430px', minWidth: 320, display: 'flex', flexDirection: 'column', gap: 6 }}>
         {editable ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" data-testid="agr-nuevo" style={btn} disabled={!selIds.length} onClick={nuevo}>
+            <button className="btn btn-primary" data-testid="agr-nuevo" style={btn} disabled={!selIds.length} onClick={() => nuevo()}>
               ＋ grupo nuevo con la selección{selIds.length ? ` (${selIds.length})` : ''}
             </button>
-            <button className="btn btn-secondary" data-testid="agr-soltar" style={btn} disabled={!selIds.length} onClick={soltar}>sacar de su grupo</button>
+            <button className="btn btn-secondary" data-testid="agr-soltar" style={btn} disabled={!selIds.length} onClick={() => soltar()}>sacar de su grupo</button>
             <button className="btn btn-secondary" data-testid="agr-renumerar" style={btn} title="T1 la sección más grande … Tn la más chica"
               onClick={() => cambiar((m) => renumerar(m, P))}>renumerar T1…</button>
             <button className="btn btn-secondary" data-testid="agr-deshacer" style={btn} disabled={!nHist} onClick={deshacer}>↶ deshacer</button>
@@ -277,6 +321,7 @@ export default function AgrupacionManual({
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
