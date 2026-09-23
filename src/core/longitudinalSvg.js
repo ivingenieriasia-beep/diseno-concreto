@@ -184,10 +184,12 @@ export function elevationsGridSvg(t, group, scale = 14) {
 
 /**
  * Diagrama de momento y cortante de un miembro con las líneas de MR.
- * Mu+ hacia abajo (convención de trabes), Mu− hacia arriba.
+ * Con la convención de RAM: M+ hacia arriba, M− hacia abajo. El cortante va
+ * con su signo (la envolvente máx y mín) y con Vr por arriba y por abajo,
+ * aunque el diseño use el mayor en valor absoluto.
  */
 export function diagramSvg(r, caps, opts = {}) {
-  const W = opts.width || 720, HM = 210, HV = 120
+  const W = opts.width || 720, HM = 210, HV = 160
   const PAD = { l: 52, r: 16, t: 26, b: 26 }
   const plotW = W - PAD.l - PAD.r
   const L = r.L
@@ -202,7 +204,7 @@ export function diagramSvg(r, caps, opts = {}) {
   const MRNk = kSup ? caps.sup.withK(kSup)?.MRT || MRN : MRN
   const maxM = Math.max(r.profile.muPmax, r.profile.muNmax, MRPk, MRNk, 0.1) * 1.12
   const y0 = PAD.t + HM / 2
-  const ym = (m) => y0 + (m / maxM) * (HM / 2) // positivo hacia abajo
+  const ym = (m) => y0 - (m / maxM) * (HM / 2) // positivo hacia arriba, como RAM
   P(`<rect x="0" y="0" width="${W}" height="${HM + HV + PAD.t + PAD.b + 30}" fill="#fff"/>`)
   // Zona que cubre el acero: verde con achurado muy tenue, bajo la envolvente de resistencia
   const pid = `hatch-${String(r.id).replace(/[^A-Za-z0-9]/g, '')}`
@@ -221,9 +223,9 @@ export function diagramSvg(r, caps, opts = {}) {
   P(`<rect x="${(W - PAD.r - 150).toFixed(1)}" y="${PAD.t - 19}" width="12" height="10" fill="${C.ok}" opacity="0.25"/>`)
   P(`<rect x="${(W - PAD.r - 150).toFixed(1)}" y="${PAD.t - 19}" width="12" height="10" fill="url(#${pid})"/>`)
   P(`<text x="${(W - PAD.r - 134).toFixed(1)}" y="${PAD.t - 10}" font-size="9" fill="${C.ok}">cubierto por el acero</text>`)
-  // zonas de bastón sombreadas
-  for (const b of r.inf.bars) P(`<rect x="${xs(b.x0).toFixed(1)}" y="${y0.toFixed(1)}" width="${(xs(b.x1) - xs(b.x0)).toFixed(1)}" height="${(HM / 2).toFixed(1)}" fill="${C.bot}" opacity="0.08"/>`)
-  for (const b of r.sup.bars) P(`<rect x="${xs(b.x0).toFixed(1)}" y="${PAD.t}" width="${(xs(b.x1) - xs(b.x0)).toFixed(1)}" height="${(HM / 2).toFixed(1)}" fill="${C.top}" opacity="0.08"/>`)
+  // zonas de bastón sombreadas, del lado de su momento (M+ arriba, M− abajo)
+  for (const b of r.inf.bars) P(`<rect x="${xs(b.x0).toFixed(1)}" y="${PAD.t}" width="${(xs(b.x1) - xs(b.x0)).toFixed(1)}" height="${(HM / 2).toFixed(1)}" fill="${C.bot}" opacity="0.08"/>`)
+  for (const b of r.sup.bars) P(`<rect x="${xs(b.x0).toFixed(1)}" y="${y0.toFixed(1)}" width="${(xs(b.x1) - xs(b.x0)).toFixed(1)}" height="${(HM / 2).toFixed(1)}" fill="${C.top}" opacity="0.08"/>`)
   // eje
   P(`<line x1="${PAD.l}" y1="${y0}" x2="${W - PAD.r}" y2="${y0}" stroke="#b8b2a6" stroke-width="1.2"/>`)
   // MR líneas
@@ -231,7 +233,7 @@ export function diagramSvg(r, caps, opts = {}) {
     const y = ym(m)
     P(`<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W - PAD.r}" y2="${y.toFixed(1)}" stroke="${color}" stroke-width="1.2" ${dashed ? 'stroke-dasharray="5,4"' : ''}/>`)
     // etiqueta al centro-derecha, fuera de los apoyos donde suelen estar los picos
-    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(y + (m > 0 ? -3 : 11)).toFixed(1)}" font-size="9.5" fill="${color}" text-anchor="start">${esc(label)}</text>`)
+    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(y + (m > 0 ? 11 : -3)).toFixed(1)}" font-size="9.5" fill="${color}" text-anchor="start">${esc(label)}</text>`)
   }
   // etiqueta de pico: anclada hacia adentro del diagrama
   const peakAnchor = (x) => (x < 0.25 * L ? ['start', 3] : x > 0.75 * L ? ['end', -3] : ['middle', 0])
@@ -242,11 +244,11 @@ export function diagramSvg(r, caps, opts = {}) {
   const capPath = (cap, sign) => cap.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.x).toFixed(1)},${ym(sign * p.MR).toFixed(1)}`).join(' ')
   if (r.inf.cap && kInf) {
     P(`<path d="${capPath(r.inf.cap, 1)}" fill="none" stroke="${C.bot}" stroke-width="2.2"/>`)
-    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(MRPk) + 11).toFixed(1)}" font-size="9.5" fill="${C.bot}">MR+ con ${kInf} bastón(es) puntual(es) ${f2(MRPk)} — envolvente desarrollada (Ld ${f2(caps.inf.Ld.Ld / 100)} m)</text>`)
+    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(MRPk) - 3).toFixed(1)}" font-size="9.5" fill="${C.bot}">MR+ con ${kInf} bastón(es) puntual(es) ${f2(MRPk)} — envolvente desarrollada (Ld ${f2(caps.inf.Ld.Ld / 100)} m)</text>`)
   }
   if (r.sup.cap && kSup) {
     P(`<path d="${capPath(r.sup.cap, -1)}" fill="none" stroke="${C.top}" stroke-width="2.2"/>`)
-    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(-MRNk) - 3).toFixed(1)}" font-size="9.5" fill="${C.top}">MR− con ${kSup} bastón(es) puntual(es) ${f2(MRNk)} — envolvente desarrollada (Ld ${f2(caps.sup.Ld.Ld / 100)} m)</text>`)
+    P(`<text x="${(PAD.l + plotW * 0.62).toFixed(1)}" y="${(ym(-MRNk) + 11).toFixed(1)}" font-size="9.5" fill="${C.top}">MR− con ${kSup} bastón(es) puntual(es) ${f2(MRNk)} — envolvente desarrollada (Ld ${f2(caps.sup.Ld.Ld / 100)} m)</text>`)
   }
   // puntos donde Mu rebasa la envolvente (no debería haber tras alargar; si los hay, en rojo)
   for (const v of [...(r.inf.capViol || []).map((v) => ({ ...v, s: 1 })), ...(r.sup.capViol || []).map((v) => ({ ...v, s: -1 }))]) {
@@ -262,45 +264,60 @@ export function diagramSvg(r, caps, opts = {}) {
   // picos
   const pk = st.reduce((a, s) => (s.muP > a.muP ? s : a), st[0])
   const nk = st.reduce((a, s) => (s.muN > a.muN ? s : a), st[0])
-  if (pk.muP > 0) { const [an, dx] = peakAnchor(pk.x); P(`<text x="${(xs(pk.x) + dx).toFixed(1)}" y="${(ym(pk.muP) + 12).toFixed(1)}" font-size="9.5" font-weight="700" fill="${C.bot}" text-anchor="${an}">Mu+ ${f2(pk.muP)} @ ${f2(pk.x)} m</text>`) }
-  if (nk.muN > 0) { const [an, dx] = peakAnchor(nk.x); P(`<text x="${(xs(nk.x) + dx).toFixed(1)}" y="${(ym(-nk.muN) - 4).toFixed(1)}" font-size="9.5" font-weight="700" fill="${C.top}" text-anchor="${an}">Mu− ${f2(nk.muN)} @ ${f2(nk.x)} m</text>`) }
-  // barras de bastón (líneas gruesas a la altura del eje)
-  for (const b of r.inf.bars) P(`<line x1="${xs(b.x0).toFixed(1)}" y1="${(y0 + 4).toFixed(1)}" x2="${xs(b.x1).toFixed(1)}" y2="${(y0 + 4).toFixed(1)}" stroke="${C.bot}" stroke-width="4"/>`)
-  for (const b of r.sup.bars) P(`<line x1="${xs(b.x0).toFixed(1)}" y1="${(y0 - 4).toFixed(1)}" x2="${xs(b.x1).toFixed(1)}" y2="${(y0 - 4).toFixed(1)}" stroke="${C.top}" stroke-width="4"/>`)
+  if (pk.muP > 0) { const [an, dx] = peakAnchor(pk.x); P(`<text x="${(xs(pk.x) + dx).toFixed(1)}" y="${(ym(pk.muP) - 4).toFixed(1)}" font-size="9.5" font-weight="700" fill="${C.bot}" text-anchor="${an}">Mu+ ${f2(pk.muP)} @ ${f2(pk.x)} m</text>`) }
+  if (nk.muN > 0) { const [an, dx] = peakAnchor(nk.x); P(`<text x="${(xs(nk.x) + dx).toFixed(1)}" y="${(ym(-nk.muN) + 12).toFixed(1)}" font-size="9.5" font-weight="700" fill="${C.top}" text-anchor="${an}">Mu− ${f2(nk.muN)} @ ${f2(nk.x)} m</text>`) }
+  // barras de bastón (líneas gruesas junto al eje, del lado de su momento)
+  for (const b of r.inf.bars) P(`<line x1="${xs(b.x0).toFixed(1)}" y1="${(y0 - 4).toFixed(1)}" x2="${xs(b.x1).toFixed(1)}" y2="${(y0 - 4).toFixed(1)}" stroke="${C.bot}" stroke-width="4"/>`)
+  for (const b of r.sup.bars) P(`<line x1="${xs(b.x0).toFixed(1)}" y1="${(y0 + 4).toFixed(1)}" x2="${xs(b.x1).toFixed(1)}" y2="${(y0 + 4).toFixed(1)}" stroke="${C.top}" stroke-width="4"/>`)
   // eje y ticks
   P(`<line x1="${PAD.l}" y1="${PAD.t}" x2="${PAD.l}" y2="${PAD.t + HM}" stroke="#b8b2a6" stroke-width="1"/>`)
   for (const m of [-maxM / 1.12, -maxM / 2.24, 0, maxM / 2.24, maxM / 1.12]) {
     const lbl = m === 0 ? '0' : `${m < 0 ? '−' : '+'}${Math.abs(m).toFixed(2)}`
     P(`<text x="${PAD.l - 5}" y="${(ym(m) + 3).toFixed(1)}" font-size="9" fill="#8a8580" text-anchor="end">${lbl}</text>`)
   }
-  P(`<text x="${PAD.l - 5}" y="${(PAD.t + 2).toFixed(1)}" font-size="8" fill="#8a8580" text-anchor="end">M−</text>`)
-  P(`<text x="${PAD.l - 5}" y="${(PAD.t + HM + 2).toFixed(1)}" font-size="8" fill="#8a8580" text-anchor="end">M+</text>`)
+  P(`<text x="${PAD.l - 5}" y="${(PAD.t + 2).toFixed(1)}" font-size="8" fill="#8a8580" text-anchor="end">M+</text>`)
+  P(`<text x="${PAD.l - 5}" y="${(PAD.t + HM + 2).toFixed(1)}" font-size="8" fill="#8a8580" text-anchor="end">M−</text>`)
 
-  // ── cortante ──
+  // ── cortante: la envolvente con su signo, y Vr por arriba y por abajo ──
   const yv0 = PAD.t + HM + 30 + HV / 2
-  const maxV = Math.max(r.profile.vuMax, r.shear.extremos.Vr || 0, 0.1) * 1.15
+  const vP = (s) => (Number.isFinite(s.vP) ? s.vP : s.vu)
+  const vN = (s) => (Number.isFinite(s.vN) ? s.vN : -s.vu)
+  const maxV = Math.max(...st.map((s) => Math.max(Math.abs(vP(s)), Math.abs(vN(s)))), r.shear.extremos.Vr || 0, r.shear.centro.Vr || 0, 0.1) * 1.15
   const yv = (v) => yv0 - (v / maxV) * (HV / 2)
-  P(`<text x="${PAD.l}" y="${PAD.t + HM + 22}" font-size="11" font-weight="700" fill="${C.ink}">Cortante |V2| (t) · estribos E#${esc(caps.shear?.varEstNum ?? '')} @ ${esc(r.shear.extremos.s ?? '—')} / ${esc(r.shear.centro.s ?? '—')}</text>`)
+  P(`<text x="${PAD.l}" y="${PAD.t + HM + 22}" font-size="11" font-weight="700" fill="${C.ink}">Cortante V2 (t) · envolvente máx y mín · estribos E#${esc(caps.shear?.varEstNum ?? '')} @ ${esc(r.shear.extremos.s ?? '—')} / ${esc(r.shear.centro.s ?? '—')} · se diseña con |V| ${f2(r.profile.vuMax)}</text>`)
   P(`<line x1="${PAD.l}" y1="${yv0}" x2="${W - PAD.r}" y2="${yv0}" stroke="#b8b2a6" stroke-width="1.2"/>`)
   const q = L / 4
   const vrSeg = (x0, x1, Vr, ok) => {
     if (Vr == null) return
-    P(`<line x1="${xs(x0).toFixed(1)}" y1="${yv(Vr).toFixed(1)}" x2="${xs(x1).toFixed(1)}" y2="${yv(Vr).toFixed(1)}" stroke="${ok === false ? C.bad : C.stirrup}" stroke-width="1.4" stroke-dasharray="5,4"/>`)
+    for (const sg of [1, -1]) {
+      P(`<line x1="${xs(x0).toFixed(1)}" y1="${yv(sg * Vr).toFixed(1)}" x2="${xs(x1).toFixed(1)}" y2="${yv(sg * Vr).toFixed(1)}" stroke="${ok === false ? C.bad : C.stirrup}" stroke-width="1.4" stroke-dasharray="5,4"/>`)
+    }
   }
   vrSeg(0, q, r.shear.extremos.Vr, r.shear.extremos.ok)
   vrSeg(L - q, L, r.shear.extremos.Vr, r.shear.extremos.ok)
   vrSeg(q, L - q, r.shear.centro.Vr, r.shear.centro.ok)
-  P(`<text x="${W - PAD.r - 2}" y="${(yv(r.shear.extremos.Vr || 0) - 3).toFixed(1)}" font-size="9.5" fill="${C.stirrup}" text-anchor="end">Vr L/4 ${f2(r.shear.extremos.Vr || 0)} · centro ${f2(r.shear.centro.Vr || 0)}</text>`)
-  const vpath = st.map((s, i) => `${i === 0 ? 'M' : 'L'}${xs(s.x).toFixed(1)},${yv(s.vu).toFixed(1)}`).join(' ')
-  P(`<path d="${vpath} L${xs(L).toFixed(1)},${yv0} L${xs(0).toFixed(1)},${yv0} Z" fill="#9333ea" opacity="0.10"/>`)
-  P(`<path d="${vpath}" fill="none" stroke="#9333ea" stroke-width="2"/>`)
-  P(`<line x1="${xs(q).toFixed(1)}" y1="${yv0 - HV / 2}" x2="${xs(q).toFixed(1)}" y2="${yv0}" stroke="#d6d0c6" stroke-width="1" stroke-dasharray="3,3"/>`)
-  P(`<line x1="${xs(L - q).toFixed(1)}" y1="${yv0 - HV / 2}" x2="${xs(L - q).toFixed(1)}" y2="${yv0}" stroke="#d6d0c6" stroke-width="1" stroke-dasharray="3,3"/>`)
+  P(`<text x="${W - PAD.r - 2}" y="${(yv(r.shear.extremos.Vr || 0) - 3).toFixed(1)}" font-size="9.5" fill="${C.stirrup}" text-anchor="end">±Vr L/4 ${f2(r.shear.extremos.Vr || 0)} · centro ${f2(r.shear.centro.Vr || 0)}</text>`)
+  const vcurva = (f) => st.map((s, i) => `${i === 0 ? 'M' : 'L'}${xs(s.x).toFixed(1)},${yv(f(s)).toFixed(1)}`).join(' ')
+  for (const f of [vP, vN]) {
+    const d = vcurva(f)
+    P(`<path d="${d} L${xs(L).toFixed(1)},${yv0} L${xs(0).toFixed(1)},${yv0} Z" fill="#9333ea" opacity="0.10"/>`)
+    P(`<path d="${d}" fill="none" stroke="#9333ea" stroke-width="1.8"/>`)
+  }
+  // picos con su signo
+  const vmax = st.reduce((a, s) => (vP(s) > vP(a) ? s : a), st[0])
+  const vmin = st.reduce((a, s) => (vN(s) < vN(a) ? s : a), st[0])
+  if (vP(vmax) > 0.005) { const [an, dx] = peakAnchor(vmax.x); P(`<text x="${(xs(vmax.x) + dx).toFixed(1)}" y="${(yv(vP(vmax)) - 4).toFixed(1)}" font-size="9.5" font-weight="700" fill="#7e22ce" text-anchor="${an}">V+ ${f2(vP(vmax))}</text>`) }
+  if (vN(vmin) < -0.005) { const [an, dx] = peakAnchor(vmin.x); P(`<text x="${(xs(vmin.x) + dx).toFixed(1)}" y="${(yv(vN(vmin)) + 12).toFixed(1)}" font-size="9.5" font-weight="700" fill="#7e22ce" text-anchor="${an}">V− ${f2(vN(vmin))}</text>`) }
+  for (const xq of [q, L - q]) P(`<line x1="${xs(xq).toFixed(1)}" y1="${yv0 - HV / 2}" x2="${xs(xq).toFixed(1)}" y2="${yv0 + HV / 2}" stroke="#d6d0c6" stroke-width="1" stroke-dasharray="3,3"/>`)
+  P(`<line x1="${PAD.l}" y1="${yv0 - HV / 2}" x2="${PAD.l}" y2="${yv0 + HV / 2}" stroke="#b8b2a6" stroke-width="1"/>`)
+  for (const v of [maxV / 1.15, 0, -maxV / 1.15]) {
+    P(`<text x="${PAD.l - 5}" y="${(yv(v) + 3).toFixed(1)}" font-size="9" fill="#8a8580" text-anchor="end">${v === 0 ? '0' : `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}`}</text>`)
+  }
   // eje x en m
   for (let i = 0; i <= 8; i++) {
     const x = (L * i) / 8
-    P(`<text x="${xs(x).toFixed(1)}" y="${yv0 + 14}" font-size="9" fill="#8a8580" text-anchor="middle">${f2(x)}</text>`)
+    P(`<text x="${xs(x).toFixed(1)}" y="${(yv0 + HV / 2 + 12).toFixed(1)}" font-size="9" fill="#8a8580" text-anchor="middle">${f2(x)}</text>`)
   }
-  const Htot = HM + HV + PAD.t + PAD.b + 30
+  const Htot = HM + HV + PAD.t + PAD.b + 30 + 6
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Htot}" width="${W}" height="${Htot}" font-family="'DM Mono','Courier New',monospace">${out.join('')}</svg>`
 }

@@ -201,9 +201,12 @@ export function buildElement(chain, byId) {
     const sts = m.reversed ? [...src.stations].reverse() : src.stations
     for (const s of sts) {
       const pos = m.reversed ? 1 - s.pos : s.pos
+      // Recorrido al revés, el M33 conserva su signo (la cara de tensión es la
+      // misma) pero el V2 lo cambia: su signo depende del sentido del eje 1.
+      const v2 = m.reversed ? { min: -s.v2.max, max: -s.v2.min } : { ...s.v2 }
       stations.push({
         raw: m.x0 + pos * m.L, isPct: false, pos: 0,
-        axial: { ...s.axial }, v2: { ...s.v2 }, v3: { ...s.v3 }, tors: { ...s.tors }, m22: { ...s.m22 }, m33: { ...s.m33 },
+        axial: { ...s.axial }, v2, v3: { ...s.v3 }, tors: { ...s.tors }, m22: { ...s.m22 }, m33: { ...s.m33 },
         member: m.id,
       })
     }
@@ -240,7 +243,9 @@ export function detectSupports(element, { minJump = 0.15 } = {}) {
  * @param member  miembro del parser
  * @param L       longitud en m (si el reporte venía en distancia se usa la suya)
  * @param invertir  true si en el modelo el M33 positivo va al revés
- * @returns { L, x:[m], muP:[t·m], muN:[t·m], vu:[t], stations:[{x, muP, muN, vu}] }
+ * @returns { L, x:[m], muP:[t·m], muN:[t·m], vu:[t], stations:[{x, muP, muN, vu, vP, vN}] }
+ *   vP / vN: la envolvente del cortante con su signo (máx y mín), sólo para
+ *   dibujar; el diseño usa vu = el mayor en valor absoluto.
  */
 export function memberProfile(member, L, invertir = false, { ajustar = true, ref = null } = {}) {
   const len = member.Lreport || +L || 0
@@ -252,6 +257,8 @@ export function memberProfile(member, L, invertir = false, { ajustar = true, ref
       muP: Math.max(0, mx),                // positivo = tensión abajo
       muN: Math.max(0, -mn),               // negativo = tensión arriba
       vu: Math.max(Math.abs(s.v2.max), Math.abs(s.v2.min)),
+      vP: invertir ? -s.v2.min : s.v2.max,
+      vN: invertir ? -s.v2.max : s.v2.min,
       m33max: mx, m33min: mn,
     }
   })
@@ -309,6 +316,7 @@ export function memberProfile(member, L, invertir = false, { ajustar = true, ref
         s.muP = aplica(s.muP, kP, rep.muP)
         s.muN = aplica(s.muN, kN, rep.muN)
         s.vu = aplica(s.vu, kV, rep.vu)
+        if (kV === Infinity) { s.vP = rep.vu; s.vN = -rep.vu } else { s.vP *= kV; s.vN *= kV }
         s.m33max = s.muP
         s.m33min = -s.muN
       }
