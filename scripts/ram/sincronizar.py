@@ -245,8 +245,26 @@ def exportar(destino, log=log):
     unidades = str(getattr(m.units, 'current', '?'))
     log(u'Modelo: %r · unidades %s' % (m.title or u'(sin título)', unidades))
     if 'TON' not in unidades.upper():
+        log(u'    (se puede cambiar con m.units.set(ramelements.Units.TON_M),')
+        log(u'     pero eso toca TU modelo, así que lo dejo en tus manos)')
+    if 'TON' not in unidades.upper():
         log(u'  ⚠ AVISO: la app espera Ton-m. Cambia las unidades del modelo o los')
         log(u'    números entrarán con otra escala.')
+
+    # ── ¿Está corrido el análisis? ───────────────────────────
+    # Preguntarlo ahora y con nombre y apellido, en vez de acabar con 1401
+    # miembros «sin resultados» y sin saber por qué.
+    try:
+        primero = next(iter(m.members))
+        m.results.member_end_forces(primero.id, next(iter(m.load_condition)).id)
+    except StopIteration:
+        raise RuntimeError(u'El modelo no tiene miembros o no tiene casos de carga.')
+    except Exception as e:
+        if 'AnalysisNotRun' in type(e).__name__:
+            raise RuntimeError(
+                u'El análisis todavía no se ha corrido: no hay resultados que exportar.\n'
+                u'    Corre el análisis en RAM (o m.analyze() aquí) y vuelve a intentarlo.')
+        # otra cosa: que siga y que cada miembro lo reporte por su cuenta
 
     # ── Condiciones de carga: se envuelven todas las combinaciones ──
     combos, casos = [], []
