@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseRamStations, memberProfile, analyzeGroup, refDeUnidad, miembrosCompartidos, compartidosCon } from '../src/core/longitudinal.js'
-import { beamEnvelopeByMember, parseRamEnvelope } from '../src/core/ramParser.js'
+import { beamEnvelopeByMember, parseRamEnvelope, evaluateBeamEnvelope } from '../src/core/ramParser.js'
+import { computeSectionCapacities, resistenciasConPuntual } from '../src/core/sectionResults.js'
 import { parseRamActions } from '../src/core/ramActions.js'
 import { attachGeometry } from '../src/core/geometry.js'
 
@@ -285,5 +286,73 @@ describe('picos entre estaciones: lo impreso se queda corto', () => {
     })
     expect(G.results[0].muestreado).toBe(true)
     expect(G.nFilo).toBe(1)
+  })
+})
+
+// ── La verificación tiene que leer el bastón puntual ─────────────
+// Los puntuales no van en el corte, así que no entran en el MR de la sección;
+// pero existen en la trabe, donde el análisis a lo largo los colocó. Un
+// ejemplar que sólo pasa con ellos está cubierto, no descubierto: el informe no
+// puede mandar a revisar un diseño que ya pasa.
+describe('ejemplares cubiertos por el bastón puntual anotado', () => {
+  const base = {
+    nombre: 'T-5', ancho: 20, peralte: 25, recub: 3, fc: 250,
+    calSup: '3', cantSup: 3, calInf: '3', cantInf: 3,
+    calBastonSup: '3', cantBastonSup: 3, calBastonInf: '3', cantBastonInf: 0,
+    calEst: '3', sepLcuarto: 8, sepRest: 16,
+    calc: { fy: 4200, varEstNum: 3, nramas: 2 },
+  }
+  // T-5 del proyecto real: MR+ 1.69 (3#3 corridas) · MR− 3.20 (3#3 + 3 de bastón corrido).
+  // Dos ejemplares: al 18 le basta el corrido; el 32 pide Mu+ 2.30 > MR+ 1.69.
+  const pts = [
+    { member: '18', tipo: 'Max', m33: 0.9, v2: 1.6 }, { member: '18', tipo: 'Min', m33: -0.9, v2: -1.6 },
+    { member: '32', tipo: 'Max', m33: 2.3, v2: 2.1 }, { member: '32', tipo: 'Min', m33: -2.0, v2: -2.1 },
+  ]
+
+  it('sin puntuales anotados, el que rebasa el MR del corte no queda cubierto', () => {
+    const R = computeSectionCapacities(base)
+    const ev = evaluateBeamEnvelope(pts, R, false, resistenciasConPuntual(base))
+    expect(resistenciasConPuntual(base)).toBeNull()
+    expect(ev.total).toBe(2)
+    expect(ev.failing).toBe(1)
+    expect(ev.conPuntual).toBe(0)
+    expect(ev.results.find((r) => r.member === '32').cubierto).toBe(false)
+  })
+
+  it('con 2 bastones puntuales anotados, ese mismo ejemplar sí queda cubierto', () => {
+    const t = { ...base, cantBastonPuntInf: 2 }
+    const punt = resistenciasConPuntual(t)
+    expect(punt.kInf).toBe(2)
+    expect(punt.MRP).toBeGreaterThan(computeSectionCapacities(t).resP.MRT)
+    const ev = evaluateBeamEnvelope(pts, computeSectionCapacities(t), false, punt)
+    const r32 = ev.results.find((r) => r.member === '32')
+    expect(r32.ok).toBe(false)            // con el corte no le alcanza…
+    expect(r32.conPuntual).toBe(true)     // …pero el puntual lo cubre
+    expect(r32.cubierto).toBe(true)
+    expect(r32.utilPunt).toBeLessThanOrEqual(1)
+    expect(ev.failing).toBe(0)
+    expect(ev.allOk).toBe(true)
+    expect(ev.passing).toBe(2)
+    expect(ev.conPuntual).toBe(1)
+    expect(ev.soloCorridas).toBe(1)
+    expect(ev.miembrosConPuntual).toEqual(['32'])
+  })
+
+  it('el puntual no tapa lo que de verdad no alcanza', () => {
+    const t = { ...base, cantBastonPuntInf: 2 }
+    const exagerado = [{ member: '99', tipo: 'Max', m33: 12, v2: 1 }, { member: '99', tipo: 'Min', m33: -1, v2: -1 }]
+    const ev = evaluateBeamEnvelope(exagerado, computeSectionCapacities(t), false, resistenciasConPuntual(t))
+    expect(ev.results[0].conPuntual).toBe(false)
+    expect(ev.failing).toBe(1)
+    expect(ev.allOk).toBe(false)
+  })
+
+  it('el puntual es de flexión: no salva un problema de cortante', () => {
+    const t = { ...base, cantBastonPuntInf: 2, cantBastonPuntSup: 2 }
+    const cortante = [{ member: '77', tipo: 'Max', m33: 0.5, v2: 99 }, { member: '77', tipo: 'Min', m33: -0.5, v2: -99 }]
+    const ev = evaluateBeamEnvelope(cortante, computeSectionCapacities(t), false, resistenciasConPuntual(t))
+    expect(ev.results[0].okV).toBe(false)
+    expect(ev.results[0].conPuntual).toBe(false)
+    expect(ev.failing).toBe(1)
   })
 })

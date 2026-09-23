@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
-import { computeSectionResults } from './sectionResults'
+import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM } from './constants'
 import { analyzeColumn, calcEstribos, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
@@ -399,7 +399,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
 
   const summaryRows = []
   // Estadísticas de ejemplares (miembros de las envolventes cargadas)
-  const envStats = { elementos: 0, total: 0, pasan: 0, sinEnv: 0 }
+  const envStats = { elementos: 0, total: 0, pasan: 0, conPunt: 0, sinEnv: 0 }
   const longStats = { trabes: 0, unidades: 0, miembros: 0, ok: 0, insuf: 0, elementos: false }
 
   let sectionsHTML = ''
@@ -448,7 +448,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     // ── Envolvente del modelo (reporte RAM), si la trabe la tiene ──
     const bEnv = t.envelope
     if (bEnv?.points?.length) {
-      const ev = evaluateBeamEnvelope(bEnv.points, { resP, resN, resC }, !!bEnv.invertir)
+      const ev = evaluateBeamEnvelope(bEnv.points, { resP, resN, resC }, !!bEnv.invertir, resistenciasConPuntual(t))
       const filas = [...ev.results].sort((a, b) => b.util - a.util).map((rr) => `
         <tr${rr.member === ev.critical?.member ? ' style="background:#fff8e1"' : ''}>
           <td>${rr.member}</td>
@@ -457,11 +457,11 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
           <td style="color:${rr.okN ? '#374151' : '#dc2626'}">${fmt(rr.ratioN, 3)}</td>
           <td style="color:${rr.okV ? '#374151' : '#dc2626'}">${fmt(rr.ratioV, 3)}</td>
           <td style="font-weight:700;color:${rr.util > 1 ? '#dc2626' : '#15803d'}">${fmt(rr.util, 3)}</td>
-          <td style="font-weight:700;color:${rr.ok ? '#15803d' : '#dc2626'}">${rr.ok ? '✓' : '✗'}</td>
+          <td style="font-weight:700;color:${rr.ok ? '#15803d' : rr.conPuntual ? '#1d4ed8' : '#dc2626'}">${rr.ok ? '✓' : rr.conPuntual ? `✓ bastón puntual (${fmt(rr.utilPunt, 2)})` : '✗'}</td>
         </tr>`).join('')
       sectionsHTML += `
         <div style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid #0f766e;padding-bottom:8px;margin:32px 0 14px;text-transform:uppercase;letter-spacing:0.04em">
-          Envolvente del modelo — ${ev.passing}/${ev.total} miembros pasan
+          Envolvente del modelo — ${ev.passing}/${ev.total} miembros pasan${ev.conPuntual ? ` (${ev.conPuntual} con bastón puntual)` : ''}
         </div>
         <div class="data-grid">
           ${[['Combinación', bEnv.combo || '—', ''], ['Mu+ máx', fmt(ev.globalMuP, 2), 'ton·m'],
@@ -477,12 +477,13 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
           ${filas}
         </table>
         <div style="font-size:10px;color:#6b7280;margin-top:4px">Se listan los ${ev.total} ejemplares del reporte, ordenados por utilización.</div>
+        ${ev.conPuntual ? `<div class="nota">${ev.conPuntual} ejemplar(es) rebasan el MR del corte y quedan cubiertos por los <b>${ev.kPunt?.inf || 0}/${ev.kPunt?.sup || 0} bastón(es) puntual(es)</b> que el análisis a lo largo colocó en esta trabe: ${esc0(ev.miembrosConPuntual.slice(0, 20).map((m) => `M-${m}`).join(', '))}${ev.miembrosConPuntual.length > 20 ? ` … (+${ev.miembrosConPuntual.length - 20})` : ''}. No van en el corte — salen en el alzado, con su longitud y su anclaje.</div>` : ''}
         <div class="vfinal ${ev.allOk ? 'vfinal-ok' : 'vfinal-fail'}">${ev.allOk
-          ? `✓ TODOS los miembros de la envolvente quedan cubiertos por esta sección`
+          ? `✓ TODOS los miembros de la envolvente quedan cubiertos por esta sección${ev.conPuntual ? ` (${ev.soloCorridas} con el armado del corte y ${ev.conPuntual} con bastón puntual)` : ''}`
           : `✗ ${ev.failing} miembro(s) NO quedan cubiertos — revisar sección o armado`}</div>`
       // Si la envolvente no queda cubierta, la sección no cumple en el resumen
       if (!ev.allOk && summaryRows.length) summaryRows[summaryRows.length - 1].ok = false
-      envStats.elementos++; envStats.total += ev.total; envStats.pasan += ev.passing
+      envStats.elementos++; envStats.total += ev.total; envStats.pasan += ev.passing; envStats.conPunt += ev.conPuntual
     } else {
       envStats.sinEnv++
     }
@@ -576,7 +577,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
   if (todoOk && envStats.total > 0) {
     leyenda = `✓ Todas las secciones verificadas cumplen, y sus ${envStats.total} ejemplares del modelo
       (${envStats.elementos} envolvente${envStats.elementos !== 1 ? 's' : ''} cargada${envStats.elementos !== 1 ? 's' : ''})
-      quedan cubiertos por el diseño propuesto.`
+      quedan cubiertos por el diseño propuesto${envStats.conPunt ? `, ${envStats.conPunt} de ellos gracias al bastón puntual del análisis a lo largo` : ''}.`
   } else if (todoOk) {
     leyenda = `✓ Todas las secciones verificadas cumplen.`
   } else {

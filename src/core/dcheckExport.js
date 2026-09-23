@@ -9,7 +9,7 @@
 // (format 'sogrub-dcheck', version 1).
 // ══════════════════════════════════════════════════════════════
 
-import { computeSectionCapacities } from './sectionResults'
+import { computeSectionCapacities, resistenciasConPuntual } from './sectionResults'
 import { evaluateBeamEnvelope } from './ramParser'
 import { analyzeColumn } from './columnCalculator'
 import { columnDemand, demandCase } from './columnDemand'
@@ -37,7 +37,7 @@ export function buildDcheck({ projectName = '', reviso = '', sections = [], colu
     let MuP = R.MuP, MuN = R.MuN, Vu = R.VuTon
     let fuente = 'punto capturado'
     if (t.envelope?.points?.length) {
-      const ev = evaluateBeamEnvelope(t.envelope.points, R, !!t.envelope.invertir)
+      const ev = evaluateBeamEnvelope(t.envelope.points, R, !!t.envelope.invertir, resistenciasConPuntual(t))
       MuP = ev.globalMuP; MuN = ev.globalMuN; Vu = ev.globalVu
       fuente = `envolvente ${t.envelope.archivo || ''} (${ev.total} miembros)`
     }

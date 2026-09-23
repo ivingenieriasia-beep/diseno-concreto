@@ -69,6 +69,40 @@ export function computeSectionResults(t) {
 }
 
 /**
+ * MR con los bastones PUNTUALES anotados desde el análisis longitudinal.
+ *
+ * Los puntuales no van en el corte —por eso no entran en el MR de la sección—
+ * pero sí existen en la trabe, en el tramo donde el momento los pide, con su
+ * longitud y su anclaje ya revisados por el módulo Longitudinal. Un ejemplar
+ * que sólo pasa gracias a ellos está cubierto, no descubierto: la verificación
+ * tiene que poder leerlos.
+ * @returns null si la trabe no tiene puntuales anotados
+ */
+export function resistenciasConPuntual(t) {
+  const kInf = Math.max(0, +t?.cantBastonPuntInf || 0)
+  const kSup = Math.max(0, +t?.cantBastonPuntSup || 0)
+  if (!kInf && !kSup) return null
+  const calc = t.calc || {}
+  const fc = +t.fc || 250
+  const fy = +calc.fy || 4200
+  const b = +t.ancho, h = +t.peralte, r = +t.recub || 3
+  const mr = (cal, cant, calBast, corr, kp) => {
+    if (!kp) return 0
+    const R = calcFlexion({
+      fc, fy, b, h, r, MuTm: 0.001,
+      varNum: +(CAL_TO_NUM[cal] || 3), varCount: +cant || null,
+      bastonNum: +(CAL_TO_NUM[calBast] || CAL_TO_NUM[cal] || 3), bastonCount: (+corr || 0) + kp,
+    })
+    return R.error ? 0 : R.MRT
+  }
+  return {
+    kInf, kSup,
+    MRP: mr(t.calInf, t.cantInf, t.calBastonInf, t.cantBastonInf, kInf),
+    MRN: mr(t.calSup, t.cantSup, t.calBastonSup, t.cantBastonSup, kSup),
+  }
+}
+
+/**
  * Resistencias de la sección para evaluar una envolvente aunque la trabe
  * no tenga Vu capturado: el cortante se calcula con el estribo y la
  * separación del detalle (sepLcuarto) para obtener un Vr comparable.

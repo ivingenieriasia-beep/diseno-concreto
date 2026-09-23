@@ -4,6 +4,7 @@ import { DIAM, CAL_TO_NUM } from './constants'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, calcEstribos, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope } from './ramParser'
+import { resistenciasConPuntual } from './sectionResults'
 import { columnDemand, demandCase } from './columnDemand'
 import { analyzeGroup, unidadesTexto } from './longitudinal'
 
@@ -270,7 +271,8 @@ function drawEjemplares(doc, ev, x, y, maxW, pageH, marginT, onNewPage) {
   const colW = maxW / perRow
   doc.setFontSize(6)
   setColor(doc, COL.tx3)
-  doc.text(`Ejemplares revisados (${ev.total}) - miembro : utilizacion`, x, y)
+  doc.text(`Ejemplares revisados (${ev.total}) - miembro : utilizacion` +
+    (ev.conPuntual ? `   (* = cubierto por el baston puntual del analisis a lo largo)` : ''), x, y)
   y += 3.4
 
   for (let i = 0; i < rows.length; i += perRow) {
@@ -279,9 +281,9 @@ function drawEjemplares(doc, ev, x, y, maxW, pageH, marginT, onNewPage) {
     slice.forEach((r, j) => {
       const cxp = x + j * colW
       const util = isFinite(r.util) ? r.util.toFixed(2) : 'inf'
-      setColor(doc, r.ok ? COL.tx2 : COL.warn)
+      setColor(doc, r.ok ? COL.tx2 : r.conPuntual ? COL.steelBot : COL.warn)
       doc.setFontSize(6)
-      doc.text(`${r.ok ? '' : 'X '}M-${r.member}: ${util}`, cxp, y)
+      doc.text(`${r.ok ? '' : r.conPuntual ? '* ' : 'X '}M-${r.member}: ${util}`, cxp, y)
     })
     y += 3.1
   }
@@ -455,7 +457,7 @@ export function generateReport(sections, projectName = '', columns = []) {
   let hasWarnings = false
   const incompleteSections = []
   // Ejemplares (miembros de las envolventes cargadas)
-  const envStats = { elementos: 0, total: 0, pasan: 0 }
+  const envStats = { elementos: 0, total: 0, pasan: 0, conPunt: 0 }
   const envBlocks = [] // { nombre, ev } para la sección de ejemplares
 
   // ── Header ──
@@ -641,19 +643,19 @@ export function generateReport(sections, projectName = '', columns = []) {
     const bEnv = t.envelope
     if (bEnv?.points?.length) {
       const R = computeSectionResultsLite(t)
-      const ev = evaluateBeamEnvelope(bEnv.points, R, !!bEnv.invertir)
+      const ev = evaluateBeamEnvelope(bEnv.points, R, !!bEnv.invertir, resistenciasConPuntual(t))
       doc.setFontSize(7)
       setColor(doc, ev.allOk ? COL.ok : COL.warn)
       const crit = ev.critical
       doc.setFontSize(6.5)
       doc.text(
-        `Envolvente: ${ev.passing}/${ev.total} ejemplares pasan` +
+        `Envolvente: ${ev.passing}/${ev.total} ejemplares pasan${ev.conPuntual ? ` (${ev.conPuntual} con baston puntual)` : ''}` +
         (crit ? ` | critico M-${crit.member} (${isFinite(crit.util) ? crit.util.toFixed(3) : 'inf'})` : '') +
         ` | Mu+ ${ev.globalMuP.toFixed(2)} / Mu- ${ev.globalMuN.toFixed(2)} / Vu ${ev.globalVu.toFixed(2)}`,
         tblX, cardY + cardH - 5,
       )
       if (!ev.allOk) hasWarnings = true
-      envStats.elementos++; envStats.total += ev.total; envStats.pasan += ev.passing
+      envStats.elementos++; envStats.total += ev.total; envStats.pasan += ev.passing; envStats.conPunt += ev.conPuntual || 0
       envBlocks.push({ nombre: t.nombre || 'Trabe', ev })
     }
 
@@ -723,7 +725,7 @@ export function generateReport(sections, projectName = '', columns = []) {
       doc.setFontSize(8)
       setColor(doc, blk.ev.allOk ? COL.ok : COL.warn)
       doc.text(
-        `${blk.nombre}: ${blk.ev.passing}/${blk.ev.total} ejemplares pasan` +
+        `${blk.nombre}: ${blk.ev.passing}/${blk.ev.total} ejemplares pasan${blk.ev.conPuntual ? ` (${blk.ev.conPuntual} con baston puntual)` : ''}` +
         (blk.ev.critical ? ` | critico M-${blk.ev.critical.member} (${isFinite(blk.ev.critical.util) ? blk.ev.critical.util.toFixed(3) : 'inf'})` : ''),
         marginL, y,
       )
@@ -771,7 +773,8 @@ export function generateReport(sections, projectName = '', columns = []) {
       doc.setFontSize(8)
       setColor(doc, COL.tx3)
       doc.text(
-        `${envStats.elementos} envolvente(s) del modelo revisada(s): ${envStats.pasan}/${envStats.total} ejemplares dentro de la capacidad.`,
+        `${envStats.elementos} envolvente(s) del modelo revisada(s): ${envStats.pasan}/${envStats.total} ejemplares dentro de la capacidad` +
+        (envStats.conPunt ? `, ${envStats.conPunt} con el baston puntual del analisis a lo largo.` : '.'),
         marginL, y,
       )
     } else {

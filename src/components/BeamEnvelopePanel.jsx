@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
 import useBeamStore from '../store/useBeamStore'
 import { parseRamEnvelope, evaluateBeamEnvelope } from '../core/ramParser'
+import { resistenciasConPuntual } from '../core/sectionResults'
 import { parseRamStations, looksLikeStations } from '../core/longitudinal'
 
 const TD = { padding: '4px 8px', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap' }
@@ -31,8 +32,8 @@ export default function BeamEnvelopePanel({ R }) {
   const env = form.envelope
   const ev = useMemo(() => {
     if (!R || !env?.points?.length) return null
-    return evaluateBeamEnvelope(env.points, R, !!env.invertir)
-  }, [R, env])
+    return evaluateBeamEnvelope(env.points, R, !!env.invertir, resistenciasConPuntual(form))
+  }, [R, env, form.cantBastonPuntInf, form.cantBastonPuntSup])
 
   function handleFile(e) {
     const file = e.target.files?.[0]
@@ -107,6 +108,7 @@ export default function BeamEnvelopePanel({ R }) {
                 border: `1px solid ${ev.allOk ? '#a5d6a7' : '#ef9a9a'}`,
               }}>
                 {ev.passing}/{ev.total} pasan
+                {ev.conPuntual > 0 && ` (${ev.conPuntual} con el bastón puntual)`}
                 {ev.critical && ` · crítico M-${ev.critical.member} (util ${fmt(ev.critical.util, 3)})`}
               </span>
             )}
@@ -162,21 +164,22 @@ export default function BeamEnvelopePanel({ R }) {
                     <td style={{ ...TD, color: r.okP ? 'inherit' : '#c62828' }}>{fmt(r.ratioP, 3)}</td>
                     <td style={{ ...TD, color: r.okN ? 'inherit' : '#c62828' }}>{fmt(r.ratioN, 3)}</td>
                     <td style={{ ...TD, color: r.okV ? 'inherit' : '#c62828' }}>{fmt(r.ratioV, 3)}</td>
-                    <td style={{ ...TD, fontWeight: 700, color: r.util > 1 ? '#c62828' : r.util > 0.9 ? '#b45309' : '#15803d' }}>
+                    <td style={{ ...TD, fontWeight: 700, color: r.util > 1 ? (r.conPuntual ? '#1d4ed8' : '#c62828') : r.util > 0.9 ? '#b45309' : '#15803d' }}>
                       {fmt(r.util, 3)}
                     </td>
                     <td style={TD}>
-                      <span style={{ fontWeight: 800, color: r.ok ? '#15803d' : '#c62828' }}>
-                        {r.ok ? '✓ pasa' : '✗ no pasa'}
+                      <span style={{ fontWeight: 800, color: r.ok ? '#15803d' : r.conPuntual ? '#1d4ed8' : '#c62828' }}
+                        title={r.conPuntual ? `Con el armado del corte no le alcanza (util ${fmt(r.util, 2)}), pero la trabe lleva ${ev.kPunt?.inf || 0}/${ev.kPunt?.sup || 0} bastón(es) puntual(es) anotados desde el análisis a lo largo: con ellos queda en ${fmt(r.utilPunt, 2)}.` : undefined}>
+                        {r.ok ? '✓ pasa' : r.conPuntual ? '✓ con bastón puntual' : '✗ no pasa'}
                       </span>
                     </td>
                     <td style={{ ...TD, display: 'flex', gap: 4 }}>
                       <button style={btnMini} onClick={() => aplicar(r.MuP, r.MuN, r.Vu)} title="Usar los valores de este miembro en la calculadora">
                         usar
                       </button>
-                      <button style={{ ...btnMini, color: r.ok ? 'var(--color-tx3)' : '#c62828', borderColor: r.ok ? 'var(--color-border)' : '#ef9a9a' }}
+                      <button style={{ ...btnMini, color: r.cubierto ? 'var(--color-tx3)' : '#c62828', borderColor: r.cubierto ? 'var(--color-border)' : '#ef9a9a' }}
                         data-testid={`bastonear-${r.member}`}
-                        onClick={() => setLongFocus({ member: String(r.member), fallan: ev.results.filter((x) => !x.ok).map((x) => String(x.member)) })}
+                        onClick={() => setLongFocus({ member: String(r.member), fallan: ev.results.filter((x) => !x.cubierto).map((x) => String(x.member)) })}
                         title={perfil?.members?.length
                           ? 'Abre Longitudinal en este miembro para resolverlo con bastones sólo donde hace falta'
                           : 'Abre Longitudinal (ahí se carga la envolvente por estaciones para poner bastones sólo donde hacen falta)'}>

@@ -94,25 +94,41 @@ export function beamEnvelopeByMember(points, invertir = false) {
  * Evalúa la envolvente de vigas contra las resistencias de la sección.
  * @param R resultado de computeSectionResults(section)
  */
-export function evaluateBeamEnvelope(points, R, invertir = false) {
+/**
+ * @param punt  MR con los bastones puntuales anotados (resistenciasConPuntual).
+ *   Un ejemplar que rebasa el MR del corte pero cabe con los puntuales NO está
+ *   descubierto: está cubierto por el bastón puntual que el análisis a lo largo
+ *   colocó justo ahí. Se marca aparte para que el informe lo diga con todas sus
+ *   letras, en vez de mandar a revisar un diseño que ya pasa.
+ */
+export function evaluateBeamEnvelope(points, R, invertir = false, punt = null) {
   const MRP = R?.resP?.MRT || 0
   const MRN = R?.resN?.MRT || 0
   const VR = R?.resC?.Vr || 0
+  const MRPp = Math.max(MRP, punt?.MRP || 0)
+  const MRNp = Math.max(MRN, punt?.MRN || 0)
+  const hayPunt = MRPp > MRP + 1e-9 || MRNp > MRN + 1e-9
 
   const results = beamEnvelopeByMember(points, invertir).map((g) => {
-    const rP = MRP > 0 ? g.MuP / MRP : (g.MuP > 0 ? Infinity : 0)
-    const rN = MRN > 0 ? g.MuN / MRN : (g.MuN > 0 ? Infinity : 0)
+    const ratio = (MR, Mu) => (MR > 0 ? Mu / MR : (Mu > 0 ? Infinity : 0))
+    const rP = ratio(MRP, g.MuP), rN = ratio(MRN, g.MuN)
     const rV = VR > 0 ? g.Vu / VR : (g.Vu > 0 ? Infinity : 0)
     const util = Math.max(rP, rN, rV)
+    const ok = util <= 1
+    const rPp = ratio(MRPp, g.MuP), rNp = ratio(MRNp, g.MuN)
+    const utilPunt = Math.max(rPp, rNp, rV)
+    const conPuntual = !ok && hayPunt && utilPunt <= 1
     return {
-      ...g, MRP, MRN, VR,
+      ...g, MRP, MRN, VR, MRPp, MRNp,
       ratioP: rP, ratioN: rN, ratioV: rV,
       okP: rP <= 1, okN: rN <= 1, okV: rV <= 1,
-      util, ok: util <= 1,
+      ratioPPunt: rPp, ratioNPunt: rNp, utilPunt,
+      util, ok, conPuntual, cubierto: ok || conPuntual,
     }
   })
   const sorted = [...results].sort((a, b) => (b.util === Infinity ? 1 : a.util === Infinity ? -1 : b.util - a.util))
-  const failing = results.filter((r) => !r.ok)
+  const failing = results.filter((r) => !r.cubierto)
+  const conPuntual = results.filter((r) => r.conPuntual)
   return {
     results,
     critical: sorted[0] || null,
@@ -120,6 +136,11 @@ export function evaluateBeamEnvelope(points, R, invertir = false) {
     passing: results.length - failing.length,
     failing: failing.length,
     allOk: failing.length === 0,
+    // los que sólo pasan gracias al bastón puntual anotado
+    conPuntual: conPuntual.length,
+    miembrosConPuntual: conPuntual.map((r) => r.member),
+    soloCorridas: results.length - failing.length - conPuntual.length,
+    kPunt: punt ? { inf: punt.kInf, sup: punt.kSup } : null,
     // Envolvente global (la más desfavorable de todos los miembros)
     globalMuP: Math.max(0, ...results.map((r) => r.MuP)),
     globalMuN: Math.max(0, ...results.map((r) => r.MuN)),
