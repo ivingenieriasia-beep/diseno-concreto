@@ -170,7 +170,9 @@ def main():
     # ── Miembros ─────────────────────────────────────────────
     miembros = []
     grupos = {}
-    saltados = 0
+    # Saltar miembros en silencio esconde problemas: se apunta el motivo y el id.
+    sin_largo, sin_result, motivos = [], [], {}
+    est_por_grupo = {}
     todos = list(m.members)
     for k, mb in enumerate(todos):
         grupo = str(mb.description or u'(sin nombre)').strip()
@@ -178,7 +180,7 @@ def main():
             continue
         L = largo(mb)
         if L <= 1e-6:
-            saltados += 1
+            sin_largo.append(int(mb.id))
             continue
         mid = int(mb.id)
         xs = estaciones(L)
@@ -188,10 +190,11 @@ def main():
         for c in usadas:
             try:
                 por_combo[c] = R.member_forces_at_station(mid, c, xs)
-            except Exception:
-                pass
+            except Exception as e:
+                clave = u'%s: %s' % (type(e).__name__, e)
+                motivos[clave] = motivos.get(clave, 0) + 1
         if not por_combo:
-            saltados += 1
+            sin_result.append(int(mb.id))
             continue
 
         def envolver(lista_xs, datos):
@@ -257,6 +260,7 @@ def main():
             },
         })
         grupos[grupo] = grupos.get(grupo, 0) + 1
+        est_por_grupo.setdefault(grupo, []).append(len(est))
         if (k + 1) % 200 == 0:
             log(u'  … %d/%d miembros' % (k + 1, len(todos)))
 
@@ -287,6 +291,7 @@ def main():
         'campos_est': ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax'],
         'casos': casos, 'combinaciones': combos, 'envueltas': usadas,
         'nudos': nudos, 'miembros': miembros, 'reacciones': reacciones,
+        'saltados': {'sin_longitud': sin_largo, 'sin_resultados': sin_result, 'motivos': motivos},
     }
 
     carpeta = CARPETA or os.path.join(os.path.expanduser('~'), 'Desktop')
@@ -302,8 +307,22 @@ def main():
     log(u'Grupos: %s' % u', '.join(u'%s(%d)' % (g, n) for g, n in sorted(grupos.items(), key=lambda kv: -kv[1])))
     log(u'%d miembros · %d estaciones guardadas (%.1f por miembro) · %d reacciones'
         % (len(miembros), n_est, n_est / float(len(miembros) or 1), len(reacciones)))
-    if saltados:
-        log(u'%d miembros saltados (sin longitud o sin resultados)' % saltados)
+    if sin_largo or sin_result:
+        log(u'')
+        log(u'SALTADOS: %d sin longitud, %d sin resultados' % (len(sin_largo), len(sin_result)))
+        if sin_largo:
+            log(u'  sin longitud (nudos i y j en el mismo punto, o sin coordenadas): %s%s'
+                % (sin_largo[:15], u' …' if len(sin_largo) > 15 else u''))
+        if sin_result:
+            log(u'  sin resultados: %s%s' % (sin_result[:15], u' …' if len(sin_result) > 15 else u''))
+        for k, v in sorted(motivos.items(), key=lambda kv: -kv[1]):
+            log(u'  motivo (%d veces): %s' % (v, k))
+
+    log(u'')
+    log(u'ESTACIONES POR GRUPO (mín / media / máx) — si salen 2 o 3, la curva es plana:')
+    for g in sorted(est_por_grupo, key=lambda g: -len(est_por_grupo[g])):
+        v = est_por_grupo[g]
+        log(u'  %-8s %4d miembros   %2d / %4.1f / %3d' % (g, len(v), min(v), sum(v) / float(len(v)), max(v)))
     log(u'%.1f s · %.1f KB' % (dt, os.path.getsize(ruta) / 1024.0))
     log(u'')
     log(u'>>> %s' % ruta)
