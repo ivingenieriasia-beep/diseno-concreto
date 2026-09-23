@@ -32,10 +32,6 @@ Ajusta CARPETA para que apunte a donde la app va a leer.
 #   'preguntar'   vuelve a preguntar (para cambiarla)
 #   r'C:\\ruta'    esa y sin preguntar
 CARPETA = None
-# MODO: 'panel' abre una ventanita con dos botones (configurar carpeta ·
-# sincronizar) y se queda ahí; 'directo' exporta y termina. Con la carpeta ya
-# recordada, 'directo' + Ctrl+R en la consola es lo más rápido que hay.
-MODO = 'panel'
 ARCHIVO = 'modelo.json'
 PASO_M = 0.05           # una estación cada 5 cm
 MIN_EST = 21            # nunca menos de esto por miembro
@@ -91,83 +87,66 @@ def _guardar_config(d):
         return False
 
 
-def _pedir_tk(inicial):
-    u"""El explorador de siempre. `topmost` para que no se esconda tras RAM."""
-    import tkinter
-    from tkinter import filedialog
-    raiz = tkinter.Tk()
-    raiz.withdraw()
-    try:
-        raiz.attributes('-topmost', True)
-    except Exception:
-        pass
-    try:
-        d = filedialog.askdirectory(
-            title=u'Auxiliar IV — carpeta donde dejar modelo.json',
-            initialdir=inicial or os.path.expanduser('~'), mustexist=True)
-    finally:
-        raiz.destroy()
-    return d or None
-
-
-def _pedir_win32(inicial):
-    u"""Sin tkinter: el diálogo de carpetas de Windows, por ctypes."""
-    import ctypes
-    from ctypes import wintypes
-    shell32, ole32 = ctypes.windll.shell32, ctypes.windll.ole32
-    ole32.CoInitialize(None)
-
-    class BROWSEINFO(ctypes.Structure):
-        _fields_ = [('hwndOwner', wintypes.HWND), ('pidlRoot', ctypes.c_void_p),
-                    ('pszDisplayName', wintypes.LPWSTR), ('lpszTitle', wintypes.LPCWSTR),
-                    ('ulFlags', wintypes.UINT), ('lpfn', ctypes.c_void_p),
-                    ('lParam', wintypes.LPARAM), ('iImage', ctypes.c_int)]
-
-    buf = ctypes.create_unicode_buffer(260)
-    bi = BROWSEINFO()
-    bi.pszDisplayName = ctypes.cast(buf, wintypes.LPWSTR)
-    bi.lpszTitle = u'Auxiliar IV — carpeta donde dejar modelo.json'
-    bi.ulFlags = 0x0001 | 0x0040        # sólo carpetas reales · diálogo moderno
-    shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
-    pidl = shell32.SHBrowseForFolderW(ctypes.byref(bi))
-    if not pidl:
+def carpeta_del_modelo():
+    u"""
+    Dónde está el .retx abierto. La API no lo dice, pero RAM guarda los
+    recientes en su Recents.xml y leer un archivo sí está permitido.
+    """
+    base = os.environ.get('APPDATA')
+    if not base:
         return None
-    ruta = ctypes.create_unicode_buffer(260)
-    shell32.SHGetPathFromIDListW(ctypes.c_void_p(pidl), ruta)
-    ole32.CoTaskMemFree(ctypes.c_void_p(pidl))
-    return ruta.value or None
-
-
-def elegir_carpeta(inicial=None):
-    for intentar in (_pedir_tk, _pedir_win32):
-        try:
-            d = intentar(inicial)
-            if d:
-                return os.path.normpath(d)
-            return None          # el usuario canceló: no se prueba el siguiente
-        except Exception as e:
-            log(u'  (%s no sirvió: %s)' % (intentar.__name__, e))
+    raiz = os.path.join(base, 'Bentley', 'Engineering', 'RAM Elements')
+    if not os.path.isdir(raiz):
+        return None
+    candidatos = []
+    for dirpath, _dirs, files in os.walk(raiz):
+        for f in files:
+            if f.lower() == 'recents.xml':
+                ruta = os.path.join(dirpath, f)
+                try:
+                    candidatos.append((os.path.getmtime(ruta), ruta))
+                except Exception:
+                    pass
+    if not candidatos:
+        return None
+    candidatos.sort(reverse=True)
+    try:
+        with open(candidatos[0][1], 'rb') as f:
+            txt = f.read().decode('utf-8', 'replace')
+    except Exception:
+        return None
+    import re
+    for m in re.finditer(r'([A-Za-z]:\\[^<>"\r\n]+?\.ret[xs]?)', txt):
+        # el separador se quita a mano: os.path.dirname sólo entiende el del
+        # sistema donde corre, y aquí la ruta siempre es de Windows
+        carp = re.sub(r'[\\/][^\\/]*$', '', m.group(1))
+        if carp and os.path.isdir(carp):
+            return carp
     return None
 
 
 def resolver_carpeta():
-    u"""La carpeta de destino, preguntando sólo cuando hace falta."""
+    u"""
+    La carpeta de destino. Sin diálogo posible, el orden es:
+      1. CARPETA, si la pusiste arriba (lo normal, y queda para siempre)
+      2. la que se guardó la última vez
+      3. la carpeta del modelo abierto, leyendo los recientes de RAM
+      4. el Escritorio, avisando de que hay que poner CARPETA
+    """
     cfg = _leer_config()
     guardada = cfg.get('carpeta')
-    if CARPETA and CARPETA != 'preguntar':
-        return CARPETA, u'fijada en el script'
-    if CARPETA != 'preguntar' and guardada and os.path.isdir(guardada):
-        return guardada, u'recordada'
-    log(u'Elige la carpeta donde la app va a buscar el modelo.json…')
-    d = elegir_carpeta(guardada)
-    if not d:
-        if guardada and os.path.isdir(guardada):
-            return guardada, u'recordada (no se eligió otra)'
-        d = os.path.join(os.path.expanduser('~'), 'Desktop')
-        return d, u'el Escritorio (no se pudo abrir el explorador)'
-    cfg['carpeta'] = d
-    _guardar_config(cfg)
-    return d, u'elegida ahora y recordada'
+    if CARPETA and CARPETA != 'preguntar' and str(CARPETA).strip():
+        d = os.path.normpath(CARPETA)
+        if guardada != d:
+            cfg['carpeta'] = d
+            _guardar_config(cfg)
+        return d, u'la de CARPETA'
+    if guardada and os.path.isdir(guardada):
+        return guardada, u'recordada de la vez anterior'
+    delModelo = carpeta_del_modelo()
+    if delModelo:
+        return delModelo, u'la del modelo (no hay CARPETA puesta)'
+    return os.path.join(os.path.expanduser('~'), 'Desktop'), u'el Escritorio, a falta de algo mejor'
 
 
 # ── Compactar una curva sin perder los picos ──────────────────
@@ -475,101 +454,17 @@ def exportar(destino, log=log):
     }
 
 
-# ── La ventanita: dos botones y ya ────────────────────────────
-def panel():
-    u"""
-    Un panel mínimo sobre RAM: la carpeta arriba y dos botones.
-    Ojo: mientras esté abierto, la consola de Python queda ocupada (es su
-    mismo hilo). Se cierra al terminar y RAM sigue como si nada.
-    """
-    import tkinter as tk
-    from tkinter import scrolledtext
-
-    cfg = _leer_config()
-    estado = {'carpeta': cfg.get('carpeta') or ''}
-
-    raiz = tk.Tk()
-    raiz.title(u'Auxiliar IV · sincronizar con RAM')
-    raiz.geometry('620x400')
-    try:
-        raiz.attributes('-topmost', True)
-    except Exception:
-        pass
-
-    cab = tk.Frame(raiz, padx=12, pady=10)
-    cab.pack(fill='x')
-    tk.Label(cab, text=u'Carpeta donde la app busca el modelo.json:',
-             font=('Segoe UI', 9)).pack(anchor='w')
-    vCarpeta = tk.StringVar(value=estado['carpeta'] or u'— sin configurar —')
-    tk.Label(cab, textvariable=vCarpeta, font=('Consolas', 9), fg='#1a4a7a',
-             wraplength=580, justify='left').pack(anchor='w', pady=(2, 8))
-
-    botones = tk.Frame(cab)
-    botones.pack(fill='x')
-    salida = scrolledtext.ScrolledText(raiz, height=15, font=('Consolas', 8))
-    salida.pack(fill='both', expand=True, padx=12, pady=(0, 12))
-
-    def escribir(*a):
-        salida.insert('end', u' '.join(str(x) for x in a) + u'\n')
-        salida.see('end')
-        raiz.update_idletasks()
-
-    def configurar():
-        d = elegir_carpeta(estado['carpeta'] or None)
-        if not d:
-            escribir(u'(no se eligió carpeta)')
-            return
-        estado['carpeta'] = d
-        c = _leer_config()
-        c['carpeta'] = d
-        _guardar_config(c)
-        vCarpeta.set(d)
-        escribir(u'Carpeta guardada: %s' % d)
-
-    def sincronizar():
-        if not estado['carpeta']:
-            escribir(u'Primero configura la carpeta.')
-            configurar()
-            if not estado['carpeta']:
-                return
-        bSync.config(state='disabled', text=u'Sincronizando…')
-        salida.delete('1.0', 'end')
-        try:
-            r = exportar(estado['carpeta'], log=escribir)
-            escribir(u'')
-            escribir(u'LISTO · %d miembros · %d estaciones · %.0f KB · %.1f s'
-                     % (r['miembros'], r['estaciones'], r['kb'], r['segundos']))
-            escribir(u'Ahora, en la app: Sincronizar con RAM')
-        except Exception as e:
-            import traceback
-            escribir(u'ERROR: %s: %s' % (type(e).__name__, e))
-            escribir(traceback.format_exc())
-        finally:
-            bSync.config(state='normal', text=u'  Sincronizar ahora  ')
-
-    tk.Button(botones, text=u'  Carpeta…  ', command=configurar).pack(side='left')
-    bSync = tk.Button(botones, text=u'  Sincronizar ahora  ', command=sincronizar,
-                      font=('Segoe UI', 9, 'bold'))
-    bSync.pack(side='left', padx=8)
-    tk.Button(botones, text=u'  Cerrar  ', command=raiz.destroy).pack(side='right')
-
-    escribir(u'Con el modelo abierto y el análisis corrido, dale a Sincronizar.')
-    if not estado['carpeta']:
-        escribir(u'Primero hay que decir en qué carpeta dejar el modelo.json.')
-    raiz.mainloop()
-
-
 def main():
-    if MODO == 'panel':
-        try:
-            panel()
-            return
-        except Exception as e:
-            log(u'(no se pudo abrir el panel: %s — se hace directo)' % e)
     destino, comoSalio = resolver_carpeta()
     log(u'Destino: %s  (%s)' % (destino, comoSalio))
+    if not (CARPETA and str(CARPETA).strip() and CARPETA != 'preguntar'):
+        log(u'')
+        log(u'  ┌─ Para que caiga donde la app la busca, pon arriba del script:')
+        log(u"  │    CARPETA = r'C:\\ruta\\a\\tu\\carpeta'")
+        log(u'  │  Se pone una vez y ya. (Aquí no hay explorador: RAM no deja.)')
+        log(u'  └─')
+        log(u'')
     exportar(destino)
-    log(u'    (carpeta %s · para cambiarla, pon CARPETA = \'preguntar\' arriba)' % comoSalio)
 
 
 try:
