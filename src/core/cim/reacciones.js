@@ -164,6 +164,74 @@ export function ladoRequerido(c, obra = {}, h = 35) {
   return B
 }
 
+// ── Linderos ─────────────────────────────────────────────────
+// Los lados de la planta que son colindancia se marcan en la planta
+// ('x-min', 'x-max', 'y-min', 'y-max', en los ejes de la zapata). Un apoyo
+// sobre un lado marcado lleva zapata de lindero; sobre dos, de esquina. Cada
+// una se diseña en sus propios ejes, con el lindero del lado −x (y −y en la
+// esquina): sus cargas se giran o reflejan a esos ejes con la matriz T
+// (e_local = T e_global) y el mismo tipo sirve en los cuatro lados.
+
+export const LADOS = ['x-min', 'x-max', 'y-min', 'y-max']
+const TOL_LADO = 0.3                                          // m: un apoyo está «sobre» el lado
+
+/** El rectángulo que envuelve los apoyos (centros de columna), m */
+export function contorno(apoyos) {
+  const xs = apoyos.map((a) => a.x), ys = apoyos.map((a) => a.y)
+  const mitad = (eje, lado) => {
+    // media columna de los apoyos de ese lado: el paño exterior es el lindero
+    const v = lado === 'min' ? Math.min(...(eje === 'x' ? xs : ys)) : Math.max(...(eje === 'x' ? xs : ys))
+    const en = apoyos.filter((a) => Math.abs((eje === 'x' ? a.x : a.y) - v) <= TOL_LADO)
+    return Math.max(0.1, ...en.map((a) => ((eje === 'x' ? a.col?.c1 : a.col?.c2) || 30) / 200))
+  }
+  return {
+    xmin: Math.min(...xs), xmax: Math.max(...xs), ymin: Math.min(...ys), ymax: Math.max(...ys),
+    paño: { 'x-min': mitad('x', 'min'), 'x-max': mitad('x', 'max'), 'y-min': mitad('y', 'min'), 'y-max': mitad('y', 'max') },
+  }
+}
+
+/** Dónde está la línea de un lindero (el paño exterior de las columnas de ese lado) */
+export function lineaLindero(cont, lado) {
+  const d = cont.paño[lado]
+  return lado === 'x-min' ? cont.xmin - d : lado === 'x-max' ? cont.xmax + d : lado === 'y-min' ? cont.ymin - d : cont.ymax + d
+}
+
+const T0 = [1, 0, 0, 1]
+const mul = (A, B) => [A[0] * B[0] + A[1] * B[2], A[0] * B[1] + A[1] * B[3], A[2] * B[0] + A[3] * B[2], A[2] * B[1] + A[3] * B[3]]
+/**
+ * Condición de un apoyo con los lados marcados: clase (centro, lindero,
+ * esquina), la posición de su columna en la zapata (px, py) y T.
+ */
+export function condicionApoyo(a, cont, linderos = {}) {
+  const en = (l) => linderos[l] && Math.abs((l[0] === 'x' ? a.x : a.y) - (l.endsWith('min') ? (l[0] === 'x' ? cont.xmin : cont.ymin) : (l[0] === 'x' ? cont.xmax : cont.ymax))) <= TOL_LADO
+  const x = en('x-min') ? 'min' : en('x-max') ? 'max' : null
+  const y = en('y-min') ? 'min' : en('y-max') ? 'max' : null
+  if (x && y) {
+    // esquina: se refleja lo que haga falta para que quede en (−x, −y)
+    let T = T0
+    if (x === 'max') T = mul([-1, 0, 0, 1], T)
+    if (y === 'max') T = mul([1, 0, 0, -1], T)
+    return { clase: 'esquina', lados: [`x-${x}`, `y-${y}`], px: 'min', py: 'min', T, gira: false }
+  }
+  if (x) return { clase: 'lindero', lados: [`x-${x}`], px: 'min', py: 'centro', T: x === 'max' ? [-1, 0, 0, 1] : T0, gira: false }
+  // lindero en y: se gira un cuarto de vuelta para que quede del lado −x
+  if (y) return { clase: 'lindero', lados: [`y-${y}`], px: 'min', py: 'centro', T: y === 'min' ? [0, 1, -1, 0] : [0, -1, 1, 0], gira: true }
+  return { clase: 'centro', lados: [], px: 'centro', py: 'centro', T: T0, gira: false }
+}
+
+/** Las cargas de un apoyo en los ejes de su zapata (e_local = T e_global) */
+export function cargasEnEjes(c, T = T0) {
+  if (T.every((v, i) => v === T0[i])) return c
+  const gira = (q, abs) => {
+    // (My, Mx) y (Vx, Vy) son vectores en planta (x, y)
+    const ex = T[0] * q.My + T[1] * q.Mx, ey = T[2] * q.My + T[3] * q.Mx
+    const vx = T[0] * q.Vx + T[1] * q.Vy, vy = T[2] * q.Vx + T[3] * q.Vy
+    const f = abs ? Math.abs : (v) => v
+    return { P: q.P, My: f(ex), Mx: f(ey), Vx: f(vx), Vy: f(vy) }
+  }
+  return { CM: gira(c.CM, false), CV: gira(c.CV, false), S: gira(c.S, true) }
+}
+
 /**
  * Agrupa lados requeridos en k tipos, cada uno del tamaño de su apoyo mayor,
  * con el menor volumen total (áreas × número de zapatas).
@@ -198,29 +266,49 @@ export function agruparPorLado(lados, k) {
   return grupos.sort((a, b) => b.B - a.B)
 }
 
-const redondea3 = (c) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([j, x]) => [j, Math.round(x * 1000) / 1000]))]))
-
 const resumenApoyos = (as) => (as.length <= 6 ? `nudo${as.length > 1 ? 's' : ''} ${as.map((a) => a.nudo).join(', ')}` : `${as.length} nudos (${as.slice(0, 4).map((a) => a.nudo).join(', ')}…)`)
 
-/** Zapatas aisladas: una por grupo de apoyos, con la envolvente del grupo */
-export function aisladasDesde(apoyos, papeles, up, { tipos = 3, obra = {}, archivo = '' } = {}) {
-  const cargas = apoyos.map((a) => cargasDeApoyo(a, papeles, up))
-  const lados = cargas.map((c) => ladoRequerido(c, obra))
-  const grupos = agruparPorLado(lados, tipos)
+const CLASES = { centro: 'céntrica', lindero: 'de lindero', esquina: 'de esquina' }
+
+/**
+ * Los tipos de zapata aislada para unos apoyos: cada condición (céntrica, de
+ * lindero, de esquina) se agrupa aparte, en hasta `tipos` tipos, con las
+ * cargas ya en los ejes de su zapata.
+ * @returns [{ clase, desde, hasta, B, idx: [...] }] (idx en `apoyos`)
+ */
+export function tiposDeZapata(apoyos, papeles, up, { tipos = 3, obra = {}, linderos = {}, cont = null } = {}) {
+  const C = cont || contorno(apoyos)
+  const conds = apoyos.map((a) => condicionApoyo(a, C, linderos))
+  const cargas = apoyos.map((a, i) => cargasEnEjes(cargasDeApoyo(a, papeles, up), conds[i].T))
+  const out = []
+  for (const clase of ['centro', 'lindero', 'esquina']) {
+    const idx = apoyos.map((_, i) => i).filter((i) => conds[i].clase === clase)
+    if (!idx.length) continue
+    const lados = idx.map((i) => ladoRequerido(cargas[i], obra))
+    for (const g of agruparPorLado(lados, tipos)) out.push({ ...g, clase, idx: g.idx.map((k) => idx[k]) })
+  }
+  return { grupos: out, conds, cargas }
+}
+
+/** Zapatas aisladas: una por tipo, con la envolvente del tipo y la revisión de cada apoyo */
+export function aisladasDesde(apoyos, papeles, up, { tipos = 3, obra = {}, archivo = '', linderos = {}, cont = null } = {}) {
+  const { grupos, conds, cargas } = tiposDeZapata(apoyos, papeles, up, { tipos, obra, linderos, cont })
   return grupos.map((g) => {
     const as = g.idx.map((i) => apoyos[i])
     const z = nuevaAislada()
-    // la columna más chica del grupo: rige penetración, aplastamiento y volado
-    const cols = as.map((a) => a.col).filter(Boolean)
+    const cd = conds[g.idx[0]]
+    // la columna más chica del grupo (en los ejes de su zapata): rige
+    // penetración, aplastamiento y volado
+    const cols = g.idx.map((i) => (apoyos[i].col ? (conds[i].gira ? { c1: apoyos[i].col.c2, c2: apoyos[i].col.c1 } : apoyos[i].col) : null)).filter(Boolean)
     const c1 = cols.length ? Math.min(...cols.map((c) => c.c1)) : z.geo.c1
     const c2 = cols.length ? Math.min(...cols.map((c) => c.c2)) : z.geo.c2
     return {
       ...z,
       cargas: envolvente(g.idx.map((i) => cargas[i])),
-      // y la zapata se revisa también con las de cada apoyo
-      apoyos: g.idx.map((i) => ({ nudo: apoyos[i].nudo, cargas: redondea3(cargas[i]) })),
-      geo: { ...z.geo, c1, c2, B: Math.max(0.6, arriba(g.B, 0.05)), L: Math.max(0.6, arriba(g.B, 0.05)) },
-      origen: { ram: { archivo, nudos: as.map((a) => a.nudo), resumen: `${resumenApoyos(as)} · lado pedido ${f2(g.desde)}–${f2(g.hasta)} m` } },
+      // y la zapata se revisa también con las de cada apoyo, cada una en sus ejes
+      apoyos: g.idx.map((i) => ({ nudo: apoyos[i].nudo, cargas: cargas[i], T: conds[i].T })),
+      geo: { ...z.geo, c1, c2, px: cd.px, py: cd.py, liga: true, B: Math.max(0.6, arriba(g.B, 0.05)), L: Math.max(0.6, arriba(g.B, 0.05)) },
+      origen: { ram: { archivo, nudos: as.map((a) => a.nudo), resumen: `${CLASES[g.clase]} · ${resumenApoyos(as)} · lado pedido ${f2(g.desde)}–${f2(g.hasta)} m` } },
     }
   })
 }
@@ -239,9 +327,17 @@ function eje(apoyos) {
 }
 
 /** Zapata corrida: la suma de las reacciones de la fila entre su largo tributario */
-export function corridaDesde(apoyos, papeles, up, { archivo = '' } = {}) {
+/** El lado marcado sobre el que caen todos estos apoyos, si hay uno */
+function ladoComun(apoyos, linderos, cont) {
+  if (!cont) return null
+  const ls = apoyos.map((a) => condicionApoyo(a, cont, linderos).lados)
+  return LADOS.find((l) => ls.every((x) => x.includes(l))) || null
+}
+
+export function corridaDesde(apoyos, papeles, up, { archivo = '', linderos = {}, cont = null } = {}) {
   if (apoyos.length < 2) return null
   const E = eje(apoyos)
+  const lado = ladoComun(apoyos, linderos, cont)
   const ts = [...E.t].sort((a, b) => a - b)
   const sep = (ts[ts.length - 1] - ts[0]) / (ts.length - 1)
   const L = ts[ts.length - 1] - ts[0] + sep
@@ -252,15 +348,17 @@ export function corridaDesde(apoyos, papeles, up, { archivo = '' } = {}) {
   return {
     ...z,
     cargas: { CM: { w: red(sum('CM')), M: 0 }, CV: { w: red(sum('CV')), M: 0 }, S: { w: red(Math.max(0, ...c.map((x) => Math.abs(x.S.P))) / Math.max(sep, 0.5)), M: 0 } },
-    geo: { ...z.geo, Lz: Math.round(L * 100) / 100 },
-    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), resumen: `${resumenApoyos(apoyos)} · ${f2(L)} m de muro${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
+    // sobre un lindero: el muro va a la orilla y la zapata crece hacia adentro
+    geo: { ...z.geo, Lz: Math.round(L * 100) / 100, ...(lado ? { pos: 'lindero', liga: true } : {}) },
+    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), lindero: lado, resumen: `${lado ? 'de lindero · ' : ''}${resumenApoyos(apoyos)} · ${f2(L)} m de muro${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
   }
 }
 
 /** Contratrabe: las columnas del eje, en su posición, con sus cargas */
-export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo = 0.5 } = {}) {
+export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo = 0.5, linderos = {}, cont = null } = {}) {
   if (apoyos.length < 2) return null
   const E = eje(apoyos)
+  const lado = ladoComun(apoyos, linderos, cont)
   const t0 = Math.min(...E.t)
   const orden = apoyos.map((a, i) => ({ a, t: E.t[i] - t0 })).sort((p, q) => p.t - q.t)
   const z = nuevaContratrabe()
@@ -297,7 +395,7 @@ export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo =
     ...z,
     geo: { ...z.geo, L },
     columnas,
-    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), resumen: `${resumenApoyos(apoyos)} · eje de ${f2(orden[orden.length - 1].t)} m${casoS ? ` · sismo del eje: ${casoS}` : ''}${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
+    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), lindero: lado, resumen: `${lado ? 'sobre el lindero (se diseña centrada: revisa que el alero no pase al colindante) · ' : ''}${resumenApoyos(apoyos)} · eje de ${f2(orden[orden.length - 1].t)} m${casoS ? ` · sismo del eje: ${casoS}` : ''}${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
   }
 }
 

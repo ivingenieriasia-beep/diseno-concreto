@@ -15,6 +15,7 @@ import imgCimContencion from '../assets/novedades/cim-contencion.webp'
 import imgCimRam from '../assets/novedades/cim-ram.webp'
 import imgMemPrellenado from '../assets/novedades/mem-prellenado.webp'
 import imgCimPlanta from '../assets/novedades/cim-planta.webp'
+import imgCimLinderos from '../assets/novedades/cim-linderos.webp'
 
 export const TIPOS = {
   nuevo: { etiqueta: 'NUEVO', fondo: '#dcf3ec', color: '#1a7a5e' },
@@ -28,6 +29,26 @@ export const TIPOS = {
  * lo que hay que hacer para aprovecharla.
  */
 export const NOVEDADES = [
+  {
+    version: '3.03',
+    fecha: '2026-09-24',
+    lema: 'Zapatas de lindero y de esquina desde la planta de cimentación.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'Linderos en la planta',
+        texto: 'Marca qué lados de la planta son colindancia (clic en el lado o en su botón). Al crear, los apoyos sobre un lindero salen con zapata de lindero y los de dos lados con zapata de esquina, cada una girada hacia adentro con sus cargas en sus ejes: un mismo tipo sirve en los cuatro lados. Si marcas un lindero después, la planta dice qué zapatas pasan de él.',
+        donde: 'Cimentaciones → ⚡ Desde RAM → Linderos',
+        img: imgCimLinderos,
+        alt: 'Planta con dos linderos marcados, zapatas de lindero y de esquina, y las que pasan de un tercer lindero marcadas en rojo',
+      },
+    ],
+    cambios: [
+      { tipo: 'nuevo', texto: 'Los tipos de zapata se agrupan por condición (céntrica, de lindero, de esquina) y la tabla de tipos lo dice.' },
+      { tipo: 'nuevo', texto: 'Una corrida sobre un lindero sale de lindero (el muro a la orilla, la zapata hacia adentro); una contratrabe sobre un lindero avisa que se diseña centrada.' },
+      { tipo: 'mejora', texto: 'Los linderos se guardan con el proyecto.' },
+    ],
+  },
   {
     version: '3.02',
     fecha: '2026-09-24',

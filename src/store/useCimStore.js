@@ -16,6 +16,7 @@ const useCimStore = create((set, get) => ({
   selUid: null,
   suelo: {},          // lo capturado de la obra; lo que falte sale de SUELO
   criterios: {},      // lo cambiado de CRITERIOS
+  linderos: {},       // lados de la planta que son colindancia: { 'x-min': true, … } (ejes de la zapata)
   hist: [],
 
   obra: () => ({ suelo: get().suelo, criterios: get().criterios }),
@@ -94,17 +95,18 @@ const useCimStore = create((set, get) => ({
 
   setSuelo: (patch) => set((s) => ({ suelo: { ...s.suelo, ...patch } })),
   setCriterios: (patch) => set((s) => ({ criterios: { ...s.criterios, ...patch } })),
+  setLinderos: (patch) => set((s) => ({ linderos: { ...s.linderos, ...patch } })),
 
   /** Del .json del proyecto (o del autoguardado) */
   cargar: (data) => {
     const d = data || {}
     const cimientos = Array.isArray(d.cimientos) ? d.cimientos.map(conUid) : []
-    set({ cimientos, suelo: d.suelo || {}, criterios: d.criterios || {}, selUid: cimientos[0]?.uid ?? null, hist: [] })
+    set({ cimientos, suelo: d.suelo || {}, criterios: d.criterios || {}, linderos: d.linderos || {}, selUid: cimientos[0]?.uid ?? null, hist: [] })
   },
 
   empacar: () => {
-    const { cimientos, suelo, criterios } = get()
-    return { cimientos, suelo, criterios }
+    const { cimientos, suelo, criterios, linderos } = get()
+    return { cimientos, suelo, criterios, linderos }
   },
 }))
 

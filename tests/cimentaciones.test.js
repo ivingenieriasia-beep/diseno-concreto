@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { meyerhof, rankine } from '../src/core/cim/suelo'
-import { capacidadEfectiva, presiones, flexion, penetracion, parrilla, proponerParrilla, anclaje, arriba } from '../src/core/cim/comun'
+import { capacidadEfectiva, presiones, flexion, penetracion, parrilla, proponerParrilla, anclaje, arriba, num } from '../src/core/cim/comun'
 import { revisarAislada, nuevaAislada, proponerAislada, centroColumna } from '../src/core/cim/aislada'
 import { revisarCorrida, nuevaCorrida } from '../src/core/cim/corrida'
 import { revisarContratrabe, nuevaContratrabe, presionRigida, diagramas, centrarResultante, combinacionesContratrabe } from '../src/core/cim/contratrabe'
@@ -12,7 +12,8 @@ import { revisarMamposteria, nuevaMamposteria, tabla84 } from '../src/core/cim/m
 import { TIPOS_CIM, crearCim, revisarCim, nombreLibre, estadoCim, tipoCim } from '../src/core/cim'
 import { dibujarCim } from '../src/core/cim/dibujo'
 import { parseModeloRam } from '../src/core/ramModel'
-import { apoyosDe, papelesPorDefecto, cargasDeApoyo, sismosDeApoyo, aZapata, ladoRequerido, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente } from '../src/core/cim/reacciones'
+import { apoyosDe, papelesPorDefecto, cargasDeApoyo, sismosDeApoyo, aZapata, ladoRequerido, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente, contorno, lineaLindero, condicionApoyo, cargasEnEjes } from '../src/core/cim/reacciones'
+import { cimentacionEnPlanta } from '../src/core/cim/planta'
 
 const valor = (R, titulo) => R.secciones.flatMap((s) => s.pasos).find((p) => p.t === titulo)?.v
 const chk = (R, id) => R.checks.find((c) => c.id === id)
@@ -447,5 +448,78 @@ describe('reacciones de un modelo real de RAM', () => {
     // con sus apoyos, la propuesta cubre a los dos
     const q = { ...z, ...tipoCim('aislada').proponer(z, {}) }
     expect(revisarCim({ ...q, cargas: cargas[i9], apoyos: [] }, {}).ok).toBe(true)
+  })
+})
+
+describe('zapatas de lindero desde la planta', () => {
+  const R = parseModeloRam(readFileSync(resolve(__dirname, 'fixtures/modelo_edificio_prueba.json'), 'utf8'), 'modelo.json')
+  const A = apoyosDe(R)
+  const pap = papelesPorDefecto(R.casos)
+  const cont = contorno(A.apoyos)
+  const nudo = (n) => A.apoyos.find((a) => a.nudo === n)
+  const cargasPlanta = A.apoyos.map((a) => cargasDeApoyo(a, pap, 'y'))
+
+  it('el contorno y la línea de lindero en el paño exterior de las columnas', () => {
+    expect(cont).toMatchObject({ xmin: 0, xmax: 15, ymin: 0, ymax: 9 })
+    expect(lineaLindero(cont, 'x-min')).toBeCloseTo(-0.15, 9)
+    expect(lineaLindero(cont, 'y-max')).toBeCloseTo(9.15, 9)
+  })
+
+  it('clasifica cada apoyo con los lados marcados: céntrica, de lindero o de esquina', () => {
+    const lind = { 'x-min': true, 'y-min': true }
+    const clase = (n) => condicionApoyo(nudo(n), cont, lind).clase
+    expect(clase('1')).toBe('esquina')      // (0, 0)
+    expect(clase('5')).toBe('lindero')      // (0, 5.5)
+    expect(clase('13')).toBe('lindero')     // (4, 0)
+    expect(clase('17')).toBe('centro')      // (4, 5.5)
+    expect(clase('45')).toBe('centro')      // (15, 9): esos lados no son lindero
+    expect(condicionApoyo(nudo('1'), cont, {}).clase).toBe('centro')
+  })
+
+  it('las cargas se giran a los ejes de su zapata: el lindero siempre queda en −x', () => {
+    const c = { CM: { P: 10, Mx: 1, My: 2, Vx: 3, Vy: 4 }, CV: { P: 0, Mx: 0, My: 0, Vx: 0, Vy: 0 }, S: { P: 1, Mx: 5, My: 6, Vx: 7, Vy: 8 } }
+    // lindero en x-max: se refleja x
+    expect(cargasEnEjes(c, [-1, 0, 0, 1]).CM).toMatchObject({ P: 10, My: -2, Mx: 1, Vx: -3, Vy: 4 })
+    // lindero en y-min: lo que empujaba hacia +y ahora empuja hacia +x (adentro)
+    expect(cargasEnEjes(c, [0, 1, -1, 0]).CM).toMatchObject({ My: 1, Mx: -2, Vx: 4, Vy: -3 })
+    // el sismo se queda en valores absolutos
+    expect(cargasEnEjes(c, [0, 1, -1, 0]).S).toMatchObject({ My: 5, Mx: 6, Vx: 8, Vy: 7 })
+  })
+
+  it('crea tipos por condición, con la columna a la orilla, y ninguna pasa del lindero', () => {
+    const lind = { 'x-min': true, 'x-max': true, 'y-min': true, 'y-max': true }
+    const zs = aisladasDesde(A.apoyos, pap, 'y', { tipos: 2, linderos: lind, cont })
+    const clases = zs.map((z) => z.origen.ram.resumen.split(' · ')[0])
+    expect(new Set(clases)).toEqual(new Set(['céntrica', 'de lindero', 'de esquina']))
+    const esq = zs.filter((z) => z.origen.ram.resumen.startsWith('de esquina'))
+    for (const z of esq) expect(z.geo).toMatchObject({ px: 'min', py: 'min', liga: true })
+    expect(esq.flatMap((z) => z.apoyos.map((a) => a.nudo)).sort()).toEqual(['1', '37', '45', '9'].sort())
+    const armados = zs.map((z, i) => ({ ...z, ...tipoCim('aislada').proponer(z, {}), uid: `u${i}`, nombre: `Z-${i + 1}` }))
+    for (const z of armados) expect(revisarCim(z, {}).ok).toBe(true)
+    const P = cimentacionEnPlanta(A, armados, cargasPlanta, {}, cont, lind)
+    expect(P.items).toHaveLength(12)
+    expect(P.items.filter((it) => it.invade.length)).toEqual([])
+    // cada apoyo cumple con su propia reacción, en los ejes de su zapata
+    expect(P.items.every((it) => it.ok)).toBe(true)
+  })
+
+  it('una céntrica sobre un lindero se detecta: pasa del lindero', () => {
+    const z = { ...aisladasDesde([nudo('5')], pap, 'y', { tipos: 1 })[0], uid: 'c', nombre: 'Z-9' }
+    const p = { ...z, ...tipoCim('aislada').proponer(z, {}) }
+    const P = cimentacionEnPlanta(A, [p], cargasPlanta, {}, cont, { 'x-min': true })
+    expect(P.items[0].invade).toEqual(['x-min'])
+  })
+
+  it('una corrida sobre un lindero sale de lindero y crece hacia adentro', () => {
+    const fila = ['1', '5', '9'].map(nudo)
+    const z = corridaDesde(fila, pap, 'y', { linderos: { 'x-min': true }, cont })
+    expect(z.geo.pos).toBe('lindero')
+    expect(z.origen.ram.lindero).toBe('x-min')
+    const p = { ...z, ...tipoCim('corrida').proponer(z, {}), uid: 'k', nombre: 'ZC-1' }
+    const P = cimentacionEnPlanta(A, [p], cargasPlanta, {}, cont, { 'x-min': true })
+    expect(P.items[0].invade).toEqual([])
+    expect(Math.min(...P.items[0].poly.map((q) => q[0]))).toBeCloseTo(-num(p.geo.t) / 200, 6)
+    // la contratrabe sobre el lindero avisa que se diseña centrada
+    expect(contratrabeDesde(fila, pap, 'y', { linderos: { 'x-min': true }, cont }).origen.ram.resumen).toMatch(/lindero/)
   })
 })

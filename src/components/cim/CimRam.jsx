@@ -3,10 +3,9 @@ import useCimStore from '../../store/useCimStore'
 import { parseModeloRam } from '../../core/ramModel'
 import { modeloGuardado, hace, EVENTO_MODELO } from '../../core/ramSync'
 import { gira, GIRO_RAM } from '../../core/agrupacion'
-import { PAPELES, papelesPorDefecto, apoyosDe, cargasDeApoyo, aisladasDesde, corridaDesde, contratrabeDesde, agruparPorLado, ladoRequerido } from '../../core/cim/reacciones'
-import { tipoCim, nombreLibre, revisarCim, estadoCim } from '../../core/cim'
-import { centroColumna } from '../../core/cim/aislada'
-import { num } from '../../core/cim/comun'
+import { PAPELES, papelesPorDefecto, apoyosDe, cargasDeApoyo, aisladasDesde, corridaDesde, contratrabeDesde, tiposDeZapata, contorno, lineaLindero, condicionApoyo, LADOS } from '../../core/cim/reacciones'
+import { tipoCim, nombreLibre } from '../../core/cim'
+import { cimentacionEnPlanta } from '../../core/cim/planta'
 
 // Cimientos a partir de las reacciones de los apoyos del modelo de RAM: se
 // asigna el papel de cada caso de carga, se eligen apoyos en la planta y se
@@ -22,77 +21,14 @@ const pct = (u) => (Number.isFinite(u) ? `${Math.round(u * 100)} %` : '—')
 // el color de la utilización: holgado, justo, no cumple
 const tonoDe = (u, ok) => (!ok || !(u <= 1 + 1e-9) ? { c: '#c62828', f: 'rgba(198,40,40,0.16)' } : u > 0.85 ? { c: '#b45309', f: 'rgba(232,131,10,0.16)' } : { c: '#1a7a5e', f: 'rgba(26,122,94,0.14)' })
 const CORTO = { aislada: 'aislada', corrida: 'corrida', contratrabe: 'contratrabe' }
-
-/**
- * Los cimientos que salieron de estos apoyos, en planta (m del modelo): cada
- * aislada en cada uno de sus apoyos (con la reacción de ese apoyo), y las
- * corridas y contratrabes como franjas sobre su eje.
- */
-function cimentacionEnPlanta(A, cimientos, cargas, obra) {
-  const idx = new Map(A.apoyos.map((a, i) => [a.nudo, i]))
-  const items = [], porNudo = new Map()
-  const anota = (n, it) => { if (!porNudo.has(n)) porNudo.set(n, []); porNudo.get(n).push(it) }
-  for (const z of cimientos) {
-    const nudos = (z.origen?.ram?.nudos || []).map(String).filter((n) => idx.has(n))
-    if (!nudos.length) continue
-    if (z.tipo === 'aislada') {
-      const B = num(z.geo.B, 1), L = num(z.geo.cuadrada ? z.geo.B : z.geo.L, 1)
-      const { xc, yc } = centroColumna({ ...z.geo, L })
-      for (const n of nudos) {
-        const i = idx.get(n), a = A.apoyos[i]
-        // con la reacción de hoy de este apoyo: si el modelo cambió, se nota aquí
-        const R = revisarCim({ ...z, cargas: cargas[i], apoyos: [] }, obra)
-        const { u } = estadoCim(R)
-        const cx = a.x - xc, cy = a.y - yc
-        const it = {
-          z, n, u, ok: R.ok, rige: R.checks.filter((c) => !c.ok).map((c) => c.titulo.toLowerCase()),
-          poly: [[cx - B / 2, cy - L / 2], [cx + B / 2, cy - L / 2], [cx + B / 2, cy + L / 2], [cx - B / 2, cy + L / 2]],
-        }
-        items.push(it); anota(n, it)
-      }
-    } else if (z.tipo === 'corrida' || z.tipo === 'contratrabe') {
-      const pts = nudos.map((n) => A.apoyos[idx.get(n)])
-      // el eje: de los dos apoyos más lejanos
-      let p = pts[0], q = pts[pts.length - 1], dMax = -1
-      for (const s of pts) for (const t of pts) { const d = Math.hypot(t.x - s.x, t.y - s.y); if (d > dMax) { dMax = d; p = s; q = t } }
-      const largo = Math.max(dMax, 1e-6)
-      let u = [(q.x - p.x) / largo, (q.y - p.y) / largo]
-      let ini, L
-      if (z.tipo === 'contratrabe') {
-        L = num(z.geo.L, largo)
-        const c0 = (z.columnas || []).find((c) => c.nudo != null && idx.has(String(c.nudo)))
-        const cN = [...(z.columnas || [])].reverse().find((c) => c.nudo != null && idx.has(String(c.nudo)))
-        if (c0 && cN && c0 !== cN) {
-          const a0 = A.apoyos[idx.get(String(c0.nudo))], aN = A.apoyos[idx.get(String(cN.nudo))]
-          const d = Math.hypot(aN.x - a0.x, aN.y - a0.y) || 1
-          u = [(aN.x - a0.x) / d, (aN.y - a0.y) / d]
-          ini = [a0.x - num(c0.x) * u[0], a0.y - num(c0.x) * u[1]]
-        } else ini = [p.x - (L - largo) / 2 * u[0], p.y - (L - largo) / 2 * u[1]]
-      } else {
-        L = num(z.geo.Lz, largo)
-        const m = [(p.x + q.x) / 2, (p.y + q.y) / 2]
-        ini = [m[0] - (L / 2) * u[0], m[1] - (L / 2) * u[1]]
-      }
-      const B = num(z.geo.B, 1), nv = [-u[1] * B / 2, u[0] * B / 2]
-      const fin = [ini[0] + L * u[0], ini[1] + L * u[1]]
-      const R = revisarCim(z, obra)
-      const { u: ut } = estadoCim(R)
-      const it = {
-        z, nudos, u: ut, ok: R.ok, rige: R.checks.filter((c) => !c.ok).map((c) => c.titulo.toLowerCase()), franja: true,
-        poly: [[ini[0] + nv[0], ini[1] + nv[1]], [fin[0] + nv[0], fin[1] + nv[1]], [fin[0] - nv[0], fin[1] - nv[1]], [ini[0] - nv[0], ini[1] - nv[1]]],
-        eje: [ini, fin],
-      }
-      items.push(it)
-      for (const n of nudos) anota(n, it)
-    }
-  }
-  return { items, porNudo }
-}
+const CLASE = { centro: 'céntrica', lindero: 'lindero', esquina: 'esquina' }
 
 export default function CimRam({ obra, onClose, onToast }) {
   const cimientos = useCimStore((s) => s.cimientos)
   const agregarVarios = useCimStore((s) => s.agregarVarios)
   const seleccionar = useCimStore((s) => s.seleccionar)
+  const linderos = useCimStore((s) => s.linderos)
+  const setLinderos = useCimStore((s) => s.setLinderos)
   const [fuente, setFuente] = useState(null)
   const [aviso, setAviso] = useState('')
   const [papeles, setPapeles] = useState(leer)
@@ -130,7 +66,10 @@ export default function CimRam({ obra, onClose, onToast }) {
   const idxElegidos = A ? A.apoyos.map((a, i) => (sel.has(a.nudo) ? i : -1)).filter((i) => i >= 0) : []
 
   // ── la cimentación que ya hay sobre estos apoyos ──
-  const planta = useMemo(() => (A ? cimentacionEnPlanta(A, cimientos, cargas, obra) : { items: [], porNudo: new Map() }), [A, cimientos, cargas, obra])
+  const cont = useMemo(() => (A?.apoyos.length ? contorno(A.apoyos) : null), [A])
+  const planta = useMemo(() => (A && cont ? cimentacionEnPlanta(A, cimientos, cargas, obra, cont, linderos) : { items: [], porNudo: new Map() }), [A, cimientos, cargas, obra, cont, linderos])
+  const invasiones = planta.items.filter((it) => it.invade?.length)
+  const condDe = (a) => (cont ? condicionApoyo(a, cont, linderos) : { clase: 'centro' })
   const verCim = (vista ?? (planta.items.length ? 'cim' : 'cargas')) === 'cim'
   const cubiertos = A ? A.apoyos.filter((a) => planta.porNudo.has(a.nudo)).length : 0
   const faltan = A ? A.apoyos.filter((a) => !planta.porNudo.has(a.nudo)) : []
@@ -150,7 +89,8 @@ export default function CimRam({ obra, onClose, onToast }) {
   const geo = useMemo(() => {
     if (!A?.apoyos.length) return null
     // que quepan los apoyos y los cimientos dibujados
-    const todos = [...A.apoyos.map((a) => [a.x, a.y]), ...planta.items.flatMap((it) => it.poly)]
+    const todos = [...A.apoyos.map((a) => [a.x, a.y]), ...planta.items.flatMap((it) => it.poly),
+      ...(cont ? [[lineaLindero(cont, 'x-min') - 0.4, lineaLindero(cont, 'y-min') - 0.4], [lineaLindero(cont, 'x-max') + 0.4, lineaLindero(cont, 'y-max') + 0.4]] : [])]
     const pts0 = todos.map(([x, y]) => gira(x, y, GIRO_RAM))
     const xs = pts0.map((p) => p[0]), ys = pts0.map((p) => p[1])
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
@@ -168,7 +108,7 @@ export default function CimRam({ obra, onClose, onToast }) {
       return [P(a[A.plano[0]], a[A.plano[1]]), P(b[A.plano[0]], b[A.plano[1]])]
     }).filter(Boolean)
     return { P, k, lineas, pts: A.apoyos.map((a) => P(a.x, a.y)) }
-  }, [A, R, planta])
+  }, [A, R, planta, cont])
   const maxP = Math.max(1e-6, ...servicio)
 
   const punto = (e) => { const r = svgRef.current.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] }
@@ -193,7 +133,8 @@ export default function CimRam({ obra, onClose, onToast }) {
   const abrir = (z) => { seleccionar(z.uid); onClose() }
 
   const archivo = fuente?.archivo || ''
-  const grupos = useMemo(() => (idxElegidos.length ? agruparPorLado(idxElegidos.map((i) => ladoRequerido(cargas[i], obra)), tipos) : []), [idxElegidos.join(','), tipos, cargas, obra]) // eslint-disable-line react-hooks/exhaustive-deps
+  const grupos = useMemo(() => (elegidos.length ? tiposDeZapata(elegidos, pap, A.up, { tipos, obra, linderos, cont }).grupos : []), [idxElegidos.join(','), tipos, pap, obra, linderos, cont]) // eslint-disable-line react-hooks/exhaustive-deps
+  const opLind = { linderos, cont }
   const conNombres = (lista) => {
     const hechos = [...cimientos]
     return lista.map((z) => { const n = { ...z, nombre: nombreLibre(z.tipo, hechos) }; hechos.push(n); return n })
@@ -257,17 +198,51 @@ export default function CimRam({ obra, onClose, onToast }) {
               <svg ref={svgRef} width={W} height={H} className="cim-ram-planta" data-testid="cim-ram-planta"
                 onPointerDown={empezarCaja} onPointerMove={moverCaja} onPointerUp={soltarCaja}>
                 {geo?.lineas.map(([p, q], i) => <line key={i} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke="#cfc8bd" strokeWidth={1.4} />)}
+                {cont && LADOS.map((l) => {
+                  // cada lado de la planta: clic para marcarlo como lindero
+                  const v = lineaLindero(cont, l), m = 0.5
+                  const [a0, a1] = l[0] === 'x' ? [[v, cont.ymin - m], [v, cont.ymax + m]] : [[cont.xmin - m, v], [cont.xmax + m, v]]
+                  const p = geo.P(...a0), q = geo.P(...a1)
+                  const on = !!linderos[l]
+                  const cen = geo.P((cont.xmin + cont.xmax) / 2, (cont.ymin + cont.ymax) / 2)
+                  const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]
+                  const len = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1
+                  const d = [(q[0] - p[0]) / len, (q[1] - p[1]) / len]
+                  let nr = [-d[1], d[0]]
+                  if (Math.hypot(mid[0] + nr[0] - cen[0], mid[1] + nr[1] - cen[1]) < Math.hypot(mid[0] - cen[0], mid[1] - cen[1])) nr = [-nr[0], -nr[1]]
+                  const ticks = on ? Array.from({ length: Math.floor(len / 9) }, (_, k) => { const t0 = 4 + k * 9; return [p[0] + d[0] * t0, p[1] + d[1] * t0] }) : []
+                  const txt = [mid[0] + nr[0] * (Math.abs(nr[0]) > 0.5 ? 9 : 15), mid[1] + nr[1] * 15]
+                  return (
+                    <g key={l} className="cim-lindero" data-testid={`cim-lado-${l}`} style={{ cursor: 'pointer' }}
+                      onPointerDown={(e) => e.stopPropagation()} onClick={() => setLinderos({ [l]: !on })}>
+                      <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke="transparent" strokeWidth={16} />
+                      {ticks.map(([x, y], k) => <line key={k} x1={x} y1={y} x2={x + nr[0] * 6 + d[0] * 4} y2={y + nr[1] * 6 + d[1] * 4} stroke="#c62828" strokeWidth={0.9} pointerEvents="none" />)}
+                      <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={on ? '#c62828' : '#bdb6ab'} strokeWidth={on ? 2 : 1} strokeDasharray={on ? undefined : '6 4'} pointerEvents="none" />
+                      <text x={txt[0]} y={txt[1] + 3} textAnchor={nr[0] > 0.5 ? 'start' : nr[0] < -0.5 ? 'end' : 'middle'} fontSize={on ? 9.5 : 9} fontWeight={on ? 700 : 400} letterSpacing={on ? 1 : 0} fill={on ? '#c62828' : '#a39c92'} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{on ? 'LINDERO' : 'lindero?'}</text>
+                      <title>{on ? 'Colindancia: las zapatas de sus apoyos salen de lindero. Clic para quitarlo.' : 'Clic: este lado es colindancia (las zapatas de sus apoyos saldrán de lindero)'}</title>
+                    </g>
+                  )
+                })}
                 {verCim && planta.items.map((it, j) => {
                   const t = tonoDe(it.u, it.ok)
                   const pts = it.poly.map(([x, y]) => geo.P(x, y))
-                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = Math.min(...pts.map((p) => p[1]))
+                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length
                   const ancho = Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0]))
+                  const alto = Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1]))
+                  // el nombre: arriba de la franja; en una aislada, dentro y del lado libre de la columna
+                  let tx = cx, ty = Math.min(...pts.map((p) => p[1])) - 3
+                  if (!it.franja) {
+                    const cy0 = pts.reduce((s, p) => s + p[1], 0) / pts.length
+                    const [sx, sy] = geo.pts[A.apoyos.findIndex((a) => a.nudo === it.n)] || [cx, cy0]
+                    const dx = cx - sx, dy = cy0 - sy, dd = Math.hypot(dx, dy)
+                    if (dd < 4) { tx = cx; ty = cy0 - alto / 2 + 11 } else { tx = cx + (dx / dd) * ancho * 0.28; ty = cy0 + (dy / dd) * alto * 0.28 + 3 }
+                  }
                   return (
                     <g key={`${it.z.uid}-${it.n || j}`} className="cim-plan-item" data-testid={it.franja ? `cim-plan-${it.z.nombre}` : `cim-plan-${it.z.nombre}-${it.n}`}
                       onPointerDown={(e) => { e.stopPropagation() }} onClick={() => abrir(it.z)} style={{ cursor: 'pointer' }}>
-                      <polygon data-cim={it.z.uid} points={poli(it.poly)} fill={t.f} stroke={t.c} strokeWidth={1.5} />
+                      <polygon data-cim={it.z.uid} points={poli(it.poly)} fill={t.f} stroke={it.invade?.length ? '#c62828' : t.c} strokeWidth={it.invade?.length ? 2 : 1.5} strokeDasharray={it.invade?.length ? '4 2' : undefined} />
                       {it.franja && <line x1={geo.P(...it.eje[0])[0]} y1={geo.P(...it.eje[0])[1]} x2={geo.P(...it.eje[1])[0]} y2={geo.P(...it.eje[1])[1]} stroke={t.c} strokeWidth={it.z.tipo === 'contratrabe' ? 3.2 : 1} strokeDasharray={it.z.tipo === 'contratrabe' ? undefined : '5 3'} pointerEvents="none" />}
-                      {(it.franja || ancho > 26) && <text x={cx} y={cy - 3} textAnchor="middle" fontSize={9.5} fontWeight={700} fill={t.c} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre}{it.franja ? ` · ${pct(it.u)}` : ''}</text>}
+                      {(it.franja || ancho > 26) && <text x={tx} y={ty} textAnchor="middle" fontSize={9.5} fontWeight={700} fill={t.c} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre}{it.franja ? ` · ${pct(it.u)}` : ''}</text>}
                       <title>{`${it.z.nombre} · ${tipoCim(it.z.tipo).nombre}${it.n ? ` en el nudo ${it.n}` : ` sobre ${it.nudos.length} apoyos`}: ${pct(it.u)}${it.ok ? '' : ` · no cumple: ${it.rige.join(', ')}`} · clic para abrirlo`}</title>
                     </g>
                   )
@@ -303,6 +278,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                       </circle>
                       <text x={x + r + 2} y={y - 2} fontSize={9} fill="#6b6760" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
                       <text x={x + r + 2} y={y + 8} fontSize={9} fill="#1a1814" fontFamily="DM Mono, monospace" pointerEvents="none">{servicio[i].toFixed(1)} t</text>
+                      {condDe(a).clase !== 'centro' && <text x={x + r + 2} y={y + 18} fontSize={8.5} fontWeight={700} fill="#c62828" fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{condDe(a).clase}</text>}
                     </g>
                   )
                 })}
@@ -327,6 +303,12 @@ export default function CimRam({ obra, onClose, onToast }) {
                 <b>{cubiertos} de {A.apoyos.length}</b> apoyos con cimiento
                 {faltan.length > 0 && <button className="cim-mini" data-testid="cim-ram-faltan" onClick={() => setSel(new Set(faltan.map((a) => a.nudo)))}>elegir los {faltan.length} que faltan</button>}
               </div>
+              {invasiones.length > 0 && (
+                <p className="cim-aviso-mini" data-testid="cim-ram-invade">
+                  Pasan del lindero: {[...new Set(invasiones.map((it) => it.z.nombre))].map((n) => `${n} (nudo${invasiones.filter((it) => it.z.nombre === n && it.n).length > 1 ? 's' : ''} ${invasiones.filter((it) => it.z.nombre === n).map((it) => it.n || it.nudos.join(', ')).join(', ')})`).join(' · ')}.
+                  Bórralas y créalas otra vez con el lindero marcado.
+                </p>
+              )}
               {dobles.length > 0 && <p className="cim-aviso-mini" data-testid="cim-ram-dobles">Nudo{dobles.length > 1 ? 's' : ''} {dobles.map((a) => a.nudo).join(', ')} en dos cimientos: borra el que sobre.</p>}
               {resumenCim.length > 0 && (
                 <div className="cim-ram-lista" data-testid="cim-ram-lista">
@@ -343,6 +325,16 @@ export default function CimRam({ obra, onClose, onToast }) {
                 </div>
               )}
 
+              <div className="cim-grupo-t" style={{ marginTop: 10 }}>Linderos</div>
+              <div className="cim-lados">
+                {cont && LADOS.map((l) => {
+                  const eje = (l[0] === 'x' ? A.plano[0] : A.plano[1]).toUpperCase()
+                  const v = l === 'x-min' ? cont.xmin : l === 'x-max' ? cont.xmax : l === 'y-min' ? cont.ymin : cont.ymax
+                  return <button key={l} className={`cim-lado ${linderos[l] ? 'on' : ''}`} data-testid={`cim-lindero-${l}`} onClick={() => setLinderos({ [l]: !linderos[l] })} title="Lado de la planta (ejes del modelo) que es colindancia">{eje} = {f2(v)}</button>
+                })}
+              </div>
+              <p className="cim-nota">Marca los lados que son colindancia (aquí o con clic en la planta): sus apoyos salen con zapata de lindero, y en dos lados, de esquina.</p>
+
               <div className="cim-grupo-t" style={{ marginTop: 10 }}>Zapatas aisladas</div>
               <label className="cim-caso-fila"><span>tipos de zapata</span>
                 <select className="field-select" value={tipos} data-testid="cim-ram-tipos" onChange={(e) => setTipos(+e.target.value)}>{[1, 2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}</option>)}</select>
@@ -350,20 +342,20 @@ export default function CimRam({ obra, onClose, onToast }) {
               {grupos.length > 0 && (
                 <table className="cim-mini-tabla" data-testid="cim-ram-grupos">
                   <thead><tr><th>tipo</th><th>apoyos</th><th>lado pedido</th></tr></thead>
-                  <tbody>{grupos.map((g, i) => <tr key={i}><td>{i + 1}</td><td>{g.idx.length}</td><td>{f2(g.desde)}–{f2(g.hasta)} m</td></tr>)}</tbody>
+                  <tbody>{grupos.map((g, i) => <tr key={i}><td>{i + 1} <small className="gris">{CLASE[g.clase]}</small></td><td>{g.idx.length}</td><td>{f2(g.desde)}–{f2(g.hasta)} m</td></tr>)}</tbody>
                 </table>
               )}
-              <button className="btn btn-primary" data-testid="cim-ram-aisladas" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos, obra, archivo }), 'Zapatas aisladas')}>
+              <button className="btn btn-primary" data-testid="cim-ram-aisladas" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos, obra, archivo, ...opLind }), 'Zapatas aisladas')}>
                 Crear {Math.min(tipos, sel.size) || ''} tipo(s) de zapata
               </button>
-              <button className="btn btn-secondary" data-testid="cim-ram-una" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos: 1, obra, archivo }), 'Zapata aislada')}>
+              <button className="btn btn-secondary" data-testid="cim-ram-una" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos: 1, obra, archivo, ...opLind }), 'Zapata aislada')}>
                 Una zapata para todos (envolvente)
               </button>
               <div className="cim-grupo-t" style={{ marginTop: 10 }}>Sobre un eje</div>
-              <button className="btn btn-secondary" data-testid="cim-ram-corrida" disabled={sel.size < 2} onClick={() => { const z = corridaDesde(elegidos, pap, A.up, { archivo }); if (z) crear([z], 'Zapata corrida') }}>
+              <button className="btn btn-secondary" data-testid="cim-ram-corrida" disabled={sel.size < 2} onClick={() => { const z = corridaDesde(elegidos, pap, A.up, { archivo, ...opLind }); if (z) crear([z], 'Zapata corrida') }}>
                 Zapata corrida (muro sobre estos apoyos)
               </button>
-              <button className="btn btn-secondary" data-testid="cim-ram-contratrabe" disabled={sel.size < 2} onClick={() => { const z = contratrabeDesde(elegidos, pap, A.up, { archivo }); if (z) crear([z], 'Contratrabe') }}>
+              <button className="btn btn-secondary" data-testid="cim-ram-contratrabe" disabled={sel.size < 2} onClick={() => { const z = contratrabeDesde(elegidos, pap, A.up, { archivo, ...opLind }); if (z) crear([z], 'Contratrabe') }}>
                 Corrida con contratrabe (columnas del eje)
               </button>
               <p className="cim-nota">Cada cimiento guarda de qué nudos salió y se revisa con la reacción de cada uno. Con un modelo nuevo, la planta dice cuáles ya no alcanzan.</p>

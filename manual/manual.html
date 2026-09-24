@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.02"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.03"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -126,7 +126,7 @@
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.02</b>Septiembre de 2026</div>
+    <div><b>Versión 3.03</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -787,6 +787,19 @@
     <li><b>Clic en un cimiento</b> (en la planta o en la lista) lo abre.</li>
     <li>Los % se calculan con las reacciones del modelo de hoy: al resincronizar, la planta dice cuáles ya no alcanzan.</li>
   </ul>
+
+  <h3>Linderos: zapatas de lindero y de esquina</h3>
+  <figure>
+    <img src="img/cim-linderos.png" alt="">
+    <figcaption><b>Linderos.</b> X = 0 y Z = 0 marcados antes de crear: sus zapatas salen de lindero, con la columna a la orilla y creciendo hacia adentro, y la del nudo 1 de esquina. Al marcar después X = 15, las céntricas de ese lado se marcan en rojo punteado: pasan del lindero.</figcaption>
+  </figure>
+  <ol class="pasos">
+    <li>Marca los lados de la planta que son colindancia: clic en el lado (la línea punteada que dice <b>lindero?</b>) o en su botón de <b>Linderos</b> (<code>X = 0.00</code>, <code>Z = 9.00</code>…, en los ejes del modelo). El lindero es el paño exterior de las columnas de ese lado.</li>
+    <li>Elige los apoyos y crea las zapatas como siempre. Los que caen sobre un lindero salen <b>de lindero</b>; sobre dos, <b>de esquina</b>; los demás, céntricas. Cada condición se agrupa en sus propios tipos; la tabla de tipos lo dice.</li>
+    <li>Revisa en la planta que ninguna diga que <b>pasa del lindero</b>. Si marcaste un lindero después de crear, borra las que avisa y créalas otra vez.</li>
+  </ol>
+  <p>Cada zapata de lindero o de esquina se diseña en sus propios ejes, con la columna del lado −x (y −y en la esquina): la app gira o refleja las cargas de cada apoyo a esos ejes, así un mismo tipo sirve en los cuatro lados. Salen con <b>trabe de liga</b>, que toma el momento N·e;
+  si tu estructura no la tiene, quítala en el formulario y vuelve a proponer. Una <b>corrida</b> sobre un lindero sale de lindero (el muro a la orilla); una <b>contratrabe</b> sobre un lindero se diseña centrada y lo avisa.</p>
 
   <div class="caja nota">
     <span class="t">Cargas</span>
