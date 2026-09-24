@@ -31,6 +31,24 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.05',
+    fecha: '2026-09-24',
+    lema: 'Mampostería para placas en el catálogo de RAM, y los DXF con sus acentos.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'Tabique, block y Covintec en el grupo Personales de RAM',
+        texto: 'instalar_catalogo.py ahora también da de alta los materiales de mampostería para placas: TABIQUE (barro recocido), BLOCK HUECO y BLOCK MACIZO (concreto) con f′m = 15 kg/cm², Em = 600 u 800 f′m y Gm = 0.4 Em de la NTC-Mampostería, y COVINTEC con 1.2 t/m³. Toma el formato de las tablas «Masonry clay» y «Masonry concrete» de tu RAM y te dice qué columna llenó con qué.',
+        donde: 'Reportes de RAM → ⚡ Desde RAM → ⚙ Configurar RAM → ⬇ instalar_catalogo.py',
+      },
+    ],
+    cambios: [
+      { tipo: 'arreglo', texto: 'DXF: los acentos, la ñ y los símbolos ya no salen como «?» en AutoCAD («Zapata céntrica», «sección», m², Δ). Vale para todos los planos: vigas, columnas, alzados y cimentaciones.' },
+      { tipo: 'mejora', texto: 'En el DXF, «·» sale como «-», «×» como «x» y «≤» como «<=», que txt.shx sí dibuja; Ø, ° y ± con %%c, %%d y %%p.' },
+    ],
+    aviso: 'Para tener la mampostería en RAM, vuelve a descargar y correr instalar_catalogo.py (es seguro correrlo otra vez).',
+  },
+  {
     version: '3.04',
     fecha: '2026-09-24',
     lema: 'Contratrabes de liga, un mismo diseño en varios ejes y la planta de cimentación en grande.',

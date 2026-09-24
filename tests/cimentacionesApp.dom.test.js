@@ -58,7 +58,7 @@ describe('store de cimentaciones', () => {
 
 describe('planos a DXF', () => {
   it('todos los tipos apilados, a escala real (1 cm del modelo = 1 cm del dibujo)', () => {
-    const lista = ['aislada', 'corrida', 'contratrabe', 'contencion', 'gravedad', 'mamposteria'].map((t) => crearCim(t, [], {}))
+    const lista = ['aislada', 'corrida', 'contratrabe', 'contencion', 'gravedad', 'mamposteria', 'liga'].map((t) => crearCim(t, [], {}))
     const P = planosSvg(lista, {})
     const svg = svgParaDxf(P)
     expect(svg).toMatch(/width="[\d.]+cm"/)
@@ -66,6 +66,10 @@ describe('planos a DXF', () => {
     const dxf = svgToDxf(svg, { scaleFactor: 1 })
     expect(dxf).toContain('SECTION')
     expect((dxf.match(/\nLINE\n/g) || []).length).toBeGreaterThan(100)
+    // los textos con acentos y «·» ya no salen como «?»
+    expect(dxf).not.toMatch(/\?/)
+    expect(/^[\x00-\x7F]*$/.test(dxf)).toBe(true)
+    expect(dxf).toMatch(/c\\U\+00E9ntrica|\\U\+00F3n/)
   })
 })
 

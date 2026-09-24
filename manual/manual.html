@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.04"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.05"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -126,7 +126,7 @@
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.04</b>Septiembre de 2026</div>
+    <div><b>Versión 3.05</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -223,7 +223,7 @@
   <table>
     <thead><tr><th style="width:24%">Script</th><th>Qué hace</th><th style="width:28%">Qué toca</th></tr></thead>
     <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM, los desplazamientos de las trabes para las flechas, en cada columna P, M22 y M33 simultáneos de cada combinación y las reacciones de los apoyos por caso de carga.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
-    <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones y concretos en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
+    <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones, concretos y mampostería para placas en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
     <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2… o C1, C2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en <code>1 Agrupación</code>.</td></tr>
     <tr><td><b>edificio_prueba.py</b></td><td>Construye y analiza un edificio de práctica.</td><td>Sólo un modelo nuevo y vacío.</td></tr>
   </table>
@@ -247,11 +247,11 @@
   <h2><span class="n">2</span>Preparar la computadora</h2>
   <p class="entrada">Una sola vez por computadora, no por proyecto: el catálogo queda en la base de datos de RAM y lo ve cualquier modelo que abras ahí.</p>
 
-  <h3>Instalar el catálogo de secciones y concretos</h3>
+  <h3>Instalar el catálogo de secciones, concretos y mampostería</h3>
   <ol class="pasos">
     <li>En la app, <b>📥 Reportes de RAM</b> (arriba a la derecha) → pestaña <b>⚡ Desde RAM</b> → abre <b>⚙ Configurar RAM para este proyecto</b> → <b>⬇ instalar_catalogo.py</b>.</li>
     <li>En RAM, en la consola de Python: <b>Abrir Script…</b> → elige <code>instalar_catalogo.py</code> → <kbd>Ctrl</kbd>+<kbd>R</kbd>.</li>
-    <li>Lee lo que imprime: cuántas secciones y concretos agregó, cuáles ya estaban y dónde dejó el respaldo.</li>
+    <li>Lee lo que imprime: cuántas secciones, concretos y materiales de mampostería agregó, cuáles ya estaban y dónde dejó el respaldo.</li>
     <li>Si no aparecen en el grupo <b>Personales</b> al asignar secciones, cierra RAM y vuelve a abrirlo.</li>
   </ol>
 
@@ -275,6 +275,23 @@
       </table>
       <p class="pequeno gris">Todos con ν = 0.2, 2.4 t/m³, α = 1×10⁻⁵ /°C, fy = fyt = 4 200 kg/cm², Es = 2.04×10⁶ kg/cm². Clase 1 con agregado calizo (14 000√f'c).</p>
     </div>
+  </div>
+
+  <h4>Mampostería para placas (4)</h4>
+  <table>
+    <thead><tr><th>Material</th><th>Tabla en Personales</th><th class="num">f′m</th><th class="num">Em</th><th class="num">Gm</th><th class="num">ν</th><th class="num">Peso</th></tr></thead>
+    <tr><td><b>TABIQUE</b> <span class="pequeno gris">barro rojo recocido 7×14×28</span></td><td>Mampostería de barro</td><td class="num">15</td><td class="num">9 000 · 600 f′m</td><td class="num">3 600</td><td class="num">0.25</td><td class="num">1.5 t/m³</td></tr>
+    <tr><td><b>BLOCK HUECO</b> <span class="pequeno gris">concreto 15×20×40, sin colar</span></td><td>Mampostería de concreto</td><td class="num">15</td><td class="num">12 000 · 800 f′m</td><td class="num">4 800</td><td class="num">0.25</td><td class="num">1.4 t/m³</td></tr>
+    <tr><td><b>BLOCK MACIZO</b> <span class="pequeno gris">o tabicón</span></td><td>Mampostería de concreto</td><td class="num">15</td><td class="num">12 000 · 800 f′m</td><td class="num">4 800</td><td class="num">0.25</td><td class="num">2.1 t/m³</td></tr>
+    <tr><td><b>COVINTEC</b> <span class="pequeno gris">panel 3″ + 2.5 cm de mortero por cara</span></td><td>Mampostería de concreto</td><td class="num">40*</td><td class="num">32 000*</td><td class="num">13 333</td><td class="num">0.2</td><td class="num">1.2 t/m³</td></tr>
+  </table>
+  <p class="pequeno gris">kg/cm². NTC-Mampostería: f′m de diseño sobre área bruta con mortero II o III (con mortero I el block llega a 20), Em para cargas de corta duración, Gm = 0.4 Em; fy = 4&nbsp;200. El peso es el del muro con sus juntas; el de block macizo es el de Pesos Unitarios. *Covintec no está en la NTC: sus valores son los equivalentes en todo el espesor (12.5 cm) de las dos caras de mortero f′c 100; sirven para el peso y la rigidez del análisis, no para diseñarlo con el módulo de mampostería de RAM. El espesor lo pone la placa.</p>
+
+  <div class="caja ojo">
+    <span class="t">La mampostería copia el formato de tu RAM</span>
+    Las tablas de mampostería de RAM llevan otras columnas que la de concreto. El instalador lee las de fábrica (<b>Masonry clay</b> y <b>Masonry concrete</b>, grupo United States),
+    toma su fila más parecida de plantilla y sólo cambia E, G, ν, peso, α, f′m y fy, ya en las unidades de esa fila; imprime qué columna llenó con qué y cuáles dejó como las trae RAM.
+    Si no encuentra esas tablas no inventa nada: lo dice y lista las que vio (mándale esa salida a quien mantiene la app).
   </div>
 
   <div class="caja oro">
@@ -897,6 +914,8 @@
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
     <tr><td>El aplicar dice que falta una sección</td><td>No se aplicó la agrupación: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar. Si además dice que un miembro «se quedó con» otra sección al probar, cierra el modelo sin guardar.</td></tr>
     <tr><td>Cimentaciones → Desde RAM: el modelo no trae reacciones, o sólo por combinación</td><td>El <code>sincronizar.py</code> es de una versión anterior: sin los casos no se pueden separar CM, CV y S.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
+    <tr><td>En AutoCAD, un texto del DXF sale con «?» en lugar de acentos</td><td>El DXF es de una versión anterior a la 3.05.</td><td>Expórtalo otra vez: los acentos van como <code>\U+00E9</code>, que AutoCAD convierte en la letra; «·» sale «-» y «×» sale «x».</td></tr>
+    <tr><td>El instalador dice «No encontré la tabla de mampostería de RAM…»</td><td>Tu RAM no tiene las tablas Masonry clay / Masonry concrete donde se buscan.</td><td>Los concretos y secciones sí se instalaron. Manda la salida (lista las tablas que vio) para ajustar el instalador.</td></tr>
     <tr><td>Un cimiento no cumple ni con ⚡ Proponer</td><td>Suelo muy pobre, columna chica para su carga o resultante fuera de la base.</td><td>Lee el aviso bajo el veredicto: dice qué no alcanza y qué conviene.</td></tr>
     <tr><td>Agrupación → Columnas: «Este modelo.json es de un sincronizar.py anterior»</td><td>Las columnas no traen M22 ni las fuerzas de cada combinación.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
   </table>
@@ -937,6 +956,7 @@
     <thead><tr><th style="width:30%">Qué</th><th>Dónde</th></tr></thead>
     <tr><td>Catálogo de secciones</td><td class="mono pequeno">C:\ProgramData\Bentley\Engineering\RAM Elements\26.0.1\Database\Sections\Personales\Vigas de Concreto.sec y Columnas de Concreto.sec</td></tr>
     <tr><td>Catálogo de concretos</td><td class="mono pequeno">…\Database\Materials\Personales\Concreto.mat</td></tr>
+    <tr><td>Catálogo de mampostería</td><td class="mono pequeno">…\Database\Materials\Personales\Mampostería de barro.mat y Mampostería de concreto.mat</td></tr>
     <tr><td>Respaldos del catálogo</td><td>Escritorio: <code>Respaldo RAM - …</code></td></tr>
     <tr><td>La carpeta de la app en cada obra</td><td><code>PROCESO\Auxiliar IV</code> (la arma crear-proyectoiv.bat)</td></tr>
     <tr><td>El proyecto y el modelo</td><td><code>Auxiliar IV\proyecto.json</code> y <code>Auxiliar IV\modelo.json</code></td></tr>

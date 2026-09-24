@@ -174,21 +174,41 @@ function parseLengthCm(s){
   return (toCm[unit]!==undefined) ? val*toCm[unit] : null;
 }
 
-// ── Text special-character encoder for AutoCAD txt.shx ──────
-function encodeAcadText(str){
-  return String(str)
-    .replace(/Ø|ø|\u00D8|\u00F8/g,'%%c')
-    .replace(/°|\u00B0/g,'%%d')
-    .replace(/±|\u00B1/g,'%%p')
-    .replace(/×|\u00D7/g,'x')
-    .replace(/÷|\u00F7/g,'/')
-    .replace(/²|\u00B2/g,'^2')
-    .replace(/³|\u00B3/g,'^3')
-    .replace(/µ|\u00B5/g,'u')
-    .replace(/\u2205/g,'%%c')
-    .replace(/\u2200/g,'%%c')
-    .replace(/[\r\n\t]+/g,' ')
-    .replace(/[^\x20-\x7E]/g,'?');
+// ── Texto para AutoCAD (txt.shx) ────────────────────────────
+// Antes todo lo que no era ASCII salía como «?» («Zapata c?ntrica»). El DXF
+// ahora va en ASCII puro y los acentos viajan como \U+00E9, que AutoCAD
+// (y BricsCAD, LibreCAD, DraftSight…) convierte en la letra al abrirlo, sin
+// importar la página de códigos de la computadora:
+//   · Ø ° ± con sus códigos de siempre (%%c %%d %%p);
+//   · las letras y signos del español (á é í ó ú ñ ü ¿ ¡ º ª) y los símbolos
+//     que las fuentes SHX de AutoCAD sí traen (² ³ Δ ≈ ≠ Ω), como \U+;
+//   · lo que txt.shx no dibuja se escribe con su equivalente: · → -, × → x,
+//     ≤ → <=, — → -, ′ → ' …  (antes «²» salía «^2», y en un DXF «^2» se lee
+//     como un carácter de control, no como «al cuadrado»).
+const ACAD_CODIGO = { 'Ø':'%%c', 'ø':'%%c', '∅':'%%c', '⌀':'%%c', '°':'%%d', '±':'%%p' };
+const ACAD_EQUIVALENTE = {
+  '·':'-', '•':'-', '×':'x', '÷':'/', 'µ':'u', 'μ':'u',
+  '′':"'", '″':'"', '‘':"'", '’':"'", '‚':"'", '“':'"', '”':'"', '„':'"', '«':'"', '»':'"',
+  '–':'-', '—':'-', '−':'-', '─':'-', '…':'...', '→':'->', '←':'<-', '⇒':'=>',
+  '≤':'<=', '≥':'>=', '\u00A0':' ', '\u2009':' ', '\u202F':' ',
+};
+// lo que sí tiene glifo en las SHX de AutoCAD (Latin-1 y los símbolos de su tabla)
+const ACAD_UNICODE = /[\u00A1-\u00FF\u0394\u03A9\u2082\u2126\u2248\u2260\u2261\u2220]/;
+const unicodeAcad = (ch) => '\\U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+
+export function encodeAcadText(str){
+  let out = '';
+  for (const ch of String(str).replace(/[\r\n\t]+/g, ' ')) {
+    if (ch >= ' ' && ch <= '~') { out += ch; continue; }
+    if (ACAD_CODIGO[ch]) { out += ACAD_CODIGO[ch]; continue; }
+    if (ACAD_EQUIVALENTE[ch] !== undefined) { out += ACAD_EQUIVALENTE[ch]; continue; }
+    if (ACAD_UNICODE.test(ch)) { out += unicodeAcad(ch); continue; }
+    // otra letra con acento (ő, ł…): la base sin el acento; si no hay, en \U+
+    const base = ch.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
+    out += /^[\x20-\x7E]+$/.test(base) ? base : unicodeAcad(ch);
+  }
+  // en un DXF, «^» seguido de otra cosa es un carácter de control: «^ » es el ^ literal
+  return out.replace(/\^(?! )/g, '^ ');
 }
 
 // ── DXF builder — AC1009 / R12 format ──────────────────────
@@ -271,6 +291,7 @@ class DXFWriter {
     const header =
 `  0\nSECTION\n  2\nHEADER\n`+
 `  9\n$ACADVER\n  1\nAC1009\n`+
+`  9\n$DWGCODEPAGE\n  3\nANSI_1252\n`+
 `  9\n$INSBASE\n 10\n0.0\n 20\n0.0\n 30\n0.0\n`+
 `  9\n$EXTMIN\n 10\n${f(x0)}\n 20\n${f(y0)}\n 30\n0.0\n`+
 `  9\n$EXTMAX\n 10\n${f(x1)}\n 20\n${f(y1)}\n 30\n0.0\n`+

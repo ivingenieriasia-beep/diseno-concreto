@@ -6,7 +6,7 @@ import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
 import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida, SIN_NOMBRE } from '../core/ramModel'
 import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta, generarInstaladorCatalogo } from '../core/ramScript'
-import { SECCIONES_RAM, MATERIALES_RAM } from '../core/catalogoRam'
+import { SECCIONES_RAM, MATERIALES_RAM, MAMPOSTERIA_RAM } from '../core/catalogoRam'
 import { proponerTrabe, proponerColumna } from '../core/propuesta'
 import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta, guardarCarpeta, modeloGuardado,
@@ -570,8 +570,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                   ⬇ instalar_catalogo.py
                 </button>
                 <span style={{ fontSize: 10.5, color: 'var(--color-tx3)', lineHeight: 1.5, flex: '1 1 300px' }}>
-                  Da de alta en el grupo <b>Personales</b> de RAM las {SECCIONES_RAM.length} secciones y los {MATERIALES_RAM.length} concretos
-                  del catálogo. Una vez por computadora, no por proyecto: conserva lo que ya tengas y guarda un respaldo.
+                  Da de alta en el grupo <b>Personales</b> de RAM las {SECCIONES_RAM.length} secciones, los {MATERIALES_RAM.length} concretos
+                  y la mampostería para placas ({MAMPOSTERIA_RAM.map((m) => m.nombre.toLowerCase()).join(', ')}) del catálogo.
+                  Una vez por computadora, no por proyecto: conserva lo que ya tengas y guarda un respaldo.
                 </span>
               </div>
               {esRutaWindows(ruta) && carpeta && nombreCarpeta(ruta) !== carpeta.name && (

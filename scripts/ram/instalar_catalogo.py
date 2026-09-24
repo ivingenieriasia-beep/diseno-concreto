@@ -2,15 +2,22 @@
 u"""
 Auxiliar IV · Instala el catálogo de la casa en el grupo «Personales» de RAM.
 
-Da de alta las secciones (vigas y columnas de concreto) y los concretos del
+Da de alta las secciones (vigas y columnas de concreto), los concretos y la
+mampostería para placas (tabique, block hueco, block macizo y Covintec) del
 catálogo de la app. Es una vez por computadora: los grupos son de RAM, no
 del proyecto, así que a partir de aquí todos los modelos los tienen.
 
 Qué hace, y qué no:
-  · ESCRIBE las tres tablas del grupo Personales (lo crea si no existe):
+  · ESCRIBE las tablas del grupo Personales (lo crea si no existe):
       Sections / Personales / Vigas de Concreto.sec
       Sections / Personales / Columnas de Concreto.sec
       Materials / Personales / Concreto.mat
+      Materials / Personales / Mampostería de barro.mat      (tabique)
+      Materials / Personales / Mampostería de concreto.mat   (blocks, Covintec)
+  · La mampostería copia el formato de las tablas de RAM «Masonry clay» y
+    «Masonry concrete» (grupo United States): sus columnas, y de su fila más
+    parecida lo que no es de la NTC. Sólo cambia E, G, ν, peso, α, f'm y fy,
+    ya en las unidades de esa fila. Imprime qué columna llenó con qué.
   · FUSIONA, no sustituye: lo que ya tenías se queda. Si una fila se llama
     igual que una del catálogo, manda la del catálogo (así se corrige el
     F'C 250 que traía f'c = 281 de la plantilla US).
@@ -26,6 +33,7 @@ Ctrl+R. Si las secciones no aparecen enseguida, cierra y vuelve a abrir RAM.
 
 import os
 import re
+import sys
 
 # ── El catálogo (lo escribe la app desde catalogoRam.js; no hace falta tocarlo)
 CATALOGO = {
@@ -323,6 +331,56 @@ CATALOGO = {
    "FytH": "4200",
    "RCRegion": "US"
   }
+ ],
+ "mamposteria": [
+  {
+   "nombre": "TABIQUE",
+   "tabla": "Mampostería de barro",
+   "plantilla": "clay",
+   "E": 9000,
+   "G": 3600,
+   "U": 0.25,
+   "W": 0.0015,
+   "Alpha": 0.0000072,
+   "Fm": 15,
+   "Fy": 4200
+  },
+  {
+   "nombre": "BLOCK HUECO",
+   "tabla": "Mampostería de concreto",
+   "plantilla": "concrete",
+   "E": 12000,
+   "G": 4800,
+   "U": 0.25,
+   "W": 0.0014,
+   "Alpha": 0.0000081,
+   "Fm": 15,
+   "Fy": 4200
+  },
+  {
+   "nombre": "BLOCK MACIZO",
+   "tabla": "Mampostería de concreto",
+   "plantilla": "concrete",
+   "E": 12000,
+   "G": 4800,
+   "U": 0.25,
+   "W": 0.0021,
+   "Alpha": 0.0000081,
+   "Fm": 15,
+   "Fy": 4200
+  },
+  {
+   "nombre": "COVINTEC",
+   "tabla": "Mampostería de concreto",
+   "plantilla": "concrete",
+   "E": 32000,
+   "G": 13333.333333333334,
+   "U": 0.2,
+   "W": 0.0012,
+   "Alpha": 0.00001,
+   "Fm": 40,
+   "Fy": 4200
+  }
  ]
 }
 # ── fin del catálogo
@@ -509,6 +567,210 @@ def material(m):
     return fila
 
 
+
+# ── Mampostería: el formato lo pone RAM ──────────────────────────
+# Las tablas de mampostería de RAM no son como la de concreto y aquí no se
+# inventan: se lee la que trae RAM («Masonry clay» o «Masonry concrete» del
+# grupo United States), se toma su fila más parecida como plantilla y sólo se
+# reescriben las columnas que se reconocen. Las propiedades vienen de la app
+# en kg y cm y se pasan a las unidades de esa fila (RAM guarda cada fila con
+# las suyas: «Kip-In», «Kg-Cm»…), así que lo que no se toca sigue coherente.
+
+FUERZA = {u'kip': 453.59237, u'kips': 453.59237, u'lb': 0.45359237, u'lbs': 0.45359237,
+          u'kg': 1.0, u'kgf': 1.0, u'ton': 1000.0, u't': 1000.0, u'tonf': 1000.0,
+          u'kn': 101.971621297793, u'n': 0.101971621297793}
+LARGO = {u'in': 2.54, u'ft': 30.48, u'cm': 1.0, u'm': 100.0, u'mm': 0.1}
+
+
+def unidades(u):
+    u"""(kg por unidad de fuerza, cm por unidad de largo, ¿°F?) de «Kip-In», «Kg-Cm»…"""
+    partes = [p for p in re.split(r'[-_ /]+', (u or u'').strip().lower()) if p]
+    if len(partes) != 2 or partes[0] not in FUERZA or partes[1] not in LARGO:
+        return None
+    return FUERZA[partes[0]], LARGO[partes[1]], partes[1] in (u'in', u'ft')
+
+
+def numero(x):
+    u"""Como los escribe RAM: «9.9E-6», «221359.436211787»."""
+    s = u'%.15G' % x
+    if u'E' in s:
+        m, e = s.split(u'E')
+        s = u'%sE%d' % (m, int(e))
+    return s
+
+
+def _n(c):
+    return re.sub(r'[^a-z]', u'', c.lower())
+
+
+# qué columna es qué, por su nombre (sin mayúsculas ni signos)
+ROLES = (
+    (u'E', lambda n: n in (u'e', u'em')),
+    (u'G', lambda n: n in (u'g', u'gm', u'ev', u'gv')),
+    (u'U', lambda n: n in (u'u', u'nu', u'poisson')),
+    (u'W', lambda n: n in (u'w', u'gamma', u'density', u'weight', u'unitweight')),
+    (u'Alpha', lambda n: n in (u'alpha', u'alfa')),
+    (u'Fm', lambda n: re.match(r'^f(p|prime)?mh?$', n) is not None),
+    (u'Fy', lambda n: n.startswith(u'fy')),
+)
+
+
+def numeros_del_nombre(nombre):
+    return [float(x) for x in re.findall(r'\d+(?:\.\d+)?', nombre or u'')]
+
+
+def papeles(enc, plantilla, u):
+    u"""{columna: papel}. f'm también por su valor: «BMU 1.0-60» lleva f'm = 1.0 ksi."""
+    out = {}
+    for c in enc:
+        for papel, es in ROLES:
+            if es(_n(c)):
+                out[c] = papel
+                break
+    if u'Fm' not in out.values() and u[2]:
+        nums = numeros_del_nombre(plantilla.get(u'Name'))
+        a_ksi = u[0] / u[1] ** 2 / 70.3069579640175   # de la unidad de la fila a ksi
+        cands = []
+        for c in enc:
+            n = _n(c)
+            if c in out or not n.startswith(u'f') or n.startswith(u'factor'):
+                continue
+            try:
+                v = float(plantilla.get(c, u''))
+            except ValueError:
+                continue
+            if nums and abs(v * a_ksi - nums[0]) < 1e-6 * max(1.0, nums[0]):
+                cands.append(c)
+        if len(cands) == 1:
+            out[cands[0]] = u'Fm'
+    return out
+
+
+def fila_plantilla(filas):
+    u"""La de menor f'm y, entre ésas, la de fy más cercano a 60 ksi (4 200 kg/cm²)."""
+    def clave(f):
+        n = numeros_del_nombre(f.get(u'Name'))
+        return (n[0] if n else 1e9, abs((n[1] if len(n) > 1 else 60) - 60))
+    return min(filas, key=clave) if filas else None
+
+
+def raices_de_materiales(db):
+    u"""Donde RAM guarda sus tablas de fábrica (Program Files) y, al final, las de ProgramData."""
+    bases = [os.path.dirname(sys.executable or u'')]
+    for var in ('PROGRAMFILES', 'PROGRAMW6432'):
+        if os.environ.get(var):
+            bases.append(os.path.join(os.environ[var], 'Bentley', 'Engineering', 'RAM Elements'))
+    bases.append(u'C:/Program Files/Bentley/Engineering/RAM Elements')
+    raices, vistas = [], set()
+    for b in bases + [os.path.dirname(db)]:
+        r = os.path.join(b, 'Database', 'Materials')
+        clave = os.path.normcase(os.path.abspath(r))
+        if clave not in vistas and os.path.isdir(r):
+            vistas.add(clave)
+            raices.append(r)
+    return raices
+
+
+def leer_con_leo(ruta):
+    u"""(leo, encabezado, filas) de una tabla de RAM, o None."""
+    try:
+        with open(ruta, 'rb') as f:
+            texto, _cod = decodificar(f.read())
+    except Exception:
+        return None
+    lineas = [l.rstrip(u'\r') for l in texto.split(u'\n')]
+    if not lineas or not lineas[0].startswith(u'//infotable'):
+        return None
+    leo = next((l for l in lineas if l.startswith(u'[')), None)
+    previo = leer_tabla(ruta)
+    if not leo or not previo or not previo[0]:
+        return None
+    return leo, previo[0], previo[1]
+
+
+def plantillas_de_mamposteria(db):
+    u"""{'clay'|'concrete': (ruta, leo, enc, filas)} — primero el grupo United States."""
+    halladas, vistos = {}, []
+    for raiz in raices_de_materiales(db):
+        grupos = sorted(os.listdir(raiz), key=lambda g: (g.lower() != u'united states', g.lower()))
+        for g in grupos:
+            carpeta = os.path.join(raiz, g)
+            if g.lower() == u'personales' or not os.path.isdir(carpeta):
+                continue
+            for f in sorted(os.listdir(carpeta)):
+                if not f.lower().endswith(u'.mat'):
+                    continue
+                ruta = os.path.join(carpeta, f)
+                t = leer_con_leo(ruta)
+                if not t:
+                    continue
+                vistos.append((ruta, t[0], t[1]))
+                texto = (f + u' ' + t[0]).lower()
+                if u'masonry' not in texto and u'mamposter' not in texto:
+                    continue
+                tipo = u'clay' if (u'clay' in texto or u'barro' in texto) else \
+                       u'concrete' if u'concret' in texto else None
+                if tipo and tipo not in halladas and t[2]:
+                    halladas[tipo] = (ruta, t[0], t[1], t[2])
+    return halladas, vistos
+
+
+def fila_mamposteria(m, plantilla, enc, u, roles):
+    F, L, grados_f = u
+    esfuerzo = lambda x: x * L ** 2 / F
+    valores = {u'E': esfuerzo(m['E']), u'G': esfuerzo(m['G']), u'U': m['U'],
+               u'W': m['W'] * L ** 3 / F, u'Alpha': m['Alpha'] / 1.8 if grados_f else m['Alpha'],
+               u'Fm': esfuerzo(m['Fm']), u'Fy': esfuerzo(m['Fy'])}
+    fila = dict(plantilla)
+    fila[u'Name'] = m['nombre']
+    for c in enc:
+        if c in roles:
+            fila[c] = numero(valores[roles[c]])
+        elif _n(c) == u'readonly':
+            fila[c] = u'False'
+    return fila
+
+
+def instalar_mamposteria(db, lista):
+    halladas, vistos = plantillas_de_mamposteria(db)
+    tablas = []
+    for m in lista:
+        if m['tabla'] not in [x[0] for x in tablas]:
+            tablas.append((m['tabla'], m['plantilla']))
+    faltan = []
+    for tabla, tipo in tablas:
+        mats = [m for m in lista if m['tabla'] == tabla]
+        if tipo not in halladas:
+            faltan.append(u'%s (%s)' % (tabla, u', '.join(m['nombre'] for m in mats)))
+            continue
+        ruta, leo, enc, filas = halladas[tipo]
+        base = fila_plantilla(filas)
+        u = unidades(base.get(u'Unit'))
+        if u is None:
+            log(u'  !! %s: no entiendo las unidades «%s» de %s; no la toco.' % (tabla, base.get(u'Unit'), ruta))
+            continue
+        roles = papeles(enc, base, u)
+        log(u'  %s: formato de %s %s, plantilla «%s» (%s)' % (tabla, ruta, leo, base.get(u'Name'), base.get(u'Unit')))
+        log(u'    llena: %s' % u', '.join(u'%s = %s' % (c, roles[c]) for c in enc if c in roles))
+        otras = [c for c in enc if c not in roles and c not in (u'Name', u'Unit') and _n(c) != u'readonly']
+        if otras:
+            log(u'    como en RAM: %s' % u', '.join(u'%s = %s' % (c, base.get(c, u'')) for c in otras))
+        sin = [p for p in (u'E', u'W') if p not in roles.values()]
+        if sin:
+            log(u'  !! %s: la tabla de RAM no trae columna para %s; no la toco.' % (tabla, u' ni '.join(sin)))
+            continue
+        instalar_tabla(db, u'Materials', tabla + u'.mat', leo, enc,
+                       [fila_mamposteria(m, base, enc, u, roles) for m in mats])
+    if faltan:
+        log(u'')
+        log(u'  !! No encontré la tabla de mampostería de RAM que sirve de formato para:')
+        for f in faltan:
+            log(u'       %s' % f)
+        log(u'     Mándale esta salida a quien mantiene la app; las tablas de materiales que vi:')
+        for ruta, leo, enc in vistos[:40]:
+            log(u'       %s  %s  %s' % (ruta, leo, u' '.join(enc)))
+
+
 log(u'=' * 70)
 log(u'Auxiliar IV — catálogo de la casa → grupo Personales de RAM')
 log(u'=' * 70)
@@ -529,6 +791,8 @@ else:
             instalar_tabla(db, u'Sections', tabla + u'.sec', LEO[tabla], ENC_SECCION, nuevas, retirar)
         instalar_tabla(db, u'Materials', u'Concreto.mat', LEO_MAT, ENC_MATERIAL,
                        [material(m) for m in CATALOGO['materiales']])
+        if CATALOGO.get('mamposteria'):
+            instalar_mamposteria(db, CATALOGO['mamposteria'])
 
         # la sonda 10 dejó archivos de prueba que la caja de arena no le dejó borrar
         restos = []

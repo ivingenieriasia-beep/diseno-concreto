@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { svgToDxf } from '../src/core/svgToDxf.js'
+import { svgToDxf, encodeAcadText } from '../src/core/svgToDxf.js'
 import { columnsGridSvg, columnSectionSvgString } from '../src/core/columnsSvg.js'
 import { sectionSvgString } from '../src/core/sectionSvg.js'
 import { bdLookup } from '../src/core/columnCalculator.js'
@@ -67,5 +67,28 @@ describe('svgToDxf', () => {
     expect((svg.match(/<circle/g) || []).length).toBe(4 + 3 + 4)
     const dxf = svgToDxf(svg.replace('<svg ', '<svg data-real-width-cm="10" data-real-height-cm="10" '))
     expect((dxf.match(/\nCIRCLE\n/g) || []).length).toBeGreaterThanOrEqual(11)
+  })
+})
+
+describe('texto del DXF: acentos y símbolos', () => {
+  it('nada sale como «?»: los acentos van como \\U+ y el archivo es ASCII puro', () => {
+    expect(encodeAcadText('Z-1 · Zapata céntrica')).toBe('Z-1 - Zapata c\\U+00E9ntrica')
+    expect(encodeAcadText('Cimentación, sección, dirección')).toBe('Cimentaci\\U+00F3n, secci\\U+00F3n, direcci\\U+00F3n')
+    expect(encodeAcadText('Ñ ñ ü ¿ ¡ Á')).toBe('\\U+00D1 \\U+00F1 \\U+00FC \\U+00BF \\U+00A1 \\U+00C1')
+  })
+  it('los símbolos: %% de AutoCAD, los de las SHX en \\U+ y lo demás con su equivalente', () => {
+    expect(encodeAcadText('4Ø#5 ±2 90°')).toBe('4%%c#5 %%p2 90%%d')
+    expect(encodeAcadText('kg/cm² m³ Δ')).toBe('kg/cm\\U+00B2 m\\U+00B3 \\U+0394')
+    expect(encodeAcadText('q ≤ qe — f′c 20 × 40 → ok…')).toBe("q <= qe - f'c 20 x 40 -> ok...")
+    expect(encodeAcadText('x^2')).toBe('x^ 2')
+  })
+  it('un DXF de un dibujo con acentos no lleva «?» ni bytes fuera de ASCII', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" width="10cm" height="5cm"><text x="5" y="20" font-size="6">Z-1 · Zapata céntrica</text><text x="5" y="40" font-size="6">Contratrabe · sección 25 × 60 · f′c 250 kg/cm²</text></svg>`
+    const dxf = svgToDxf(svg)
+    expect(dxf).toContain('Z-1 - Zapata c\\U+00E9ntrica')
+    expect(dxf).toContain("Contratrabe - secci\\U+00F3n 25 x 60 - f'c 250 kg/cm\\U+00B2")
+    expect(dxf).not.toMatch(/\?/)
+    expect(/^[\x00-\x7F]*$/.test(dxf)).toBe(true)
+    expect(dxf).toContain('$DWGCODEPAGE\n  3\nANSI_1252')
   })
 })

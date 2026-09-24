@@ -84,6 +84,48 @@ export function materialRam(fc, { agregado = 'calizo' } = {}) {
 
 export const MATERIALES_RAM = FC_RAM.map((fc) => materialRam(fc))
 
+// ── Mampostería, para placas ─────────────────────────────────
+// RAM guarda la mampostería en dos tablas con su propio formato («Masonry
+// clay» y «Masonry concrete» en el grupo United States). Aquí van las dos
+// nuestras: la de barro con el tabique, y la de concreto con los blocks y el
+// Covintec (su mortero es de cemento).
+export const TABLA_MAMP_BARRO = 'Mampostería de barro'
+export const TABLA_MAMP_CONCRETO = 'Mampostería de concreto'
+
+// NTC-Mampostería:
+//   · f'm de diseño sobre área bruta (tabla «para algunos tipos de piezas»):
+//     tabique de barro recocido (f'p ≥ 60 kg/cm²) 15 con cualquier mortero;
+//     bloque de concreto tipo A y tabicón (f'p ≥ 100) 15 con mortero II o III
+//     (20 con mortero I). Se toma 15 en los tres: el estándar de obra.
+//   · Em = 600 f'm para piezas de barro y 800 f'm para las de concreto
+//     (cargas de corta duración, las del análisis sísmico).
+//   · Gm = 0.4 Em, de donde ν = Em / 2Gm − 1 = 0.25.
+// Pesos volumétricos del muro con sus juntas: tabique 1.5 t/m³ (NTC-Criterios
+// y Acciones, tabique de barro); block macizo 2.1 t/m³ (el de Pesos
+// Unitarios: 312.9 kg/m² en 15 cm); block hueco sin colar 1.4 t/m³.
+// α: 7.2×10⁻⁶ /°C el barro y 8.1×10⁻⁶ /°C el concreto (4.0 y 4.5×10⁻⁶ /°F de TMS).
+function mamposteria({ nombre, tabla, pieza, fm, kE, W, alfa }) {
+  const E = kE * fm
+  return { nombre, tabla, pieza, fm, kE, E, G: 0.4 * E, nu: 0.25, W, alfa, fy: 4200 }
+}
+
+export const MAMPOSTERIA_RAM = [
+  mamposteria({ nombre: 'TABIQUE', tabla: TABLA_MAMP_BARRO, pieza: 'Tabique de barro rojo recocido 7 × 14 × 28 (f′p ≥ 60 kg/cm²)', fm: 15, kE: 600, W: 0.0015, alfa: 7.2e-6 }),
+  mamposteria({ nombre: 'BLOCK HUECO', tabla: TABLA_MAMP_CONCRETO, pieza: 'Bloque hueco de concreto 15 × 20 × 40, tipo A, sin colar (f′p ≥ 100)', fm: 15, kE: 800, W: 0.0014, alfa: 8.1e-6 }),
+  mamposteria({ nombre: 'BLOCK MACIZO', tabla: TABLA_MAMP_CONCRETO, pieza: 'Bloque macizo de concreto o tabicón (f′p ≥ 100)', fm: 15, kE: 800, W: 0.0021, alfa: 8.1e-6 }),
+  // Covintec no está en la NTC: es un panel de alambre electrosoldado con
+  // alma de poliestireno y mortero en las dos caras. Sus propiedades son las
+  // equivalentes en todo el espesor de un panel de 3" terminado con 2.5 cm de
+  // mortero (f'c 100) por cara, 12.5 cm: E = 80 000 × 5/12.5 = 32 000 y
+  // f'm = 100 × 5/12.5 = 40. Sirven para el peso y la rigidez; el diseño de
+  // mampostería de RAM no aplica a un panel así.
+  {
+    nombre: 'COVINTEC', tabla: TABLA_MAMP_CONCRETO,
+    pieza: 'Panel Covintec de 3″ con 2.5 cm de mortero f′c 100 por cara (propiedades equivalentes)',
+    fm: 40, kE: 800, E: 32000, G: 32000 / (2 * 1.2), nu: 0.2, W: 0.0012, alfa: 1.0e-5, fy: 4200,
+  },
+]
+
 /**
  * El catálogo en la forma en que lo escribe instalar_catalogo.py en las tablas
  * de RAM: las secciones con su tabla, y los materiales con las columnas de
@@ -113,6 +155,14 @@ export function datosCatalogo() {
       Es: String(m.Es),
       FytH: String(m.fyt),
       RCRegion: 'US',
+    })),
+    // en kg y cm, como números: instalar_catalogo.py los pasa a las unidades
+    // de la fila de RAM que toma de plantilla
+    mamposteria: MAMPOSTERIA_RAM.map((m) => ({
+      nombre: m.nombre,
+      tabla: m.tabla,
+      plantilla: m.tabla === TABLA_MAMP_BARRO ? 'clay' : 'concrete',
+      E: m.E, G: m.G, U: m.nu, W: m.W, Alpha: m.alfa, Fm: m.fm, Fy: m.fy,
     })),
   }
 }

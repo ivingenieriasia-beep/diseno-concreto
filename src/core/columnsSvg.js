@@ -113,7 +113,7 @@ export function columnSectionGroup(col, ox, oy, scale = 14) {
   const Ast = lechos.reduce((s, Le) => s + bdLookup(Le.num).area * (+Le.n || 0), 0)
   P(`<text x="${X(bpx / 2)}" y="${Y(hpx + fs * 5.8)}" text-anchor="middle" font-size="${Math.round(fs * 1.5)}" font-weight="600" fill="#1a1814">${esc(col.nombre || 'COL')}</text>`)
   P(`<text x="${X(bpx / 2)}" y="${Y(hpx + fs * 7.2)}" text-anchor="middle" font-size="${Math.round(fs * 0.95)}" fill="#6b6760">${b} × ${h} cm</text>`)
-  // Sin "·": encodeAcadText (DXF) sustituye lo no-ASCII por "?" — dos líneas.
+  // En dos líneas: se leen mejor que una sola con «·» (que en el DXF sale «-»).
   P(`<text x="${X(bpx / 2)}" y="${Y(hpx + fs * 8.5)}" text-anchor="middle" font-size="${Math.round(fs * 0.85)}" fill="#8a8580">f'c = ${esc(col.fc)} kg/cm2</text>`)
   P(`<text x="${X(bpx / 2)}" y="${Y(hpx + fs * 9.7)}" text-anchor="middle" font-size="${Math.round(fs * 0.85)}" fill="#8a8580">Ast = ${Ast.toFixed(2)} cm2</text>`)
 
