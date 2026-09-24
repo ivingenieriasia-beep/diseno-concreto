@@ -26,29 +26,53 @@ export const escalaPara = (anchoCm, px, { min = 0.9, max = 6 } = {}) => Math.max
 const reparto = (a, b, nn) => (nn <= 1 ? [(a + b) / 2] : Array.from({ length: nn }, (_, i) => a + ((b - a) * i) / (nn - 1)))
 
 /**
+ * Estribo cerrado con sus ganchos, igual que en las secciones de trabes y
+ * columnas (beamGeometry, columnsSvg): la línea del estribo va TANGENTE al
+ * paño exterior de las varillas —las envuelve, en pantalla y en el DXF—, con
+ * las esquinas dobladas alrededor de la varilla de esquina, y los ganchos
+ * nacen en la circunferencia de la varilla de arriba a la izquierda, a 160° y
+ * 310°, hacia adentro, con largo 1.8 Øest.
+ * xL…xR, yB…yT: los paños de las varillas (lo de adentro del estribo).
+ */
+function estriboConGancho(S, { xL, xR, yB, yT, rs, ri, ve, w = 1.1 }) {
+  S.rect(xL, yB, xR - xL, yT - yB, { c: COL.estribo, w, rx: Math.min(rs, ri) })
+  const cx = xL + rs, cy = yT - rs, g = 1.8 * ve.diam
+  for (const deg of [160, 310]) {
+    // ángulos de la pantalla (y hacia abajo); el lienzo tiene y hacia arriba
+    const a = (Math.PI * deg) / 180
+    const x = cx + rs * Math.cos(a), y = cy - rs * Math.sin(a)
+    S.line(x, y, x + 0.6 * g, y - 0.8 * g, { c: COL.estribo, w })
+  }
+}
+
+/**
+ * Radio con que se pinta una varilla en corte: el real. En pantalla, con un
+ * mínimo para que se vea; en el DXF, sin mínimo, porque una varilla inflada
+ * se come al estribo (el pleito que ya hubo en el DXF de columnas).
+ */
+const radioVarilla = (v, k, exportar) => (exportar ? (v.diam / 2) * k : Math.max(1.6, (v.diam / 2) * k))
+
+/**
  * Corte de una contratrabe de liga (la CT de una zapata o una TL), como el
  * detalle de la oficina: estribo con su gancho, varillas en las esquinas y
- * los recubrimientos (3 arriba y a los lados, 5 abajo, contra el suelo).
+ * los recubrimientos libres (3 arriba y a los lados, 5 abajo, contra el
+ * suelo), hasta el paño exterior del estribo.
  * Origen: centro de la cara de abajo.
  */
-function corteLiga(S, { b, h, r, rInf, sup, inf, est }, { ids = null, k = 3, cotas = true } = {}) {
+function corteLiga(S, { b, h, r, rInf, sup, inf, est }, { ids = null, k = 3, cotas = true, exportar = false } = {}) {
   const vs = varilla(sup.num), vi = varilla(inf.num), ve = varilla(est.num)
   S.rect(-b / 2, 0, b, h, { c: COL.concreto, w: 1.6, fill: FONDO })
-  const x0 = -b / 2 + r, x1 = b / 2 - r, y0 = rInf, y1 = h - r
-  S.rect(x0, y0, x1 - x0, y1 - y0, { c: COL.estribo, w: 1.1 })
-  // gancho a 135° en la esquina de arriba a la izquierda
-  const g = Math.max(6 * ve.diam, 3)
-  S.line(x0 + ve.diam, y1 - ve.diam, x0 + ve.diam + g * 0.7, y1 - ve.diam - g * 0.7, { c: COL.estribo, w: 1.1 })
-  S.line(x0 + 2 * ve.diam, y1, x0 + 2 * ve.diam + g * 0.7, y1 - g * 0.7, { c: COL.estribo, w: 1.1 })
-  const yS = h - r - ve.diam - vs.diam / 2, yI = rInf + ve.diam + vi.diam / 2
-  const rad = (v) => Math.max(2, (v.diam / 2) * k)
-  for (const x of reparto(x0 + ve.diam + vs.diam / 2, x1 - ve.diam - vs.diam / 2, sup.n)) S.dot(x, yS, rad(vs), COL.arriba)
-  for (const x of reparto(x0 + ve.diam + vi.diam / 2, x1 - ve.diam - vi.diam / 2, inf.n)) S.dot(x, yI, rad(vi), COL.abajo)
+  // paños de las varillas: el recubrimiento más el estribo
+  const xL = -b / 2 + r + ve.diam, xR = b / 2 - r - ve.diam, yB = rInf + ve.diam, yT = h - r - ve.diam
+  estriboConGancho(S, { xL, xR, yB, yT, rs: vs.diam / 2, ri: vi.diam / 2, ve })
+  const yS = yT - vs.diam / 2, yI = yB + vi.diam / 2
+  for (const x of reparto(xL + vs.diam / 2, xR - vs.diam / 2, sup.n)) S.dot(x, yS, radioVarilla(vs, k, exportar), COL.arriba)
+  for (const x of reparto(xL + vi.diam / 2, xR - vi.diam / 2, inf.n)) S.dot(x, yI, radioVarilla(vi, k, exportar), COL.abajo)
   if (cotas) {
     S.dimH(-b / 2, b / 2, 0, 22, `${f0(b)}`)
     S.dimV(0, h, -b / 2, -18, `${f0(h)}`)
-    S.dimV(y1, h, b / 2, 16, `${f0(r)}`)
-    S.dimV(0, y0, b / 2, 16, `${f0(rInf)}`)
+    S.dimV(h - r, h, b / 2, 16, `${f0(r)}`)
+    S.dimV(0, rInf, b / 2, 16, `${f0(rInf)}`)
   }
   if (ids) {
     S.etiqueta(ids.sup, b / 2, yS, `${sup.n}#${sup.num} arriba`, { c: COL.arriba, anchor: 'start', dx: 40, dy: 4, titulo: 'Varillas de arriba' })
@@ -63,12 +87,13 @@ function corteLiga(S, { b, h, r, rInf, sup, inf, est }, { ids = null, k = 3, cot
  * dibujo (en pantalla, más grande; en el DXF, a la escala de todo).
  */
 function detalleCT(ct, x, top, { k, exportar }) {
-  const kd = exportar ? k : Math.max(k, Math.min(4, 150 / Math.max(ct.h, 1)))
+  // en pantalla, grande: que se lea cómo abraza el estribo a las varillas
+  const kd = exportar ? k : Math.max(k, Math.min(7, 210 / Math.max(ct.h, 1)))
   const S = lienzo(kd)
   const cx = x + 40 + (ct.b / 2) * kd, cy = top + 52 + ct.h * kd
   S.vista(cx, cy)
   S.titulo(x, top + 14, `CONTRATRABE ${ct.nombre}`, `${f0(ct.b)} × ${f0(ct.h)} cm · ${txtVarillasCT(ct)} · E#${ct.est.num} @ ${ct.est.s} · recubrimiento ${f0(ct.r)} arriba y a los lados, ${f0(ct.rInf)} abajo`)
-  corteLiga(S, ct, { ids: { sup: 'ct-sup', inf: 'ct-inf', est: 'ct-est' }, k: kd })
+  corteLiga(S, ct, { ids: { sup: 'ct-sup', inf: 'ct-inf', est: 'ct-est' }, k: kd, exportar })
   S.text(0, 0, 'lecho alto al nivel del terreno', { dy: 40, size: 9.5, c: COL.tenue })
   S.manija('ct-h', 0, ct.h, { eje: 'y', campo: 'ct.h', factor: 1, pasoCm: 5, min: 30, max: 150, titulo: 'h de la CT' })
   S.manija('ct-b', ct.b / 2, ct.h * 0.55, { eje: 'x', campo: 'ct.b', factor: 2, pasoCm: 5, min: 15, max: 60, titulo: 'b de la CT' })
@@ -249,7 +274,7 @@ function corrida(z, R, op = {}) {
     }
     if (ct) {
       L.vista(secX + xm * k, base - y0 * k)
-      corteLiga(L, { ...ct, h: y1 - y0 }, { k, cotas: false })
+      corteLiga(L, { ...ct, h: y1 - y0 }, { k, cotas: false, exportar: op.exportar })
       L.vista(secX, base)
       L.text(xm + Math.max(t, ct.b) / 2, (y0 + y1) / 2, ct.nombre, { anchor: 'start', dx: 26, dy: 4, size: 9.5, weight: 700, c: COL.concreto })
     }
@@ -363,11 +388,13 @@ function contratrabe(z, R, { ancho = 900, exportar = false, escalas = null } = {
   S.vista(cxX, cxY)
   S.titulo(cxX - (B / 2) * ks - 10, 22, 'CORTE', `losa ${f0(h)} cm · alma ${f0(bw)} cm`)
   S.poly([[-B / 2, 0], [B / 2, 0], [B / 2, h], [bw / 2, h], [bw / 2, Ht], [-bw / 2, Ht], [-bw / 2, h], [-B / 2, h]], { c: COL.concreto, w: 1.6, fill: FONDO })
-  S.rect(-bw / 2 + r, r, bw - 2 * r, Ht - 2 * r, { c: COL.estribo, w: 1 })
-  const xsI = reparto(-bw / 2 + r + ve.diam + vi.diam / 2, bw / 2 - r - ve.diam - vi.diam / 2, arm.inf.n)
-  const xsS = reparto(-bw / 2 + r + ve.diam + vs.diam / 2, bw / 2 - r - ve.diam - vs.diam / 2, arm.sup.n)
-  for (const x of xsI) S.dot(x, yi, Math.max(2, (vi.diam / 2) * ks), COL.abajo)
-  for (const x of xsS) S.dot(x, ysu, Math.max(2, (vs.diam / 2) * ks), COL.arriba)
+  // el estribo envuelve a las varillas, con sus ganchos, como en la CT
+  const xL = -bw / 2 + r + ve.diam, xR = bw / 2 - r - ve.diam
+  estriboConGancho(S, { xL, xR, yB: r + ve.diam, yT: Ht - r - ve.diam, rs: vs.diam / 2, ri: vi.diam / 2, ve, w: 1 })
+  const xsI = reparto(xL + vi.diam / 2, xR - vi.diam / 2, arm.inf.n)
+  const xsS = reparto(xL + vs.diam / 2, xR - vs.diam / 2, arm.sup.n)
+  for (const x of xsI) S.dot(x, yi, radioVarilla(vi, ks, exportar), COL.abajo)
+  for (const x of xsS) S.dot(x, ysu, radioVarilla(vs, ks, exportar), COL.arriba)
   S.line(-B / 2 + r, r + va.diam / 2, B / 2 - r, r + va.diam / 2, { c: COL.abajo, w: 1.3 })
   S.dimH(-B / 2, B / 2, 0, 24, `B = ${f2(D.B)}`)
   S.dimV(0, Ht, B / 2, 22, `H = ${f0(Ht)}`)
@@ -608,7 +635,7 @@ function liga(z, R, { ancho = 900, exportar = false, escalas = null } = {}) {
   const cxX = M + largo * kx + 60 + (b / 2) * ks, cxY = top + 34 + h * ks
   S.vista(cxX, cxY)
   S.titulo(cxX - (b / 2) * ks - 10, 22, 'CORTE', `${f0(b)} × ${f0(h)} cm · r ${f0(D.r ?? 3)} / ${f0(D.rInf ?? 5)}`)
-  corteLiga(S, { b, h, r: D.r ?? 3, rInf: D.rInf ?? 5, sup: arm.sup, inf: arm.inf, est: arm.est }, { k: ks })
+  corteLiga(S, { b, h, r: D.r ?? 3, rInf: D.rInf ?? 5, sup: arm.sup, inf: arm.inf, est: arm.est }, { k: ks, exportar })
   S.manija('h', 0, h, { eje: 'y', campo: 'geo.h', factor: 1, pasoCm: 5, min: 30, max: 150, titulo: 'h' })
   S.manija('b', b / 2, h * 0.55, { eje: 'x', campo: 'geo.b', factor: 2, pasoCm: 5, min: 15, max: 80, titulo: 'b' })
 

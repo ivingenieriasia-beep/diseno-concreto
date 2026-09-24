@@ -54,6 +54,8 @@ export const NOVEDADES = [
       { tipo: 'arreglo', texto: 'Liga: recubrimiento de 3 cm arriba y a los lados y de 5 cm sólo abajo, contra el suelo (antes 5 parejo), y el ancho que piden las varillas con el recubrimiento de los lados.' },
       { tipo: 'arreglo', texto: 'instalar_catalogo.py no encontraba las tablas de mampostería de RAM: las de fábrica no traen la línea «//infotable» (y pueden venir con BOM o en UTF-16). Ahora las lee; si aun así no las halla, imprime un diagnóstico de lo que hay en las carpetas de materiales.' },
       { tipo: 'arreglo', texto: 'DXF: los superíndices salían «?» en AutoCAD (txt.shx no los trae): t/m² sale t/m2 y m³ sale m3; Δ, ≈, ½ y demás símbolos, con su equivalente en texto. Los acentos siguen como en la 3.05.' },
+      { tipo: 'arreglo', texto: 'El estribo de la CT, de la liga y de la contratrabe abraza a las varillas como en trabes y columnas: tangente a su paño, doblado en las esquinas y con los ganchos saliendo de la varilla de arriba a la izquierda. En el DXF las varillas van a su diámetro real, sin inflarse sobre el estribo. El detalle de la CT sale más grande.' },
+      { tipo: 'arreglo', texto: 'La pantalla de inicio de sesión decía v0.2: ahora dice la versión de la app.' },
     ],
     aviso: 'Las zapatas de proyectos anteriores reciben la CT-1 al abrirlos; dale ⚡ Proponer a las de lindero para que su CT tome el N·e.',
   },

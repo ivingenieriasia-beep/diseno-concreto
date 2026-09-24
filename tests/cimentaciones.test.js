@@ -742,3 +742,69 @@ describe('armado por separación o por cantidad', () => {
 })
 
 function valorDe(C, t) { return C.seccion.pasos.find((p) => p.t === t)?.v }
+
+import { dibujoParaExportar, K_PLANO } from '../src/core/cim/planos'
+import { varilla as varillaDe } from '../src/core/cim/comun'
+
+// El estribo de la CT y de las contratrabes, como en trabes y columnas
+// (fix del DXF de columnas): tangente al paño de las varillas, sin cortarlas,
+// y los ganchos naciendo en la varilla de la esquina de arriba a la izquierda.
+describe('el estribo abraza a las varillas', () => {
+  const NUM = '(-?[\\d.]+)'
+  const cortes = (svg) => {
+    const estribos = [...svg.matchAll(new RegExp(`<rect x="${NUM}" y="${NUM}" width="${NUM}" height="${NUM}" rx="${NUM}" ry="${NUM}" stroke="#1a7a5e"`, 'g'))]
+      .map((m) => ({ x0: +m[1], y0: +m[2], x1: +m[1] + +m[3], y1: +m[2] + +m[4], rx: +m[5] }))
+    const barras = [...svg.matchAll(new RegExp(`<circle cx="${NUM}" cy="${NUM}" r="${NUM}" fill="(#c94f2a|#2563a8)"`, 'g'))]
+      .map((m) => ({ x: +m[1], y: +m[2], r: +m[3] }))
+    const lineas = [...svg.matchAll(new RegExp(`<line x1="${NUM}" y1="${NUM}" x2="${NUM}" y2="${NUM}" stroke="#1a7a5e"`, 'g'))]
+      .map((m) => ({ x1: +m[1], y1: +m[2], x2: +m[3], y2: +m[4] }))
+    return estribos.map((E) => ({ E, barras: barras.filter((b) => b.x > E.x0 && b.x < E.x1 && b.y > E.y0 && b.y < E.y1), lineas }))
+  }
+  const TOL = 0.03   // px: el lienzo redondea a centésimas
+  const revisa = (svg, etiqueta, { radioReal = null } = {}) => {
+    const cs = cortes(svg)
+    expect(cs.length, etiqueta).toBeGreaterThan(0)
+    for (const { E, barras, lineas } of cs) {
+      expect(barras.length, etiqueta).toBeGreaterThanOrEqual(4)
+      for (const b of barras) {
+        // adentro del estribo, tocándolo arriba o abajo
+        const gaps = [b.x - b.r - E.x0, E.x1 - b.x - b.r, b.y - b.r - E.y0, E.y1 - b.y - b.r]
+        for (const g of gaps) expect(g, `${etiqueta}: la varilla no cruza el estribo`).toBeGreaterThan(-TOL)
+        expect(Math.min(gaps[2], gaps[3]), `${etiqueta}: tangente arriba/abajo`).toBeLessThan(TOL)
+        if (radioReal) expect(radioReal.some((r) => Math.abs(b.r - r) < TOL), `${etiqueta}: radio real ${b.r}`).toBe(true)
+      }
+      // las de las esquinas tocan también los costados
+      const xs = barras.map((b) => b.x)
+      for (const b of barras.filter((bb) => bb.x === Math.min(...xs))) expect(b.x - b.r - E.x0).toBeLessThan(TOL)
+      for (const b of barras.filter((bb) => bb.x === Math.max(...xs))) expect(E.x1 - b.x - b.r).toBeLessThan(TOL)
+      // la esquina del estribo se dobla en la varilla
+      expect(E.rx).toBeCloseTo(Math.min(...barras.map((b) => b.r)), 1)
+      // los dos ganchos nacen en la varilla de arriba a la izquierda y entran
+      const esq = barras.reduce((a, b) => (b.x + b.y < a.x + a.y ? b : a))
+      const ganchos = lineas.filter((l) => Math.abs(Math.hypot(l.x1 - esq.x, l.y1 - esq.y) - esq.r) < TOL)
+      expect(ganchos.length, `${etiqueta}: ganchos`).toBe(2)
+      for (const g of ganchos) expect(g.x2 > g.x1 && g.y2 > g.y1).toBe(true)
+    }
+  }
+  const obra = { suelo: { qadm: 15, Df: 1 } }
+  it('en la CT de la zapata aislada, en pantalla y en el DXF', () => {
+    const z = crearCim('aislada', [], obra)
+    const R = revisarCim(z, obra)
+    revisa(dibujarCim(z, R, { ancho: 1000, Df: 1 }).svg, 'aislada en pantalla')
+    const r4 = (varillaDe(4).diam / 2) * K_PLANO
+    revisa(dibujoParaExportar(z, obra, R).inner, 'aislada en el DXF', { radioReal: [r4] })
+  })
+  it('en la CT de la corrida, en la liga y en la contratrabe (DXF)', () => {
+    for (const t of ['corrida', 'liga', 'contratrabe']) {
+      const z = crearCim(t, [], obra)
+      const R = revisarCim(z, obra)
+      const radios = [3, 4, 5, 6, 8].map((n) => (varillaDe(n).diam / 2) * K_PLANO)
+      revisa(dibujoParaExportar(z, obra, R).inner, `${t} en el DXF`, { radioReal: radios })
+    }
+  })
+  it('con varillas de abajo más gruesas que las de arriba', () => {
+    const z = crearCim('aislada', [], obra)
+    const zz = { ...z, ct: { ...z.ct, inf: { num: 6, n: 2 }, est: { ...z.ct.est, num: 3 } } }
+    revisa(dibujoParaExportar(zz, obra).inner, 'CT #4 / #6')
+  })
+})

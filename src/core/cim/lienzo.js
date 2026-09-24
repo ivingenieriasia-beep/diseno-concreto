@@ -32,7 +32,8 @@ export function lienzo(k = 2, ky = k) {
     vista(x0, y0) { ox = x0; oy = y0 },
     raw(s) { out.push(s) },
     line(x1, y1, x2, y2, o) { out.push(`<line x1="${n(X(x1))}" y1="${n(Y(y1))}" x2="${n(X(x2))}" y2="${n(Y(y2))}" ${est(o)}/>`) },
-    rect(x, y, w, h, o) { out.push(`<rect x="${n(X(x))}" y="${n(Y(y + h))}" width="${n(w * k)}" height="${n(h * ky)}" ${est(o)}/>`) },
+    /** o.rx: radio de las esquinas, en cm del modelo */
+    rect(x, y, w, h, o) { out.push(`<rect x="${n(X(x))}" y="${n(Y(y + h))}" width="${n(w * k)}" height="${n(h * ky)}"${o?.rx ? ` rx="${n(o.rx * k)}" ry="${n(o.rx * ky)}"` : ''} ${est(o)}/>`) },
     poly(pts, o, cerrado = true) {
       const p = pts.map(([x, y]) => `${n(X(x))},${n(Y(y))}`).join(' ')
       out.push(`<${cerrado ? 'polygon' : 'polyline'} points="${p}" ${est(o)}/>`)
