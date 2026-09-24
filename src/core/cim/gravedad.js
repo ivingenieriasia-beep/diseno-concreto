@@ -10,7 +10,7 @@
 // quedar dentro de f*m y v*m (que ya incluyen FR). Por metro de muro.
 // ══════════════════════════════════════════════════════════════
 
-import { CRITERIOS, SUELO, paso, check, f1, f2, f3, arriba, num } from './comun'
+import { CRITERIOS, SUELO, paso, check, f1, f2, f3, arriba, num, minimos } from './comun'
 import { rankine } from './suelo'
 
 export const MAMPOSTERIA = { gm: 2.2, fm: 20, vm: 0.6 }     // t/m³ · kg/cm² · kg/cm² (con FR)
@@ -18,7 +18,7 @@ export const MAMPOSTERIA = { gm: 2.2, fm: 20, vm: 0.6 }     // t/m³ · kg/cm² 
 export function nuevaGravedad(nombre = 'MM-1') {
   return {
     tipo: 'gravedad', nombre,
-    geo: { H: 2.0, c: 0.4, B: 1.2, m1: 0, Df: 0.5, beta: 0, q: 0, pasivo: false, Lz: 10 },
+    geo: { H: 2.0, c: 0.4, B: 1.2, m1: 0, Df: 0.6, beta: 0, q: 0, pasivo: false, Lz: 10 },
     mat: { ...MAMPOSTERIA }, suelo: {},
   }
 }
@@ -78,7 +78,7 @@ export function revisarGravedad(z, obra = {}) {
   // ── base ──
   const J0 = sobreJunta(G, 0)
   const FSv = J0.Mv > 0 ? J0.Mr / J0.Mv : Infinity
-  const Df = num(g.Df, 0.5)
+  const Df = num(g.Df, 0.6)
   const Pp = g.pasivo ? 0.5 * num(S.gsB, gs) * Kp * Df * Df + 2 * num(S.c) * Math.sqrt(Kp) * Df : 0
   const mu = num(S.mu, 0.45)
   const Fr = mu * J0.N + Pp
@@ -93,6 +93,9 @@ export function revisarGravedad(z, obra = {}) {
   checks.push(check('deslizamiento', 'Deslizamiento', C.fsDesl, FSd, 'FS', { grupo: 'Estabilidad', nota: `FS = ${f2(FSd)}` }))
   checks.push(check('excentricidad', 'Resultante en el tercio medio', Math.abs(e), B / 6, 'm', { grupo: 'Estabilidad', nota: `e = ${f3(e)}` }))
   checks.push(check('suelo', 'Presión máxima', qmax, num(S.qadm), 't/m²', { grupo: 'Estabilidad' }))
+  const mn = minimos(C, { Df })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Desplante mínimo', pasos: mn.pasos })
   if (qmax > num(S.qadm)) avisos.push(`La presión máxima pasa de qadm = ${f2(num(S.qadm))} t/m²: ensancha la base o inclina el frente (⚡ Proponer prueba los dos). Si ni así, con este suelo conviene muro de concreto armado.`)
   secciones.push({
     titulo: 'Geometría y empujes (por metro)',
@@ -158,6 +161,9 @@ export function revisarGravedad(z, obra = {}) {
  * la de menor aprovechamiento, y la revisión dice qué no alcanza.
  */
 export function proponerGravedad(z, obra = {}) {
+  const C = { ...CRITERIOS, ...(obra.criterios || {}) }
+  // enterrado al menos el desplante mínimo
+  z = { ...z, geo: { ...z.geo, Df: Math.max(num(z.geo.Df, 0.6), num(C.DfMin, 0.6)) } }
   const H = num(z.geo.H, 2)
   const c = Math.max(0.3, num(z.geo.c, 0.4))
   const m0 = Math.max(0, num(z.geo.m1, 0))

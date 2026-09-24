@@ -451,6 +451,11 @@ input[type="number"] { -moz-appearance: textfield; }
 .cim-num input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 4px 6px; font: 12.5px var(--font-mono); color: var(--color-tx); }
 .cim-num input:disabled { color: var(--color-tx3); }
 .cim-uni { font: 10.5px var(--font-mono); color: var(--color-tx3); padding-right: 6px; white-space: nowrap; }
+.cim-flechas { display: flex; flex-direction: column; border-left: 1px solid var(--color-border); align-self: stretch; }
+.cim-flechas button { flex: 1; border: 0; background: transparent; color: var(--color-tx3); font-size: 7.5px; line-height: 1; padding: 0 5px; cursor: pointer; }
+.cim-flechas button:hover { background: var(--color-bg); color: var(--color-accent); }
+.cim-apagado { opacity: 0.5; }
+.cim-apagado:focus-within, .cim-apagado:hover { opacity: 0.85; }
 .cim-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-tx2); cursor: pointer; padding: 2px 0; }
 .cim-nota { font-size: 11px; color: var(--color-tx3); line-height: 1.45; }
 .cim-tabla { display: flex; flex-direction: column; gap: 4px; }

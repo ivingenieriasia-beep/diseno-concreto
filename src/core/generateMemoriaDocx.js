@@ -549,7 +549,7 @@ async function bloquesCimentacion(cimientos, obra) {
       [run(`${c.ok ? '✓' : '✗'} ${c.titulo}`, { size: 15, color: c.ok ? OKC : BADC })],
       c.unidad === 'FS' ? c.nota : `${fmtV(c.act)} ${c.unidad}`,
       c.unidad === 'FS' ? `≥ ${fmtV(c.act)}` : `${fmtV(c.res)} ${c.unidad}`,
-      Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—',
+      !c.sinU && Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—',
     ]), [3600, 2000, 2800, 1238], { size: 15 }))
     for (const sec of R.secciones) {
       out.push(para([run(sec.titulo, { bold: true, color: '1F2937' })], { before: 120, after: 40 }))

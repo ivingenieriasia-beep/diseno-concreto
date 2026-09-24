@@ -142,7 +142,7 @@ async function imagen(doc, ctx, svg, W, H, maxAlto = 120) {
 /** Filas de la tabla de revisiones */
 export const filasRevision = (R) => R.checks.map((c) => [[
   `${c.ok ? '✓' : '✗'} ${c.titulo}`, c.unidad === 'FS' ? c.nota : `${fmtV(c.act)} ${c.unidad}`, c.unidad === 'FS' ? `≥ ${fmtV(c.act)}` : `${fmtV(c.res)} ${c.unidad}`,
-  Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—',
+  !c.sinU && Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—',
 ], { colores: [c.ok ? [21, 128, 61] : [198, 40, 40]] }])
 
 export async function memoriaPdf(lista, obra, { projectName = '' } = {}) {

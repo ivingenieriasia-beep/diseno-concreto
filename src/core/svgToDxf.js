@@ -176,24 +176,28 @@ function parseLengthCm(s){
 
 // ── Texto para AutoCAD (txt.shx) ────────────────────────────
 // Antes todo lo que no era ASCII salía como «?» («Zapata c?ntrica»). El DXF
-// ahora va en ASCII puro y los acentos viajan como \U+00E9, que AutoCAD
-// (y BricsCAD, LibreCAD, DraftSight…) convierte en la letra al abrirlo, sin
-// importar la página de códigos de la computadora:
+// va en ASCII puro:
+//   · las letras del español (á é í ó ú ñ ü, ¿ ¡ º ª) viajan como \U+00E9,
+//     que AutoCAD (y BricsCAD, LibreCAD, DraftSight…) convierte en la letra
+//     al abrirlo, sin importar la página de códigos: txt.shx sí las trae;
 //   · Ø ° ± con sus códigos de siempre (%%c %%d %%p);
-//   · las letras y signos del español (á é í ó ú ñ ü ¿ ¡ º ª) y los símbolos
-//     que las fuentes SHX de AutoCAD sí traen (² ³ Δ ≈ ≠ Ω), como \U+;
-//   · lo que txt.shx no dibuja se escribe con su equivalente: · → -, × → x,
-//     ≤ → <=, — → -, ′ → ' …  (antes «²» salía «^2», y en un DXF «^2» se lee
-//     como un carácter de control, no como «al cuadrado»).
+//   · lo demás, con su equivalente en texto: txt.shx no trae superíndices ni
+//     símbolos (² salía «?» en AutoCAD), así que m² → m2, · → -, × → x,
+//     ≤ → <=, Δ → D, ½ → 1/2… (y «^2» tampoco sirve: en un DXF «^» seguido
+//     de otra letra es un carácter de control).
 const ACAD_CODIGO = { 'Ø':'%%c', 'ø':'%%c', '∅':'%%c', '⌀':'%%c', '°':'%%d', '±':'%%p' };
 const ACAD_EQUIVALENTE = {
   '·':'-', '•':'-', '×':'x', '÷':'/', 'µ':'u', 'μ':'u',
-  '′':"'", '″':'"', '‘':"'", '’':"'", '‚':"'", '“':'"', '”':'"', '„':'"', '«':'"', '»':'"',
-  '–':'-', '—':'-', '−':'-', '─':'-', '…':'...', '→':'->', '←':'<-', '⇒':'=>',
-  '≤':'<=', '≥':'>=', '\u00A0':' ', '\u2009':' ', '\u202F':' ',
+  '²':'2', '³':'3', '¹':'1', '₂':'2', '₃':'3', '½':'1/2', '¼':'1/4', '¾':'3/4',
+  '′':"'", '″':'"', '‘':"'", '’':"'", '‚':"'", '“':'"', '”':'"', '„':'"', '«':'"', '»':'"', '´':"'", '¨':'"',
+  '–':'-', '—':'-', '−':'-', '─':'-', '¯':'-', '¬':'-', '…':'...', '→':'->', '←':'<-', '⇒':'=>',
+  '≤':'<=', '≥':'>=', '≈':'~', '≠':'<>', '≡':'=', '∠':'<', '√':'raiz ',
+  'Δ':'D', 'Ω':'Ohm', 'Ω':'Ohm', 'α':'alfa', 'β':'beta', 'γ':'gama', 'φ':'%%c', 'ϕ':'%%c', 'ρ':'rho', 'σ':'sigma', 'ε':'e', 'λ':'lambda', 'ν':'nu', 'θ':'teta', 'π':'pi',
+  '©':'(c)', '®':'(R)', '§':'S', '¶':'P', '¢':'c', '£':'L', '¥':'Y', '¸':',',
+  ' ':' ', ' ':' ', ' ':' ',
 };
-// lo que sí tiene glifo en las SHX de AutoCAD (Latin-1 y los símbolos de su tabla)
-const ACAD_UNICODE = /[\u00A1-\u00FF\u0394\u03A9\u2082\u2126\u2248\u2260\u2261\u2220]/;
+// lo que txt.shx sí dibuja fuera de ASCII: las letras latinas con acento y ¿ ¡ º ª
+const ACAD_UNICODE = /[À-ÖØ-öø-ÿ¡¿ªº]/;
 const unicodeAcad = (ch) => '\\U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
 
 export function encodeAcadText(str){
@@ -203,9 +207,9 @@ export function encodeAcadText(str){
     if (ACAD_CODIGO[ch]) { out += ACAD_CODIGO[ch]; continue; }
     if (ACAD_EQUIVALENTE[ch] !== undefined) { out += ACAD_EQUIVALENTE[ch]; continue; }
     if (ACAD_UNICODE.test(ch)) { out += unicodeAcad(ch); continue; }
-    // otra letra con acento (ő, ł…): la base sin el acento; si no hay, en \U+
-    const base = ch.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
-    out += /^[\x20-\x7E]+$/.test(base) ? base : unicodeAcad(ch);
+    // otra letra con acento (ő, ł…): la base sin el acento; si no hay equivalente, se omite
+    const base = ch.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    out += /^[\x20-\x7E]+$/.test(base) ? base : '';
   }
   // en un DXF, «^» seguido de otra cosa es un carácter de control: «^ » es el ^ literal
   return out.replace(/\^(?! )/g, '^ ');

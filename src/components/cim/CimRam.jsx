@@ -394,10 +394,10 @@ export default function CimRam({ obra, onClose, onToast }) {
                   <tbody>{grupos.map((g, i) => <tr key={i}><td>{i + 1} <small className="gris">{CLASE[g.clase]}</small></td><td>{g.idx.length}</td><td>{f2(g.desde)}–{f2(g.hasta)} m</td></tr>)}</tbody>
                 </table>
               )}
-              <button className="btn btn-primary" data-testid="cim-ram-aisladas" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos, obra, archivo, ...opLind }), 'Zapatas aisladas')}>
+              <button className="btn btn-primary" data-testid="cim-ram-aisladas" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos, obra, archivo, ...opLind, todos: A.apoyos }), 'Zapatas aisladas')}>
                 Crear {Math.min(tipos, sel.size) || ''} tipo(s) de zapata
               </button>
-              <button className="btn btn-secondary" data-testid="cim-ram-una" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos: 1, obra, archivo, ...opLind }), 'Zapata aislada')}>
+              <button className="btn btn-secondary" data-testid="cim-ram-una" disabled={!sel.size} onClick={() => crear(aisladasDesde(elegidos, pap, A.up, { tipos: 1, obra, archivo, ...opLind, todos: A.apoyos }), 'Zapata aislada')}>
                 Una zapata para todos (envolvente)
               </button>
               <div className="cim-grupo-t" style={{ marginTop: 10 }}>Sobre un eje</div>

@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.05"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.06"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -126,7 +126,7 @@
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.05</b>Septiembre de 2026</div>
+    <div><b>Versión 3.06</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -737,7 +737,7 @@
   <ol class="pasos">
     <li><b>🪨 Suelo y criterios</b>: la capacidad admisible <b>qadm</b> del estudio de mecánica de suelos, el peso volumétrico γs, la profundidad de desplante Df y, para empujes y deslizamiento, φ, c y μ.</li>
     <li>Si el estudio no da qadm, la calculadora de <b>Meyerhof</b> la estima con c, φ, B, Df y el factor de seguridad; <b>Usar qadm</b> la pasa a la obra.</li>
-    <li>Los criterios (factores de carga, FS de volteo y deslizamiento, separaciones y calibres que se prueban, peralte y ancho mínimos) son los de la oficina; aquí se cambian para toda la obra.</li>
+    <li>Los criterios (factores de carga, FS de volteo y deslizamiento, separaciones y calibres que se prueban, peralte, ancho y desplante mínimos) son los de la oficina; aquí se cambian para toda la obra. <b>Ninguna zapata mide menos de 0.60 m de ancho ni se desplanta a menos de 0.60 m</b>: ⚡ Proponer no baja de ahí y la revisión lo marca si se captura menos.</li>
   </ol>
   <p>Un cimiento puede tener su propio suelo (bloque <b>Suelo</b> de su formulario): lo que captures ahí manda sobre el de la obra, y <b>propio ↺</b> lo regresa.</p>
 
@@ -752,6 +752,25 @@
     <li><b>⚡ Proponer</b>: la base más chica que aguanta el suelo, el peralte más chico que pasa el concreto y la parrilla con menos acero que ancla, todo a cada 5 cm y vuelto a revisar con las varillas elegidas.</li>
     <li>Ajusta lo que quieras en el formulario o en el dibujo; las revisiones se recalculan al momento.</li>
   </ol>
+
+  <h3>El armado: por separación o por cantidad</h3>
+  <p>En cada parrilla hay dos campos juntos: la <b>separación</b> (con flechas ▲▼ a cada 5 cm) y la <b>cantidad</b> de varillas. Programas el que quieras; el otro se ve atenuado con lo que resulta
+  (con la separación, cuántas varillas caben; con la cantidad, a cuánto quedan). Si programas la cantidad, se queda aunque cambies el ancho de la zapata. En las franjas por metro la cantidad es por metro.</p>
+
+  <h3>La contratrabe de liga de cada zapata (CT)</h3>
+  <p>Toda zapata aislada, y la corrida bajo muro de mampostería, lleva <b>su</b> contratrabe de liga a la altura del tope del dado, con el lecho alto al nivel del terreno;
+  ahí se une con las contratrabes de liga independientes (TL). Por omisión es la <b>CT-1</b> de la oficina: <b>15 × 30</b>, 4 varillas #4 (2 arriba y 2 abajo), estribos #2.5 @ 15,
+  recubrimiento de 3 cm arriba y a los lados y de 5 cm abajo, contra el suelo. Sale en el corte de la zapata y en su detalle, y se revisa con lo que le toca:</p>
+  <ul>
+    <li><b>Aislada:</b> la liga en tensión y compresión (10 % de la Pu), su peso y el muro que cargue en el claro libre a la zapata vecina (de RAM sale solo) y, si es de lindero o de esquina, el N·e.
+      Como liga, estribos a no más de 1.5 b ni 20 cm; si trabaja como viga (N·e o cortante que el concreto no toma), a d/2.</li>
+    <li><b>Corrida bajo muro:</b> es la dala de desplante (NTC-Mampostería): tan ancha como el muro, As ≥ 0.2 f′c t²/fy con 3 varillas o más, estribos Asc ≥ 1000 s/(fy hc) a 1.5 t y 20 cm como máximo.</li>
+  </ul>
+  <figure>
+    <img src="img/cim-ct.png" alt="">
+    <figcaption><b>Zapata de lindero con su contratrabe de liga.</b> En el corte, la CT con el lecho alto al nivel del terreno; abajo, su detalle. Con el N·e de la columna de orilla la CT-1 no alcanza y ⚡ Proponer dejó una CT-2 de 20 × 40.</figcaption>
+  </figure>
+  <p>Si las solicitaciones piden otra, <b>⚡ Proponer</b> la diseña (se llama CT-2 mientras no le pongas otro nombre) y <b>volver a la CT-1</b> la regresa. Se edita en su bloque del formulario o en el detalle del dibujo.</p>
 
   <h3>El dibujo se arrastra</h3>
   <ul>
@@ -772,7 +791,7 @@
     <tr><td><b>Zapata corrida</b></td><td>Por metro, bajo muro de concreto (sección crítica en la cara) o de mampostería (a t/4 dentro del muro), al centro o de lindero. Suelo, cortante, flexión transversal, anclaje y el acero longitudinal de temperatura.</td></tr>
     <tr><td><b>Corrida con contratrabe</b></td><td>Varias columnas sobre un eje, por el método rígido (presión lineal). Diagramas de cortante y momento de la contratrabe, armado abajo y arriba con los motores de la app, estribos, y los aleros como voladizos. <b>Centrar resultante</b> ajusta los voladizos para que la presión salga pareja.</td></tr>
     <tr><td><b>Muro de contención</b></td><td>De concreto armado, en voladizo: volteo, deslizamiento (con dentellón y pasivo si lo pides), resultante en el tercio medio y presión máxima; pantalla, talón y punta a flexión y cortante; anclaje de la pantalla en la base; temperatura.</td></tr>
-    <tr><td><b>Contratrabe de liga</b></td><td>Une las zapatas de un eje a la altura del dado; no lleva zapata ni apoya en el suelo. Toma una fuerza de liga en tensión y compresión (10 % de la Pu de la columna más cargada del tramo), el momento N·e de las zapatas de lindero o de esquina que se ligan en ella (como viga de equilibrio) y el peso de un muro, si lo lleva. Flexión arriba y abajo, la tensión con el acero que sobra, compresión, cortante con estribos cerrados (s ≤ d/2 ≤ 30 cm) y lado ≥ claro/20 (sin pasar de 45 cm).</td></tr>
+    <tr><td><b>Contratrabe de liga</b></td><td>Une las zapatas de un eje a la altura del dado; no lleva zapata ni apoya en el suelo. Toma una fuerza de liga en tensión y compresión (10 % de la Pu de la columna más cargada del tramo), el momento N·e de las zapatas de lindero o de esquina que se ligan en ella (como viga de equilibrio) y el peso de un muro, si lo lleva. Flexión arriba y abajo, la tensión con el acero que sobra, compresión, cortante con estribos cerrados y sección mínima la CT-1 (15 × 30), de la que arranca ⚡ Proponer. Con el criterio del ACI 18.13.3.3 encendido, además lado ≥ claro/20 (sin pasar de 45 cm).</td></tr>
     <tr><td><b>Muro de piedra</b></td><td>De gravedad, de piedra braza: la misma estabilidad, juntas sin tensión a cada altura, y compresión y cortante en la mampostería. ⚡ Proponer prueba también inclinar el frente.</td></tr>
     <tr><td><b>Cimiento de mampostería</b></td><td>Trapecio o medio trapecio (lindero), como la hoja de la oficina: el ancho por suelo, el escarpio por cortante y a 1.5 del vuelo y, en lindero, la separación máxima de muros perpendiculares (tabla 8.4 de la NTC-Mampostería).</td></tr>
   </table>
@@ -870,11 +889,12 @@
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 9, con H del modelo.</td></tr>
-    <tr><td><b>Contratrabe de liga</b></td><td>Práctica de la oficina, sin análisis de RAM: T = 10 % de la Pu mayor del tramo (ACI 18.13.3), N·e de las zapatas excéntricas con reparto lineal (viga de equilibrio), wu Ln²/10 con su peso y el muro; lado ≥ Ln/20 ≤ 45 cm; estribos cerrados a d/2 ≤ 30 cm (capítulo 11).</td></tr>
+    <tr><td><b>Contratrabe de liga</b></td><td>Práctica de la oficina, sin análisis de RAM: T = 10 % de la Pu mayor del tramo (ACI 18.13.3), N·e de las zapatas excéntricas con reparto lineal (viga de equilibrio), wu Ln²/10 con su peso y el muro; sección mínima la CT-1 (15 × 30), recubrimiento 3 cm arriba y a los lados y 5 abajo; estribos cerrados a d/2 ≤ 30 cm si trabaja como viga, a 1.5 b ≤ 20 cm si sólo liga (dalas, NTC-Mampostería); lado ≥ Ln/20 ≤ 45 cm sólo con el criterio del ACI 18.13.3.3. La CT de cada zapata, igual; en la corrida bajo muro, las reglas de las dalas (capítulo 11).</td></tr>
     <tr><td><b>Cimentaciones</b></td><td>Las hojas de la oficina, corregidas. Suelo con cargas de servicio contra qe = qadm − γs (Df − h) − γc h, en t/m² (la hoja restaba t/m³ a kg/m²), con el área efectiva de Meyerhof B′ = B − 2e y e = (M + V h)/(N + W); con sismo, 1.33 qadm y el sismo cargando y descargando.
       Concreto con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S): FR 0.9 en flexión y 0.75 en cortante; VcR = 0.5 FR b d √f'c (reducido si h &gt; 70 cm); penetración FR (0.5 + γ) √f'c ≤ FR √f'c con la sección crítica de 4, 3 o 2 lados; aplastamiento FR 0.65, √(A2/A1) ≤ 2, y el excedente con arranques.
       Acero: el calculado, 4/3 de él o el mínimo, nunca menos que 0.0018 b h. Anclaje con L<sub>d</sub> × As,req/As,prov (≥ 30 cm) o gancho a 90°.
-      Muros: Rankine con talud, empuje × 1.5 para el concreto, FS de volteo 2.0 y de deslizamiento 1.5, resultante en el tercio medio. Mampostería: NTC-Mampostería, tabla 8.4 en linderos (capítulo 11).</td></tr>
+      Muros: Rankine con talud, empuje × 1.5 para el concreto, FS de volteo 2.0 y de deslizamiento 1.5, resultante en el tercio medio. Mampostería: NTC-Mampostería, tabla 8.4 en linderos (capítulo 11).
+      Mínimos de la oficina: ancho de zapata 0.60 m y desplante (o enterrado de un muro) 0.60 m.</td></tr>
     <tr><td><b>Deflexiones</b></td><td>Con CS = 1·CM + 1·CV: elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) × inmediata de CS (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 10).</td></tr>
   </table>
 
@@ -914,7 +934,7 @@
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
     <tr><td>El aplicar dice que falta una sección</td><td>No se aplicó la agrupación: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar. Si además dice que un miembro «se quedó con» otra sección al probar, cierra el modelo sin guardar.</td></tr>
     <tr><td>Cimentaciones → Desde RAM: el modelo no trae reacciones, o sólo por combinación</td><td>El <code>sincronizar.py</code> es de una versión anterior: sin los casos no se pueden separar CM, CV y S.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
-    <tr><td>En AutoCAD, un texto del DXF sale con «?» en lugar de acentos</td><td>El DXF es de una versión anterior a la 3.05.</td><td>Expórtalo otra vez: los acentos van como <code>\U+00E9</code>, que AutoCAD convierte en la letra; «·» sale «-» y «×» sale «x».</td></tr>
+    <tr><td>En AutoCAD, un texto del DXF sale con «?» en lugar de acentos</td><td>El DXF es de una versión anterior a la 3.05.</td><td>Expórtalo otra vez: los acentos van como <code>\U+00E9</code>, que AutoCAD convierte en la letra; «·» sale «-», «×» sale «x» y, como txt.shx no trae superíndices, m² sale m2 (desde la 3.06).</td></tr>
     <tr><td>El instalador dice «No encontré la tabla de mampostería de RAM…»</td><td>Tu RAM no tiene las tablas Masonry clay / Masonry concrete donde se buscan.</td><td>Los concretos y secciones sí se instalaron. Manda la salida (lista las tablas que vio) para ajustar el instalador.</td></tr>
     <tr><td>Un cimiento no cumple ni con ⚡ Proponer</td><td>Suelo muy pobre, columna chica para su carga o resultante fuera de la base.</td><td>Lee el aviso bajo el veredicto: dice qué no alcanza y qué conviene.</td></tr>
     <tr><td>Agrupación → Columnas: «Este modelo.json es de un sincronizar.py anterior»</td><td>Las columnas no traen M22 ni las fuerzas de cada combinación.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>

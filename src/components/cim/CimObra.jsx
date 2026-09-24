@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Num, Bloque } from './campos'
+import { Num, Bloque, Check } from './campos'
 import { SUELO, CRITERIOS, f2 } from '../../core/cim/comun'
 import { meyerhof } from '../../core/cim/suelo'
 import { CAMPO_SUELO } from './CimForm'
@@ -18,6 +18,7 @@ const CRIT = [
   { k: 'fsDesl', t: 'FS deslizamiento', paso: 0.1 },
   { k: 'hMin', t: 'Peralte mínimo', u: 'cm', paso: 5 },
   { k: 'Bmin', t: 'Ancho mínimo', u: 'm', paso: 0.05 },
+  { k: 'DfMin', t: 'Desplante mínimo', u: 'm', paso: 0.05, titulo: 'Df de los cimientos y enterrado de los muros' },
   { k: 'sMin', t: 'Separación mínima', u: 'cm', paso: 2.5 },
   { k: 'sMax', t: 'Separación máxima', u: 'cm', paso: 2.5 },
   { k: 'plantilla', t: 'Plantilla', u: 'cm', paso: 1 },
@@ -41,7 +42,7 @@ export default function CimObra({ suelo, criterios, setSuelo, setCriterios, onCl
             <div className="cim-grid cim-grid3">
               {Object.keys(CAMPO_SUELO).map((k) => (
                 <Num key={k} label={CAMPO_SUELO[k].t} unit={CAMPO_SUELO[k].u} step={CAMPO_SUELO[k].paso} titulo={CAMPO_SUELO[k].titulo || ''}
-                  value={S[k] ?? ''} placeholder={k === 'gsB' ? 'igual que γ' : ''} testid={`obra-${k}`}
+                  min={k === 'Df' ? Number(C.DfMin) || 0.6 : null} value={S[k] ?? ''} placeholder={k === 'gsB' ? 'igual que γ' : ''} testid={`obra-${k}`}
                   onChange={(v) => setSuelo({ [k]: v })} />
               ))}
             </div>
@@ -77,6 +78,8 @@ export default function CimObra({ suelo, criterios, setSuelo, setCriterios, onCl
                   onChange={(v) => setCriterios({ [c.k]: v })} />
               ))}
             </div>
+            <Check label="Contratrabes de liga con lado ≥ claro libre / 20 (ACI 18.13.3.3, alta sismicidad); si no, la mínima es la CT-1 (15 × 30)"
+              value={!!C.ligaAci} onChange={(v) => setCriterios({ ligaAci: v })} testid="obra-ligaAci" />
             <label className="cim-campo" style={{ marginTop: 6 }}>
               <span className="cim-etq">Calibres que se prueban al proponer</span>
               <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

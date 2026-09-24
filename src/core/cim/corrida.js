@@ -15,8 +15,9 @@
 import {
   CRITERIOS, SUELO, MAT, paso, check, f1, f2, f3, arriba, num,
   capacidadEfectiva, presiones, flexion, revisaParrilla, proponerParrilla,
-  cortante1D, anclaje, varilla, txtArm, parrilla, kgm, fmtS, GC,
+  cortante1D, anclaje, varilla, txtArm, parrilla, kgm, fmtS, GC, minimos, armEfectivo,
 } from './comun'
+import { nuevaCT, revisarCT, proponerCT } from './ct'
 
 export function nuevaCorrida(nombre = 'ZC-1') {
   return {
@@ -24,6 +25,7 @@ export function nuevaCorrida(nombre = 'ZC-1') {
     geo: { B: 0.8, h: 20, t: 15, muro: 'mamposteria', pos: 'centro', liga: true, Lz: 10 },
     cargas: { CM: { w: 4.75, M: 0 }, CV: { w: 1.2, M: 0 }, S: { w: 0, M: 0 } },
     arm: { t: { num: 3, s: 20 }, l: { num: 3, s: 25 } },
+    ct: nuevaCT(),                     // su contratrabe de liga: la dala de desplante del muro
     mat: { ...MAT }, suelo: {},
   }
 }
@@ -51,13 +53,14 @@ export function combinacionesCorrida(cargas, C) {
   return out
 }
 
-export function revisarCorrida(z, obra = {}) {
+/** @param op.soloZapata  sin su CT ni el desplante (lo que ⚡ Proponer no mueve) */
+export function revisarCorrida(z, obra = {}, op = {}) {
   const C = { ...CRITERIOS, ...(obra.criterios || {}) }
   const S = { ...SUELO, ...(obra.suelo || {}), ...(z.suelo || {}) }
   const g = z.geo, m = { ...MAT, ...(z.mat || {}) }
   const B = num(g.B, 0.8), h = num(g.h, 20), t = num(g.t, 15)
   const fc = num(m.fc, 250), fy = num(m.fy, 4200), r = num(m.r, 5)
-  const arm = { t: { num: 3, s: 20, ...(z.arm?.t || {}) }, l: { num: 3, s: 25, ...(z.arm?.l || {}) } }
+  const arm = { t: armEfectivo({ num: 3, s: 20, ...(z.arm?.t || {}) }, { porMetro: true }), l: armEfectivo({ num: 3, s: 25, ...(z.arm?.l || {}) }, { W: B * 100, r }) }
   const lindero = g.pos === 'lindero'
   const xm = lindero ? -B / 2 + t / 200 : 0              // eje del muro, m
   const off = lindero && !g.liga ? xm : 0
@@ -179,7 +182,13 @@ export function revisarCorrida(z, obra = {}) {
   const A = anclaje({ num: arm.t.num, s: arm.t.s, disponible: vuelo * 100 - r, fc, fy, r, AsReq: F.AsReq, AsProv: pT.As })
   checks.push(check('anclaje', 'Anclaje transversal', A.recto ? A.Ld : A.Ldh, A.disponible, 'cm', { grupo: 'Detallado', ok: A.ok, nota: A.recto ? 'recta' : A.gancho ? 'con gancho' : 'no se desarrolla' }))
   checks.push(check('peralte', 'Peralte mínimo', C.hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${C.hMin} cm` }))
-  secciones.push({ titulo: 'Anclaje y peralte', pasos: [...A.pasos, paso('Peralte mínimo', `h ≥ ${C.hMin} cm`, `h = ${f1(h)}`, h >= (C.hMin) ? 'cumple' : 'no cumple', '', { ok: h >= (C.hMin) })] })
+  const mn = minimos(C, { B, Df: op.soloZapata ? null : Df, que: 'B' })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Anclaje y mínimos', pasos: [...A.pasos, paso('Peralte mínimo', `h ≥ ${C.hMin} cm`, `h = ${f1(h)}`, h >= (C.hMin) ? 'cumple' : 'no cumple', '', { ok: h >= (C.hMin) }), ...mn.pasos] })
+
+  // su contratrabe de liga (la dala de desplante), si el muro es de mampostería
+  const CT = op.soloZapata ? null : revisarCT(z, obra, { t })
+  if (CT) { checks.push(...CT.checks); secciones.push(CT.seccion); avisos.push(...CT.avisos) }
 
   const Lz = num(g.Lz, 1)
   const nT = Math.floor((Lz * 100 - 2 * r) / arm.t.s) + 1
@@ -192,7 +201,7 @@ export function revisarCorrida(z, obra = {}) {
   const ok = checks.every((c) => c.ok)
   return {
     tipo: 'corrida', ok, checks, secciones, avisos, cant,
-    datos: { B, h, t, d, xm, lindero, gancho: A.gancho, nL: pL.n, qu: uM.qu - uM.qd, q: sG.q, qe: sG.qe, W, As: F.As, AsReq: F.AsReq, AsL, arm, vuelo },
+    datos: { B, h, t, d, xm, lindero, gancho: A.gancho, nL: pL.n, qu: uM.qu - uM.qd, q: sG.q, qe: sG.qe, W, As: F.As, AsReq: F.AsReq, AsL, arm, vuelo, ct: CT?.datos || null, Bmin: num(C.Bmin, 0.6) },
     resumen: `Zapata corrida ${lindero ? 'de lindero' : 'central'} de ${f2(B)} m × ${f1(h)} cm bajo muro de ${f1(t)} cm, `
       + `transversal ${txtArm(arm.t)}${A.gancho ? ' con gancho' : ''} y ${pL.n}#${arm.l.num} longitudinales, f′c = ${fc} kg/cm²`,
   }
@@ -207,7 +216,7 @@ export function proponerCorrida(z, obra = {}) {
   const BMAX = 6, HMAX = 100
   const r = num(z.mat?.r, 5), fc = num(z.mat?.fc, 250), fy = num(z.mat?.fy, 4200)
   let arm = { t: { num: 4, s: 20, ...(z.arm?.t || {}) }, l: { num: 3, s: 25, ...(z.arm?.l || {}) } }
-  const R0 = (gg, a = arm) => revisarCorrida({ ...z, geo: gg, arm: a }, obra)
+  const R0 = (gg, a = arm) => revisarCorrida({ ...z, geo: gg, arm: a }, obra, { soloZapata: true })
   const pasa = (R, ids) => ids.every((id) => R.checks.find((c) => c.id === id)?.ok)
   const concOk = (R) => pasa(R, ['cortante', 'peralte']) && !R.secciones.some((s) => s.pasos.some((p) => p.v === 'no alcanza'))
   const sube = (v) => Math.round((v + 0.05) * 100) / 100
@@ -246,5 +255,6 @@ export function proponerCorrida(z, obra = {}) {
     if (!pasa(R2, ['anclaje'])) { if (B >= BMAX) break; minB = sube(B); continue }
     break
   }
-  return { geo, arm }
+  // y su contratrabe de liga: la CT-1 si alcanza
+  return { geo, arm, ct: proponerCT({ ...z, geo, arm }, obra, { t }) }
 }

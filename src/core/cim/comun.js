@@ -32,6 +32,22 @@ export const CRITERIOS = {
   plantilla: 5,              // cm de plantilla de concreto pobre bajo el cimiento
   hMin: 15,                  // cm, peralte mínimo de una zapata
   Bmin: 0.6,                 // m, ancho mínimo de una zapata
+  DfMin: 0.6,                // m, desplante mínimo
+  ligaAci: false,            // liga con lado ≥ claro libre/20 (ACI 18.13.3.3, alta sismicidad); si no, la CT-1
+}
+
+/** Revisiones de los mínimos de la oficina: ancho de zapata y desplante */
+export function minimos(C, { B = null, Df = null, que = 'ancho' } = {}) {
+  const out = { checks: [], pasos: [] }
+  if (B != null) {
+    out.checks.push(check('anchoMin', 'Ancho mínimo', num(C.Bmin, 0.6), B, 'm', { grupo: 'Detallado', ok: B >= num(C.Bmin, 0.6) - 1e-9, nota: `${que} ≥ ${f2(num(C.Bmin, 0.6))} m` }))
+    out.pasos.push(paso('Ancho mínimo', `${que} ≥ ${f2(num(C.Bmin, 0.6))} m`, `${que} = ${f2(B)}`, B >= num(C.Bmin, 0.6) - 1e-9 ? 'cumple' : 'no cumple', '', { ok: B >= num(C.Bmin, 0.6) - 1e-9 }))
+  }
+  if (Df != null) {
+    out.checks.push(check('desplante', 'Desplante mínimo', num(C.DfMin, 0.6), Df, 'm', { grupo: 'Detallado', ok: Df >= num(C.DfMin, 0.6) - 1e-9, nota: `Df ≥ ${f2(num(C.DfMin, 0.6))} m` }))
+    out.pasos.push(paso('Desplante mínimo', `Df ≥ ${f2(num(C.DfMin, 0.6))} m`, `Df = ${f2(Df)}`, Df >= num(C.DfMin, 0.6) - 1e-9 ? 'cumple' : 'no cumple', '', { ok: Df >= num(C.DfMin, 0.6) - 1e-9 }))
+  }
+  return out
 }
 
 /** Suelo de la obra (del estudio de mecánica de suelos) */
@@ -71,6 +87,21 @@ export const kgm = (v) => v.area * 0.785
 
 /** «#4 @ 20» */
 export const txtArm = (a) => (a ? `#${a.num} @ ${fmtS(a.s)}` : '—')
+
+/**
+ * Una parrilla con la CANTIDAD programada (modo 'n', desde el formulario): la
+ * separación que da exactamente esas varillas en el ancho W (o 100/n en una
+ * franja por metro). Así, si cambia el ancho, se quedan las mismas varillas.
+ * (El 1 − 1e-9 es para que `parrilla` cuente justo n y no n + 1 por redondeo.)
+ */
+export function armEfectivo(a, { W = 100, r = 5, porMetro = false } = {}) {
+  if (!a || a.modo !== 'n' || !(Number(a.n) > 0)) return a
+  if (porMetro) return { ...a, s: 100 / Math.max(1, Math.round(Number(a.n))) }
+  const n = Math.max(2, Math.round(Number(a.n)))
+  const libre = Math.max(0, W - 2 * r - varilla(a.num).diam)
+  if (!(libre > 0)) return a
+  return { ...a, n, s: (libre / (n - 1)) * (1 - 1e-9) }
+}
 export const fmtS = (s) => (Number.isInteger(s) ? `${s}` : s.toFixed(1))
 
 // ── pasos de la memoria ──────────────────────────────────────

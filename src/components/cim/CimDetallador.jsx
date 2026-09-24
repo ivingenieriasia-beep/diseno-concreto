@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { dibujarCim } from '../../core/cim/dibujo'
+import { ctDe } from '../../core/cim/ct'
 import { CALIBRES } from './campos'
 
 // El dibujo del cimiento con lo que se puede tocar: las MANIJAS (orillas,
@@ -19,9 +20,10 @@ function setPath(o, path, v) {
 const redondear = (v, p) => Number((Math.round(v / p) * p).toFixed(4))
 
 /** Qué se edita al hacer clic en una etiqueta de varilla */
+const CT_EDITA = { 'ct-sup': 'n', 'ct-inf': 'n', 'ct-est': 'est' }
 const EDITA = {
-  aislada: { x: 's', y: 's' },
-  corrida: { t: 's', l: 's' },
+  aislada: { x: 's', y: 's', ...CT_EDITA },
+  corrida: { t: 's', l: 's', ...CT_EDITA },
   contratrabe: { inf: 'n', sup: 'n', est: 'est', alero: 's', long: 's' },
   liga: { inf: 'n', sup: 'n', est: 'est' },
   contencion: { pv: 's', bast: 'bast', pe: 's', ph: 's', ts: 's', pi: 's', pl: 's' },
@@ -98,8 +100,12 @@ export default function CimDetallador({ z, R, Df, actualizar, marcar }) {
     if (!editable[hit.id]) return
     setPop({ id: hit.id, x: hit.x + hit.w / 2, y: hit.y + hit.h + 6, titulo: hit.titulo })
   }
-  const arm = pop ? z.arm?.[pop.id] : null
-  const setArm = (v) => actualizar(z.uid, { arm: { ...z.arm, [pop.id]: v, ...(pop.id === 'pv' && z.arm.bast?.on ? { bast: { ...z.arm.bast, s: v.s } } : {}) } })
+  // las varillas de la CT de la zapata viven en z.ct; las demás en z.arm
+  const deCT = pop?.id?.startsWith('ct-')
+  const arm = pop ? (deCT ? ctDe(z)[pop.id.slice(3)] : z.arm?.[pop.id]) : null
+  const setArm = (v) => (deCT
+    ? actualizar(z.uid, { ct: { ...ctDe(z), [pop.id.slice(3)]: v } })
+    : actualizar(z.uid, { arm: { ...z.arm, [pop.id]: v, ...(pop.id === 'pv' && z.arm.bast?.on ? { bast: { ...z.arm.bast, s: v.s } } : {}) } }))
 
   return (
     <div ref={caja} className="cim-dib" data-testid="cim-dibujo">
@@ -156,7 +162,7 @@ export default function CimDetallador({ z, R, Df, actualizar, marcar }) {
             ) : editable[pop.id] !== 'bast' && (
               <div className="cim-pop-s">
                 <span>@</span>
-                {[10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30].map((s) => <button key={s} className={arm.s === s ? 'on' : ''} data-testid={`cim-pop-s-${s}`} onClick={() => setArm({ ...arm, s })}>{s}</button>)}
+                {[10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30].map((s) => <button key={s} className={arm.s === s && arm.modo !== 'n' ? 'on' : ''} data-testid={`cim-pop-s-${s}`} onClick={() => setArm({ ...arm, s, modo: 's' })}>{s}</button>)}
               </div>
             )}
             {editable[pop.id] === 'est' && (
@@ -200,6 +206,6 @@ function valorTxt(z, h) {
   }
   const c = Array.isArray(h.campo) ? h.campo[0] : h.campo
   const v = Number(get(z, c))
-  const cmCampo = /\.(h|H|bw|t)$/.test(c) && z.tipo !== 'contencion' && z.tipo !== 'gravedad' && z.tipo !== 'mamposteria'
+  const cmCampo = (/\.(h|H|bw|t)$/.test(c) && z.tipo !== 'contencion' && z.tipo !== 'gravedad' && z.tipo !== 'mamposteria') || c.startsWith('ct.')
   return `${h.titulo} = ${cmCampo ? `${v} cm` : `${v.toFixed(2)} m`}`
 }

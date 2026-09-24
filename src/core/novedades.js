@@ -31,6 +31,32 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.06',
+    fecha: '2026-09-24',
+    lema: 'Cada zapata con su contratrabe de liga, mínimos de 0.60 m y el armado por separación o por cantidad.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'La contratrabe de liga de cada zapata: la CT-1',
+        texto: 'Toda zapata aislada y toda corrida bajo muro de mampostería lleva su contratrabe de liga a la altura del tope del dado, con el lecho alto al nivel del terreno. Por omisión la CT-1 de la oficina (15 × 30, 4#4, E#2.5 @ 15, recubrimiento 3 cm y 5 abajo): sale en el corte, en su detalle, en la memoria y en el DXF. Se revisa con la liga del 10 % de la Pu, el N·e de las de lindero o, en la corrida, como dala de desplante; si no alcanza, ⚡ Proponer la diseña.',
+        donde: 'Cimentaciones → el formulario de la zapata → Contratrabe de liga',
+      },
+      {
+        tipo: 'nuevo',
+        titulo: 'Armado por separación o por cantidad',
+        texto: 'Junto a la separación (con flechas a cada 5 cm) va la cantidad de varillas: programas una y la otra se ve atenuada con lo que resulta. La cantidad programada se queda aunque cambies el ancho.',
+        donde: 'Cimentaciones → Armado',
+      },
+    ],
+    cambios: [
+      { tipo: 'nuevo', texto: 'Mínimos de la oficina: ninguna zapata de menos de 0.60 m de ancho ni desplante de menos de 0.60 m. ⚡ Proponer no baja de ahí y la revisión lo marca.' },
+      { tipo: 'mejora', texto: 'Contratrabe de liga independiente (TL): arranca en la CT-1 y crece sólo si las cargas lo piden; la regla del claro/20 del ACI queda como criterio opcional en Suelo y criterios.' },
+      { tipo: 'arreglo', texto: 'Liga: recubrimiento de 3 cm arriba y a los lados y de 5 cm sólo abajo, contra el suelo (antes 5 parejo), y el ancho que piden las varillas con el recubrimiento de los lados.' },
+      { tipo: 'arreglo', texto: 'DXF: los superíndices salían «?» en AutoCAD (txt.shx no los trae): t/m² sale t/m2 y m³ sale m3; Δ, ≈, ½ y demás símbolos, con su equivalente en texto. Los acentos siguen como en la 3.05.' },
+    ],
+    aviso: 'Las zapatas de proyectos anteriores reciben la CT-1 al abrirlos; dale ⚡ Proponer a las de lindero para que su CT tome el N·e.',
+  },
+  {
     version: '3.05',
     fecha: '2026-09-24',
     lema: 'Mampostería para placas en el catálogo de RAM, y los DXF con sus acentos.',

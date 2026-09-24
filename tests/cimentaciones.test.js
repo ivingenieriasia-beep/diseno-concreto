@@ -538,12 +538,18 @@ describe('contratrabe de liga', () => {
     expect(tramos[0].Vu).toBeCloseTo(1.15 * wu * 4.7 / 2 + 8 / 5, 9)
   })
 
-  it('⚡ Proponer deja una liga que cumple todo, con lado ≥ claro/20', () => {
+  it('⚡ Proponer deja una liga que cumple todo; con el criterio del ACI, lado ≥ claro/20', () => {
     const z = { ...nuevaLiga(), columnas: [{ x: 0, c: 30, Pu: 60, Me: 12 }, { x: 6.5, c: 30, Pu: 90, Me: 0 }, { x: 13, c: 30, Pu: 70, Me: 0 }], cargas: { CM: { w: 1.2 }, CV: { w: 0 } } }
-    const p = proponerLiga(z, {})
-    const R = revisarLiga({ ...z, ...p }, {})
+    const aci = { criterios: { ligaAci: true } }
+    const p = proponerLiga(z, aci)
+    const R = revisarLiga({ ...z, ...p }, aci)
     expect(R.ok).toBe(true)
     expect(Math.min(p.geo.b, p.geo.h)).toBeGreaterThanOrEqual(Math.ceil((6.5 - 0.3) * 100 / 20))
+    // sin el criterio del ACI manda la CT-1 de la oficina como mínimo
+    const p0 = proponerLiga(z, {})
+    expect(revisarLiga({ ...z, ...p0 }, {}).ok).toBe(true)
+    expect(p0.geo.b).toBeGreaterThanOrEqual(15)
+    expect(p0.geo.h).toBeGreaterThanOrEqual(30)
     expect(R.checks.map((c) => c.id)).toEqual(expect.arrayContaining(['flexionSup', 'flexionInf', 'tension', 'compresion', 'cortante', 'seccion']))
     expect(dibujarCim({ ...z, ...p, uid: 'l' }, R, { ancho: 900 }).svg).toMatch(/ALZADO DE LA LIGA/)
   })
@@ -617,3 +623,122 @@ describe('un mismo diseño en varios ejes', () => {
     expect(P.porNudo.has('5')).toBe(false)
   })
 })
+
+// ── v3.06: la contratrabe de liga de cada zapata, los mínimos y el armado por cantidad
+import { CT1, ctDe, esCT1, llevaCT, revisarCTAislada, revisarCTMuro, proponerCT } from '../src/core/cim/ct'
+import { armEfectivo } from '../src/core/cim/comun'
+import { alDia } from '../src/store/useCimStore'
+import { claroLiga } from '../src/core/cim/reacciones'
+
+describe('contratrabe de liga de cada zapata (CT)', () => {
+  const obra = { suelo: { qadm: 15, Df: 1 } }
+  it('toda zapata nueva lleva la CT-1: 15 × 30, 2#4 + 2#4, E#2.5 @ 15, 3 cm arriba y a los lados y 5 abajo', () => {
+    for (const t of ['aislada', 'corrida']) {
+      const z = crearCim(t, [], obra)
+      expect(llevaCT(z)).toBe(true)
+      expect(esCT1(ctDe(z))).toBe(true)
+      expect(ctDe(z)).toMatchObject({ nombre: 'CT-1', b: 15, h: 30, r: 3, rInf: 5 })
+    }
+    expect(llevaCT(crearCim('contencion', [], obra))).toBe(false)
+    expect(llevaCT({ ...nuevaCorrida(), geo: { ...nuevaCorrida().geo, muro: 'concreto' } })).toBe(false)
+  })
+  it('en la céntrica la CT-1 cumple como liga: 10 % de la Pu y estribos a no más de 1.5 b ni 20 cm', () => {
+    const z = crearCim('aislada', [], obra)
+    const R = revisarCim(z, obra)
+    expect(R.ok).toBe(true)
+    const ids = R.checks.filter((c) => c.id.startsWith('ct-')).map((c) => c.id)
+    expect(ids).toEqual(expect.arrayContaining(['ct-flexionSup', 'ct-flexionInf', 'ct-tension', 'ct-compresion', 'ct-cortante', 'ct-seccion']))
+    const T = R.secciones.find((s) => s.titulo.startsWith('Contratrabe de liga CT-1')).pasos.find((p) => p.t === 'Fuerza de liga').v
+    expect(T).toBeCloseTo(0.1 * R.datos.ctSolic.Pu, 9)
+    expect(R.secciones.flatMap((s) => s.pasos).some((p) => /como liga/.test(p.f))).toBe(true)
+    expect(chk(R, 'ct-seccion').sinU).toBe(true)                 // la CT-1 es el mínimo: no cuenta como «justo»
+    expect(estadoCim(R).tono).not.toBe('mal')
+  })
+  it('la de lindero lleva el N·e: la CT-1 no alcanza y ⚡ Proponer la diseña (CT-2)', () => {
+    const z = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, px: 'min', B: 1.5, L: 1.5 }, cargas: { CM: { P: 25 }, CV: { P: 8 } } }
+    const R = revisarAislada(z, obra)
+    expect(R.datos.ctSolic.Me).toBeGreaterThan(0)
+    expect(R.checks.filter((c) => c.id.startsWith('ct-')).some((c) => !c.ok)).toBe(true)
+    expect(R.avisos.some((a) => /no alcanza con el N·e/.test(a))).toBe(true)
+    const p = { ...z, ...proponerAislada(z, obra) }
+    expect(p.ct.nombre).toBe('CT-2')
+    const R2 = revisarAislada(p, obra)
+    expect(R2.checks.filter((c) => c.id.startsWith('ct-')).every((c) => c.ok)).toBe(true)
+    expect(R2.secciones.flatMap((s) => s.pasos).some((p2) => /como viga/.test(p2.f))).toBe(true)   // con N·e, s ≤ d/2
+  })
+  it('en la corrida es la dala de desplante: ancho ≥ muro, As ≥ 0.2 f′c t²/fy con 3 varillas, Asc ≥ 1000 s/(fy hc)', () => {
+    const z = crearCim('corrida', [], obra)
+    const C = revisarCTMuro(z, obra, { t: 15 })
+    expect(C.checks.every((c) => c.ok)).toBe(true)
+    expect(valorDe(C, 'Refuerzo longitudinal mínimo')).toBeCloseTo(0.2 * 250 * 225 / 4200, 9)
+    // muro de 20: la CT-1 de 15 no alcanza a cubrirlo y ⚡ Proponer la ensancha
+    const z20 = { ...z, geo: { ...z.geo, t: 20 } }
+    expect(revisarCTMuro(z20, obra, { t: 20 }).checks.find((c) => c.id === 'ct-ancho').ok).toBe(false)
+    const ct = proponerCT(z20, obra, { t: 20 })
+    expect(ct.b).toBeGreaterThanOrEqual(20)
+    expect(revisarCTMuro({ ...z20, ct }, obra, { t: 20 }).checks.every((c) => c.ok)).toBe(true)
+  })
+  it('el dibujo lleva la CT en el corte y su detalle, con manijas y varillas para tocar', () => {
+    for (const t of ['aislada', 'corrida']) {
+      const z = { ...crearCim(t, [], obra), uid: 'x' }
+      const d = dibujarCim(z, revisarCim(z, obra), { ancho: 900, Df: 1 })
+      expect(d.svg).toMatch(/CONTRATRABE CT-1/)
+      expect(d.handles.map((h) => h.campo)).toEqual(expect.arrayContaining(['ct.h', 'ct.b']))
+      expect(d.hits.map((h) => h.id)).toEqual(expect.arrayContaining(['ct-sup', 'ct-inf', 'ct-est']))
+    }
+  })
+  it('desde RAM la CT toma el claro a la columna vecina', () => {
+    const a = { nudo: '1', x: 0, y: 0, col: { c1: 30, c2: 30 } }
+    const todos = [a, { nudo: '2', x: 5, y: 0 }, { nudo: '3', x: 0, y: 6 }]
+    expect(claroLiga([a], todos)).toBeCloseTo(4.7, 9)
+  })
+  it('los proyectos de antes: la zapata recibe la CT-1 y la liga los recubrimientos 3 / 5', () => {
+    const { ct, ...viejaZ } = nuevaAislada()
+    expect(alDia(viejaZ).ct).toMatchObject({ nombre: 'CT-1' })
+    const liga = { ...nuevaLiga(), mat: { fc: 250, fy: 4200, r: 5 } }
+    expect(alDia(liga).mat).toMatchObject({ r: 3, rInf: 5 })
+    expect(nuevaLiga()).toMatchObject({ geo: { b: 15, h: 30 }, arm: { est: { num: 2.5, s: 15 } }, mat: { r: 3, rInf: 5 } })
+  })
+})
+
+describe('mínimos: ancho de zapata y desplante de 0.60 m', () => {
+  it('B < 0.60 o Df < 0.60 no cumplen; ⚡ Proponer nunca baja de B = 0.60', () => {
+    const obra = { suelo: { qadm: 30, Df: 1 } }
+    const z = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, B: 0.5, L: 0.5, c1: 20, c2: 20 }, cargas: { CM: { P: 2 }, CV: { P: 1 } } }
+    expect(chk(revisarAislada(z, obra), 'anchoMin').ok).toBe(false)
+    expect(chk(revisarAislada({ ...z, geo: { ...z.geo, B: 0.6, L: 0.6 } }, obra), 'anchoMin').ok).toBe(true)
+    expect(proponerAislada(z, obra).geo.B).toBeGreaterThanOrEqual(0.6)
+    const bajo = { suelo: { qadm: 30, Df: 0.5 } }
+    for (const t of ['aislada', 'corrida', 'contratrabe', 'mamposteria']) {
+      const R = revisarCim(crearCim(t, [], bajo), bajo)
+      expect(chk(R, 'desplante')?.ok, t).toBe(false)
+    }
+  })
+  it('los muros de contención quedan enterrados al menos 0.60 m', () => {
+    expect(nuevaGravedad().geo.Df).toBeGreaterThanOrEqual(0.6)
+    const z = crearCim('gravedad', [], {}, { geo: { ...nuevaGravedad().geo, Df: 0.3 } })
+    expect(z.geo.Df).toBeGreaterThanOrEqual(0.6)
+    expect(chk(revisarCim({ ...z, geo: { ...z.geo, Df: 0.4 } }, {}), 'desplante').ok).toBe(false)
+  })
+})
+
+describe('armado por separación o por cantidad', () => {
+  it('con la cantidad programada se quedan las mismas varillas aunque cambie el ancho', () => {
+    for (const W of [100, 115, 180, 243]) {
+      for (const n of [2, 5, 7, 11]) {
+        const a = armEfectivo({ num: 4, s: 20, modo: 'n', n }, { W, r: 5 })
+        expect(parrilla({ num: 4, s: a.s, W, r: 5 }).n, `${W}/${n}`).toBe(n)
+      }
+    }
+    expect(armEfectivo({ num: 3, s: 20, modo: 'n', n: 6 }, { porMetro: true }).s).toBeCloseTo(100 / 6, 9)
+    expect(armEfectivo({ num: 3, s: 20 }, { W: 100 })).toEqual({ num: 3, s: 20 })   // por separación, tal cual
+  })
+  it('la zapata con 7 varillas en x las conserva al cambiar L', () => {
+    const obra = { suelo: { qadm: 15, Df: 1 } }
+    const z = crearCim('aislada', [], obra)
+    const z7 = { ...z, arm: { ...z.arm, x: { ...z.arm.x, modo: 'n', n: 7 } } }
+    for (const L of [1.2, 1.6, 2.0]) expect(revisarAislada({ ...z7, geo: { ...z7.geo, cuadrada: false, L } }, obra).datos.nX).toBe(7)
+  })
+})
+
+function valorDe(C, t) { return C.seccion.pasos.find((p) => p.t === t)?.v }

@@ -44,8 +44,8 @@ export default function CimRevisiones({ R }) {
           {g.items.map((c) => (
             <div key={c.id} className={`cim-check-fila ${c.ok ? '' : 'mal'}`} data-testid={`cim-check-${c.id}`} title={c.nota}>
               <span className="cim-check-t">{c.ok ? '✓' : '✗'} {c.titulo}</span>
-              <Barra u={c.u} ok={c.ok} />
-              <span className="cim-check-v">{Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—'}</span>
+              {c.sinU ? <span className="cim-barra" /> : <Barra u={c.u} ok={c.ok} />}
+              <span className="cim-check-v">{!c.sinU && Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—'}</span>
               <span className="cim-check-n">{c.unidad === 'FS' ? c.nota : `${fmt(c.act)} / ${fmt(c.res)} ${c.unidad}`}{c.unidad !== 'FS' && c.nota ? ` · ${c.nota}` : ''}</span>
             </div>
           ))}

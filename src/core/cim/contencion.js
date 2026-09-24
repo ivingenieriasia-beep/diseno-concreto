@@ -17,7 +17,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  CRITERIOS, SUELO, MAT, GC, paso, check, f1, f2, f3, arriba, num,
+  CRITERIOS, SUELO, MAT, GC, paso, check, f1, f2, f3, arriba, num, minimos, armEfectivo,
   flexion, revisaParrilla, proponerParrilla, cortante1D, anclaje, varilla, txtArm, kgm, momentoResistente,
 } from './comun'
 import { rankine } from './suelo'
@@ -94,9 +94,11 @@ export function revisarContencion(z, obra = {}) {
   const m = { ...MAT, ...(z.mat || {}) }
   const fc = num(m.fc, 250), fy = num(m.fy, 4200), r = num(m.r, 5)
   const F = fuerzasMuro(z, obra)
-  const { S, H, tc, tb, p, tal, hz, B, Hs, gs, Ka, Kp, Ha, cb, sb, Pa, Pq, W, Wq, xq, xb, D, Pp, beta, q } = F
+  const { S, H, tc, tb, p, tal, hz, B, Hs, gs, Ka, Kp, Ha, cb, sb, Pa, Pq, W, Wq, xq, xb, D, Pp, beta, q, Df } = F
   const A0 = nuevaContencion().arm
-  const arm = Object.fromEntries(Object.keys(A0).map((k) => [k, { ...A0[k], ...(z.arm?.[k] || {}) }]))
+  // todo por metro de muro (con la cantidad programada, su separación)
+  const arm = Object.fromEntries(Object.keys(A0).map((k) => [k, armEfectivo({ ...A0[k], ...(z.arm?.[k] || {}) }, { porMetro: true })]))
+  if (arm.bast?.on) arm.bast = { ...arm.bast, s: arm.pv.s }
   const checks = [], secciones = [], avisos = []
 
   // ── estabilidad (servicio) ──
@@ -117,6 +119,9 @@ export function revisarContencion(z, obra = {}) {
   checks.push(check('deslizamiento', 'Deslizamiento', C.fsDesl, FSd, 'FS', { grupo: 'Estabilidad', nota: `FS = ${f2(FSd)}` }))
   checks.push(check('excentricidad', 'Resultante en el tercio medio', Math.abs(pb.e), B / 6, 'm', { grupo: 'Estabilidad', nota: `e = ${f3(pb.e)}` }))
   checks.push(check('suelo', 'Presión máxima', pb.qmax, num(S.qadm), 't/m²', { grupo: 'Estabilidad' }))
+  const mn = minimos(C, { Df })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Desplante mínimo', pasos: mn.pasos })
   secciones.push({
     titulo: 'Empujes (por metro de muro)',
     pasos: [
@@ -270,7 +275,8 @@ const f0t = (m) => (m * 100).toFixed(0)
 export function proponerContencion(z, obra = {}) {
   const C = { ...CRITERIOS, ...(obra.criterios || {}) }
   const H = num(z.geo.H, 3)
-  let geo = { ...z.geo }
+  // enterrado al menos el desplante mínimo
+  let geo = { ...z.geo, Df: Math.max(num(z.geo.Df, 0.8), num(C.DfMin, 0.6)) }
   let arm = { ...nuevaContencion().arm, ...(z.arm || {}) }
   const R0 = (g, a = arm) => revisarContencion({ ...z, geo: g, arm: a }, obra)
   const pasa = (R, ids) => ids.every((id) => R.checks.find((c) => c.id === id).ok)

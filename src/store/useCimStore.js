@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { crearCim } from '../core/cim'
+import { llevaCT, nuevaCT } from '../core/cim/ct'
+import { R_LIGA } from '../core/cim/liga'
 
 // Cimentaciones del proyecto: los cimientos, el suelo de la obra (del estudio
 // de mecánica de suelos) y los criterios. Cada cimiento puede sobrescribir el
@@ -9,6 +11,18 @@ import { crearCim } from '../core/cim'
 let seq = 0
 const nuevoUid = () => `z${Date.now().toString(36)}${(seq++).toString(36)}`
 const conUid = (z) => (z.uid ? z : { ...z, uid: nuevoUid() })
+
+/**
+ * Los proyectos de antes de la 3.06: toda zapata lleva su contratrabe de liga
+ * (la CT-1), y las ligas van con 3 cm de recubrimiento arriba y a los lados y
+ * 5 abajo (antes, 5 parejo).
+ */
+export function alDia(z) {
+  let out = z
+  if (llevaCT(out) && !out.ct) out = { ...out, ct: nuevaCT() }
+  if (out.tipo === 'liga' && out.mat?.rInf == null) out = { ...out, mat: { ...(out.mat || {}), ...R_LIGA } }
+  return out
+}
 const HIST = 40
 
 const useCimStore = create((set, get) => ({
@@ -100,7 +114,7 @@ const useCimStore = create((set, get) => ({
   /** Del .json del proyecto (o del autoguardado) */
   cargar: (data) => {
     const d = data || {}
-    const cimientos = Array.isArray(d.cimientos) ? d.cimientos.map(conUid) : []
+    const cimientos = Array.isArray(d.cimientos) ? d.cimientos.map((z) => conUid(alDia(z))) : []
     set({ cimientos, suelo: d.suelo || {}, criterios: d.criterios || {}, linderos: d.linderos || {}, selUid: cimientos[0]?.uid ?? null, hist: [] })
   },
 

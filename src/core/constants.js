@@ -1,6 +1,6 @@
 // Versión de la app. Un solo sitio: la barra, los informes y la memoria la
 // leen de aquí para que no se queden atrás unos respecto de otros.
-export const APP_VERSION = '3.05'
+export const APP_VERSION = '3.06'
 
 // Bar diameters in mm (Mexican rebar standard)
 export const DIAM = {

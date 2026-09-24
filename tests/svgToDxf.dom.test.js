@@ -76,9 +76,10 @@ describe('texto del DXF: acentos y símbolos', () => {
     expect(encodeAcadText('Cimentación, sección, dirección')).toBe('Cimentaci\\U+00F3n, secci\\U+00F3n, direcci\\U+00F3n')
     expect(encodeAcadText('Ñ ñ ü ¿ ¡ Á')).toBe('\\U+00D1 \\U+00F1 \\U+00FC \\U+00BF \\U+00A1 \\U+00C1')
   })
-  it('los símbolos: %% de AutoCAD, los de las SHX en \\U+ y lo demás con su equivalente', () => {
+  it('los símbolos: %% de AutoCAD y lo demás con su equivalente (txt.shx no trae superíndices)', () => {
     expect(encodeAcadText('4Ø#5 ±2 90°')).toBe('4%%c#5 %%p2 90%%d')
-    expect(encodeAcadText('kg/cm² m³ Δ')).toBe('kg/cm\\U+00B2 m\\U+00B3 \\U+0394')
+    expect(encodeAcadText('kg/cm² m³ Δ ½')).toBe('kg/cm2 m3 D 1/2')
+    expect(encodeAcadText('q = 12.07 t/m² ≤ qe')).toBe('q = 12.07 t/m2 <= qe')
     expect(encodeAcadText('q ≤ qe — f′c 20 × 40 → ok…')).toBe("q <= qe - f'c 20 x 40 -> ok...")
     expect(encodeAcadText('x^2')).toBe('x^ 2')
   })
@@ -86,7 +87,7 @@ describe('texto del DXF: acentos y símbolos', () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" width="10cm" height="5cm"><text x="5" y="20" font-size="6">Z-1 · Zapata céntrica</text><text x="5" y="40" font-size="6">Contratrabe · sección 25 × 60 · f′c 250 kg/cm²</text></svg>`
     const dxf = svgToDxf(svg)
     expect(dxf).toContain('Z-1 - Zapata c\\U+00E9ntrica')
-    expect(dxf).toContain("Contratrabe - secci\\U+00F3n 25 x 60 - f'c 250 kg/cm\\U+00B2")
+    expect(dxf).toContain("Contratrabe - secci\\U+00F3n 25 x 60 - f'c 250 kg/cm2")
     expect(dxf).not.toMatch(/\?/)
     expect(/^[\x00-\x7F]*$/.test(dxf)).toBe(true)
     expect(dxf).toContain('$DWGCODEPAGE\n  3\nANSI_1252')

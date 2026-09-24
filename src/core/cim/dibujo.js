@@ -12,6 +12,7 @@
 
 import { lienzo, COL } from './lienzo'
 import { varilla, txtArm, num, f2 } from './comun'
+import { txtVarillasCT } from './ct'
 
 const cm = (m) => m * 100
 const f0 = (v) => Math.round(v).toString()
@@ -24,8 +25,74 @@ export const escalaPara = (anchoCm, px, { min = 0.9, max = 6 } = {}) => Math.max
 /** posiciones de n varillas repartidas entre a y b */
 const reparto = (a, b, nn) => (nn <= 1 ? [(a + b) / 2] : Array.from({ length: nn }, (_, i) => a + ((b - a) * i) / (nn - 1)))
 
+/**
+ * Corte de una contratrabe de liga (la CT de una zapata o una TL), como el
+ * detalle de la oficina: estribo con su gancho, varillas en las esquinas y
+ * los recubrimientos (3 arriba y a los lados, 5 abajo, contra el suelo).
+ * Origen: centro de la cara de abajo.
+ */
+function corteLiga(S, { b, h, r, rInf, sup, inf, est }, { ids = null, k = 3, cotas = true } = {}) {
+  const vs = varilla(sup.num), vi = varilla(inf.num), ve = varilla(est.num)
+  S.rect(-b / 2, 0, b, h, { c: COL.concreto, w: 1.6, fill: FONDO })
+  const x0 = -b / 2 + r, x1 = b / 2 - r, y0 = rInf, y1 = h - r
+  S.rect(x0, y0, x1 - x0, y1 - y0, { c: COL.estribo, w: 1.1 })
+  // gancho a 135° en la esquina de arriba a la izquierda
+  const g = Math.max(6 * ve.diam, 3)
+  S.line(x0 + ve.diam, y1 - ve.diam, x0 + ve.diam + g * 0.7, y1 - ve.diam - g * 0.7, { c: COL.estribo, w: 1.1 })
+  S.line(x0 + 2 * ve.diam, y1, x0 + 2 * ve.diam + g * 0.7, y1 - g * 0.7, { c: COL.estribo, w: 1.1 })
+  const yS = h - r - ve.diam - vs.diam / 2, yI = rInf + ve.diam + vi.diam / 2
+  const rad = (v) => Math.max(2, (v.diam / 2) * k)
+  for (const x of reparto(x0 + ve.diam + vs.diam / 2, x1 - ve.diam - vs.diam / 2, sup.n)) S.dot(x, yS, rad(vs), COL.arriba)
+  for (const x of reparto(x0 + ve.diam + vi.diam / 2, x1 - ve.diam - vi.diam / 2, inf.n)) S.dot(x, yI, rad(vi), COL.abajo)
+  if (cotas) {
+    S.dimH(-b / 2, b / 2, 0, 22, `${f0(b)}`)
+    S.dimV(0, h, -b / 2, -18, `${f0(h)}`)
+    S.dimV(y1, h, b / 2, 16, `${f0(r)}`)
+    S.dimV(0, y0, b / 2, 16, `${f0(rInf)}`)
+  }
+  if (ids) {
+    S.etiqueta(ids.sup, b / 2, yS, `${sup.n}#${sup.num} arriba`, { c: COL.arriba, anchor: 'start', dx: 40, dy: 4, titulo: 'Varillas de arriba' })
+    S.etiqueta(ids.inf, b / 2, yI, `${inf.n}#${inf.num} abajo`, { c: COL.abajo, anchor: 'start', dx: 40, dy: 4, titulo: 'Varillas de abajo' })
+    S.etiqueta(ids.est, b / 2, h / 2, `E#${est.num} @ ${est.s}`, { c: COL.estribo, anchor: 'start', dx: 40, dy: 4, titulo: 'Estribos' })
+  }
+  return { yS, yI }
+}
+
+/**
+ * El detalle de la CT de una zapata en su propio lienzo, a la derecha del
+ * dibujo (en pantalla, más grande; en el DXF, a la escala de todo).
+ */
+function detalleCT(ct, x, top, { k, exportar }) {
+  const kd = exportar ? k : Math.max(k, Math.min(4, 150 / Math.max(ct.h, 1)))
+  const S = lienzo(kd)
+  const cx = x + 40 + (ct.b / 2) * kd, cy = top + 52 + ct.h * kd
+  S.vista(cx, cy)
+  S.titulo(x, top + 14, `CONTRATRABE ${ct.nombre}`, `${f0(ct.b)} × ${f0(ct.h)} cm · ${txtVarillasCT(ct)} · E#${ct.est.num} @ ${ct.est.s} · recubrimiento ${f0(ct.r)} arriba y a los lados, ${f0(ct.rInf)} abajo`)
+  corteLiga(S, ct, { ids: { sup: 'ct-sup', inf: 'ct-inf', est: 'ct-est' }, k: kd })
+  S.text(0, 0, 'lecho alto al nivel del terreno', { dy: 40, size: 9.5, c: COL.tenue })
+  S.manija('ct-h', 0, ct.h, { eje: 'y', campo: 'ct.h', factor: 1, pasoCm: 5, min: 30, max: 150, titulo: 'h de la CT' })
+  S.manija('ct-b', ct.b / 2, ct.h * 0.55, { eje: 'x', campo: 'ct.b', factor: 2, pasoCm: 5, min: 15, max: 60, titulo: 'b de la CT' })
+  return { S, W: cx + (ct.b / 2) * kd + 190, H: cy + 56 }
+}
+
+/** Junta el dibujo con el detalle de su CT (si lleva) */
+function conDetalleCT(d, ct, op) {
+  if (!ct) return d
+  // debajo del dibujo, a la izquierda: a lo ancho ya no cabe
+  const det = detalleCT(ct, 30, d.H - 10, { k: d.k, exportar: op.exportar })
+  const r2 = det.S.resultado(Math.max(d.W, det.W), Math.max(d.H, det.H))
+  const W = Math.max(d.W, det.W), H = Math.max(d.H, det.H)
+  const inner = d.inner + r2.inner
+  return {
+    ...d, inner, W, H,
+    handles: [...d.handles, ...r2.handles], hits: [...d.hits, ...r2.hits],
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="DM Mono, monospace">${inner}</svg>`,
+  }
+}
+
 // ── Zapata aislada ───────────────────────────────────────────
-function aislada(z, R, { ancho = 900, k: kFijo } = {}) {
+function aislada(z, R, op = {}) {
+  const { ancho = 900, k: kFijo } = op
   const D = R.datos
   const B = cm(D.B), Lc = cm(D.L), h = D.h, c1 = D.c1, c2 = D.c2, xc = cm(D.xc), yc = cm(D.yc)
   const r = num(z.mat?.r, 5)
@@ -78,11 +145,11 @@ function aislada(z, R, { ancho = 900, k: kFijo } = {}) {
   const g = z.geo
   const fB = g.px === 'centro' || g.px === 'libre' ? 2 : 1
   const fL = g.py === 'centro' || g.py === 'libre' ? 2 : 1
-  if (g.px === 'max') L.manija('B', -B / 2, 0, { eje: 'x', campo: 'geo.B', factor: -fB / 100, pasoCm: 0.05, min: 0.4, titulo: 'B' })
-  else L.manija('B', B / 2, 0, { eje: 'x', campo: 'geo.B', factor: fB / 100, pasoCm: 0.05, min: 0.4, titulo: 'B' })
+  if (g.px === 'max') L.manija('B', -B / 2, 0, { eje: 'x', campo: 'geo.B', factor: -fB / 100, pasoCm: 0.05, min: D.Bmin ?? 0.6, titulo: 'B' })
+  else L.manija('B', B / 2, 0, { eje: 'x', campo: 'geo.B', factor: fB / 100, pasoCm: 0.05, min: D.Bmin ?? 0.6, titulo: 'B' })
   if (!g.cuadrada) {
-    if (g.py === 'max') L.manija('L', 0, -Lc / 2, { eje: 'y', campo: 'geo.L', factor: -fL / 100, pasoCm: 0.05, min: 0.4, titulo: 'L' })
-    else L.manija('L', 0, Lc / 2, { eje: 'y', campo: 'geo.L', factor: fL / 100, pasoCm: 0.05, min: 0.4, titulo: 'L' })
+    if (g.py === 'max') L.manija('L', 0, -Lc / 2, { eje: 'y', campo: 'geo.L', factor: -fL / 100, pasoCm: 0.05, min: D.Bmin ?? 0.6, titulo: 'L' })
+    else L.manija('L', 0, Lc / 2, { eje: 'y', campo: 'geo.L', factor: fL / 100, pasoCm: 0.05, min: D.Bmin ?? 0.6, titulo: 'L' })
   }
   L.manija('col', xc, yc, { eje: 'xy', campo: 'col', factor: 1 / 100, pasoCm: 0.05, titulo: 'columna', forma: 'punto' })
 
@@ -97,6 +164,20 @@ function aislada(z, R, { ancho = 900, k: kFijo } = {}) {
   L.rect(-B / 2 - 5, -pl, B + 10, pl, { c: COL.plantilla, w: 0.8, fill: '#e7e2d9' })
   L.rect(-B / 2, 0, B, h, { c: COL.concreto, w: 1.6, fill: FONDO })
   const top_ = Math.max(DfCm, h) + 40
+  // su contratrabe de liga, con el lecho alto al nivel del terreno: en este
+  // corte se ve la que corre en x, a los dos lados de la columna
+  const ct = D.ct
+  if (ct) {
+    const y0 = Math.max(h, DfCm - ct.h), y1 = DfCm
+    const xa = -B / 2 - 30, xb = B / 2 + 30
+    for (const [a, b] of [[xa, xc - c1 / 2], [xc + c1 / 2, xb]]) {
+      if (b - a < 1) continue
+      L.rect(a, y0, b - a, y1 - y0, { c: COL.concreto, w: 1.2, fill: '#f3ece6' })
+      L.line(a + 2, y1 - ct.r - 1, b - 2, y1 - ct.r - 1, { c: COL.arriba, w: 1.2 })
+      L.line(a + 2, y0 + ct.rInf + 1, b - 2, y0 + ct.rInf + 1, { c: COL.abajo, w: 1.2 })
+    }
+    L.text(xa, (y0 + y1) / 2, ct.nombre, { anchor: 'start', dx: 4, dy: 4, size: 9.5, weight: 700, c: COL.concreto })
+  }
   L.rect(xc - c1 / 2, h, c1, top_ - h, { c: COL.concreto, w: 1.4, fill: '#ecdde3' })
   L.poly([[xc - c1 / 2 - 6, top_ - 4], [xc - 4, top_ + 3], [xc + 4, top_ - 7], [xc + c1 / 2 + 6, top_]], { c: COL.tenue, w: 0.8 }, false)
   // varillas de la columna (anclaje en la zapata)
@@ -125,11 +206,12 @@ function aislada(z, R, { ancho = 900, k: kFijo } = {}) {
     L.text((x0 + x1) / 2, -pl - 34 / k - hq, `q = ${f2(D.q)} t/m² ${okq ? '≤' : '>'} qe = ${f2(D.qe)}`, { dy: 14, size: 10, c: okq ? COL.presion : COL.mal, weight: okq ? 400 : 700 })
   }
   L.manija('h', 0, 0, { eje: 'y', campo: 'geo.h', factor: -1, pasoCm: 5, min: 15, max: 200, titulo: 'h' })
-  return L.resultado(W, H)
+  return conDetalleCT(L.resultado(W, H), D.ct, op)
 }
 
 // ── Zapata corrida bajo muro ─────────────────────────────────
-function corrida(z, R, { ancho = 900, k: kFijo } = {}) {
+function corrida(z, R, op = {}) {
+  const { ancho = 900, k: kFijo } = op
   const D = R.datos
   const B = cm(D.B), h = D.h, t = D.t, xm = cm(D.xm), r = num(z.mat?.r, 5)
   const arm = D.arm
@@ -154,10 +236,23 @@ function corrida(z, R, { ancho = 900, k: kFijo } = {}) {
   L.rect(-B / 2 - 5, -pl, B + 10, pl, { c: COL.plantilla, w: 0.8, fill: '#e7e2d9' })
   L.rect(-B / 2, 0, B, h, { c: COL.concreto, w: 1.6, fill: FONDO })
   const tope = Math.max(DfCm, h) + 60
+  const ct = D.ct
   if (z.geo.muro === 'concreto') L.rect(xm - t / 2, h, t, tope - h, { c: COL.concreto, w: 1.4, fill: '#ecdde3' })
   else {
-    L.rect(xm - t / 2, h, t, tope - h, { c: COL.piedra, w: 1.2, fill: '#efe9e1' })
-    for (let y = h + 10; y < tope; y += 10) L.line(xm - t / 2, y, xm + t / 2, y, { c: COL.piedra, w: 0.5 })
+    // el muro, y su contratrabe de liga (la dala de desplante) con el lecho
+    // alto al nivel del terreno
+    const y0 = ct ? Math.max(h, DfCm - ct.h) : tope, y1 = ct ? DfCm : tope
+    for (const [a, b] of [[h, y0], [y1, tope]]) {
+      if (b - a < 0.5) continue
+      L.rect(xm - t / 2, a, t, b - a, { c: COL.piedra, w: 1.2, fill: '#efe9e1' })
+      for (let y = a + 10; y < b; y += 10) L.line(xm - t / 2, y, xm + t / 2, y, { c: COL.piedra, w: 0.5 })
+    }
+    if (ct) {
+      L.vista(secX + xm * k, base - y0 * k)
+      corteLiga(L, { ...ct, h: y1 - y0 }, { k, cotas: false })
+      L.vista(secX, base)
+      L.text(xm + Math.max(t, ct.b) / 2, (y0 + y1) / 2, ct.nombre, { anchor: 'start', dx: 26, dy: 4, size: 9.5, weight: 700, c: COL.concreto })
+    }
   }
   L.poly([[xm - t / 2 - 6, tope - 4], [xm - 3, tope + 3], [xm + 3, tope - 7], [xm + t / 2 + 6, tope]], { c: COL.tenue, w: 0.8 }, false)
   const yT = r + vt.diam / 2, yLg = r + vt.diam + vl.diam / 2
@@ -172,7 +267,7 @@ function corrida(z, R, { ancho = 900, k: kFijo } = {}) {
   L.etiqueta('t', 0, yT, `${txtArm(arm.t)}${D.gancho ? ' c/gancho' : ''}`, { c: COL.abajo, dy: 62 + pl * k, titulo: 'Transversal (por metro)' })
   L.etiqueta('l', B / 2, yLg, `${D.nL}#${arm.l.num} long.`, { c: COL2, anchor: 'start', dx: 44, dy: -24, titulo: 'Longitudinal' })
   const g = z.geo
-  L.manija('B', B / 2, h / 2, { eje: 'x', campo: 'geo.B', factor: (g.pos === 'lindero' ? 1 : 2) / 100, pasoCm: 0.05, min: 0.4, titulo: 'B' })
+  L.manija('B', B / 2, h / 2, { eje: 'x', campo: 'geo.B', factor: (g.pos === 'lindero' ? 1 : 2) / 100, pasoCm: 0.05, min: D.Bmin ?? 0.6, titulo: 'B' })
   L.manija('h', 0, 0, { eje: 'y', campo: 'geo.h', factor: -1, pasoCm: 5, min: 15, max: 100, titulo: 'h' })
   L.manija('t', xm + t / 2, tope - 30, { eje: 'x', campo: 'geo.t', factor: 2, pasoCm: 1, min: 10, max: 60, titulo: 'muro' })
 
@@ -185,7 +280,7 @@ function corrida(z, R, { ancho = 900, k: kFijo } = {}) {
   for (const y of xsL) L.line(0, y, Lp, y, { c: COL2, w: 1 })
   L.poly([[Lp + 4, -B / 2 - 6], [Lp + 4, -4], [Lp + 10, 0], [Lp - 2, 4], [Lp + 4, 8], [Lp + 4, B / 2 + 6]], { c: COL.tenue, w: 0.7 }, false)
   L.dimH(0, Math.min(Lp, r + arm.t.s), B / 2, -14, `@ ${arm.t.s}`)
-  return L.resultado(W, H)
+  return conDetalleCT(L.resultado(W, H), D.ct, op)
 }
 
 // ── Zapata corrida con contratrabe ───────────────────────────
@@ -223,7 +318,7 @@ function contratrabe(z, R, { ancho = 900, exportar = false, escalas = null } = {
   P.dimV(-B / 2, B / 2, 0, -22, `B = ${f2(D.B)}`)
   P.etiqueta('alero', Lc / 2, B / 2, `aleros ${txtArm(arm.alero)}`, { c: COL.abajo, dy: -8, titulo: 'Varillas de los aleros' })
   P.manija('L', Lc, 0, { eje: 'x', campo: 'geo.L', factor: 1 / 100, pasoCm: 0.05, min: 1, titulo: 'L' })
-  P.manija('B', Lc / 2, -B / 2, { eje: 'y', campo: 'geo.B', factor: -2 / 100, pasoCm: 0.05, min: 0.4, titulo: 'B' })
+  P.manija('B', Lc / 2, -B / 2, { eje: 'y', campo: 'geo.B', factor: -2 / 100, pasoCm: 0.05, min: 0.6, titulo: 'B' })
 
   // ── alzado ──
   const E = lienzo(kx, kz)
@@ -455,7 +550,7 @@ function mamposteria(z, R, { ancho = 900, k: kFijo } = {}) {
   L.dimV(0, Hc, x0, -18, `H = ${f2(D.H)}`)
   const ang = (Math.atan(D.p) * 180) / Math.PI
   L.text(lind ? c + (B - c) / 2 : (c / 2 + B / 2) / 2, Hc / 2, `${ang.toFixed(1)}°`, { anchor: 'start', dx: 10, size: 10.5, c: ang >= 56.3 ? COL.ok : COL.mal })
-  L.manija('B', x0 + B, 0, { eje: 'x', campo: 'geo.B', factor: (lind ? 1 : 2) / 100, pasoCm: 0.05, min: 0.4, titulo: 'B' })
+  L.manija('B', x0 + B, 0, { eje: 'x', campo: 'geo.B', factor: (lind ? 1 : 2) / 100, pasoCm: 0.05, min: 0.6, titulo: 'B' })
   L.manija('H', lind ? c / 2 : 0, Hc, { eje: 'y', campo: 'geo.H', factor: 1 / 100, pasoCm: 0.05, min: 0.3, titulo: 'H' })
   L.manija('c', lind ? c : c / 2, Hc - 12, { eje: 'x', campo: 'geo.c', factor: (lind ? 1 : 2) / 100, pasoCm: 0.05, min: 0.2, titulo: 'c' })
   return L.resultado(W, H)
@@ -512,15 +607,9 @@ function liga(z, R, { ancho = 900, exportar = false, escalas = null } = {}) {
   const S = lienzo(ks)
   const cxX = M + largo * kx + 60 + (b / 2) * ks, cxY = top + 34 + h * ks
   S.vista(cxX, cxY)
-  S.titulo(cxX - (b / 2) * ks - 10, 22, 'CORTE', `${f0(b)} × ${f0(h)} cm`)
-  S.rect(-b / 2, 0, b, h, { c: COL.concreto, w: 1.6, fill: FONDO })
-  const r = num(z.mat?.r, 5)
-  S.rect(-b / 2 + r, r, b - 2 * r, h - 2 * r, { c: COL.estribo, w: 1 })
-  for (const x of reparto(-b / 2 + r + ve.diam + vs.diam / 2, b / 2 - r - ve.diam - vs.diam / 2, arm.sup.n)) S.dot(x, yS, Math.max(2, (vs.diam / 2) * ks), COL.arriba)
-  for (const x of reparto(-b / 2 + r + ve.diam + vi.diam / 2, b / 2 - r - ve.diam - vi.diam / 2, arm.inf.n)) S.dot(x, yI, Math.max(2, (vi.diam / 2) * ks), COL.abajo)
-  S.dimH(-b / 2, b / 2, 0, 22, `b = ${f0(b)}`)
-  S.dimV(0, h, b / 2, 20, `h = ${f0(h)}`)
-  S.manija('h', 0, h, { eje: 'y', campo: 'geo.h', factor: 1, pasoCm: 5, min: 20, max: 150, titulo: 'h' })
+  S.titulo(cxX - (b / 2) * ks - 10, 22, 'CORTE', `${f0(b)} × ${f0(h)} cm · r ${f0(D.r ?? 3)} / ${f0(D.rInf ?? 5)}`)
+  corteLiga(S, { b, h, r: D.r ?? 3, rInf: D.rInf ?? 5, sup: arm.sup, inf: arm.inf, est: arm.est }, { k: ks })
+  S.manija('h', 0, h, { eje: 'y', campo: 'geo.h', factor: 1, pasoCm: 5, min: 30, max: 150, titulo: 'h' })
   S.manija('b', b / 2, h * 0.55, { eje: 'x', campo: 'geo.b', factor: 2, pasoCm: 5, min: 15, max: 80, titulo: 'b' })
 
   const W = Math.max(M + largo * kx + 30, cxX + (b / 2) * ks + 70)

@@ -1,5 +1,6 @@
 import { Num, Sel, Check, Bloque, Varilla } from './campos'
-import { SUELO } from '../../core/cim/comun'
+import { SUELO, CRITERIOS } from '../../core/cim/comun'
+import { llevaCT, ctDe, esCT1, nuevaCT, CT1, txtCT } from '../../core/cim/ct'
 import { centrarResultante } from '../../core/cim/contratrabe'
 import { MAMPOSTERIA } from '../../core/cim/gravedad'
 import { conEjes, etiquetaEje } from '../../core/cim/ejes'
@@ -31,7 +32,7 @@ const SUELO_DE = {
 export const CAMPO_SUELO = {
   qadm: { t: 'qadm', u: 't/m²', paso: 0.5, titulo: 'Capacidad admisible del estudio' },
   gs: { t: 'γ suelo / relleno', u: 't/m³', paso: 0.05 },
-  Df: { t: 'Desplante Df', u: 'm', paso: 0.05 },
+  Df: { t: 'Desplante Df', u: 'm', paso: 0.05, min: 0.6, titulo: 'No menos de 0.60 m (criterio de la oficina)' },
   phi: { t: 'φ relleno', u: '°', paso: 1, titulo: 'Fricción interna del relleno (empujes)' },
   phiB: { t: 'φ suelo de apoyo', u: '°', paso: 1, titulo: 'Fricción del suelo bajo la base (deslizamiento y pasivo)' },
   c: { t: 'c suelo de apoyo', u: 't/m²', paso: 0.1 },
@@ -65,6 +66,38 @@ function Cargas({ z, set, campos }) {
   )
 }
 
+/** La contratrabe de liga de la zapata: la CT-1 de la oficina, o la que pidan sus cargas */
+function BloqueCT({ z, set }) {
+  const ct = ctDe(z)
+  const C = (patch) => set({ ct: { ...ct, ...patch } })
+  const aislada = z.tipo === 'aislada'
+  return (
+    <Bloque titulo={`Contratrabe de liga · ${txtCT(ct)}`} testid="cim-ct" extra={!esCT1(ct) && (
+      <button className="cim-mini" data-testid="cim-ct-1" title="La de la oficina: 15 × 30, 4#4, E#2.5 @ 15" onClick={() => set({ ct: { ...nuevaCT(), Ln: ct.Ln, w: ct.w } })}>volver a la CT-1</button>
+    )}>
+      <div className="cim-nota">
+        A la altura del tope del dado, con el lecho alto al nivel del terreno; ahí se une con las contratrabes de liga independientes.{' '}
+        {aislada ? 'Toma la liga (10 % de la Pu, en tensión y compresión) y, si la zapata es de lindero o de esquina, su N·e.' : 'Es la dala de desplante del muro (NTC-Mampostería).'}{' '}
+        ⚡ Proponer deja la CT-1 si alcanza.
+      </div>
+      <div className="cim-grid">
+        <label className="cim-campo"><span className="cim-etq">Nombre</span>
+          <input className="field-input" value={ct.nombre} data-testid="cim-ct-nombre" onChange={(e) => C({ nombre: e.target.value })} style={{ padding: '4px 6px', fontSize: 12.5 }} />
+        </label>
+        <Num label="Ancho b" value={ct.b} onChange={(v) => C({ b: v })} unit="cm" step={5} min={CT1.b} testid="cim-ct-b" />
+        <Num label="Peralte h" value={ct.h} onChange={(v) => C({ h: v })} unit="cm" step={5} min={CT1.h} testid="cim-ct-h" />
+        {aislada && <Num label="Claro libre a la vecina" value={ct.Ln} onChange={(v) => C({ Ln: v })} unit="m" step={0.25} min={0.5} testid="cim-ct-Ln" titulo="Hasta la zapata siguiente: su peso y el cortante del N·e dependen del claro" />}
+        {aislada && <Num label="Muro sobre la CT" value={ct.w} onChange={(v) => C({ w: v })} unit="t/m" step={0.1} min={0} titulo="Carga muerta de servicio" />}
+        <Num label="Recubrimiento arriba y lados" value={ct.r} onChange={(v) => C({ r: v })} unit="cm" step={0.5} min={2} />
+        <Num label="Recubrimiento abajo" value={ct.rInf} onChange={(v) => C({ rInf: v })} unit="cm" step={0.5} min={3} titulo="Contra el suelo" />
+      </div>
+      <Varilla label="Arriba" arm={ct.sup} onChange={(v) => C({ sup: v })} conN testid="cim-ct-sup" />
+      <Varilla label="Abajo" arm={ct.inf} onChange={(v) => C({ inf: v })} conN testid="cim-ct-inf" />
+      <Varilla label="Estribos cerrados" arm={ct.est} onChange={(v) => C({ est: v })} conRamas testid="cim-ct-est" />
+    </Bloque>
+  )
+}
+
 export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar }) {
   const g = z.geo
   const G = (patch) => set({ geo: { ...g, ...patch } })
@@ -74,6 +107,9 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
   const esMamp = z.tipo === 'gravedad' || z.tipo === 'mamposteria'
   const M = { ...(esMamp ? MAMPOSTERIA : {}), ...(z.mat || {}) }
   const Mt = (k, v) => set({ mat: { ...M, [k]: v } })
+  const Cr = { ...CRITERIOS, ...(obra.criterios || {}) }
+  const Bmin = Number(Cr.Bmin) || 0.6, DfMin = Number(Cr.DfMin) || 0.6
+  const rC = Number(z.mat?.r) || 5
 
   return (
     <div className="cim-form" data-testid="cim-form">
@@ -152,8 +188,8 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
       {z.tipo === 'aislada' && <>
         <Bloque titulo="Geometría" testid="cim-geo">
           <div className="cim-grid">
-            <Num label="B (en x)" value={g.B} onChange={(v) => G({ B: v, ...(g.cuadrada ? { L: v } : {}) })} unit="m" min={0.3} testid="cim-B" />
-            <Num label="L (en y)" value={g.cuadrada ? g.B : g.L} onChange={(v) => G({ L: v })} unit="m" min={0.3} disabled={g.cuadrada} testid="cim-L" />
+            <Num label="B (en x)" value={g.B} onChange={(v) => G({ B: v, ...(g.cuadrada ? { L: v } : {}) })} unit="m" min={Bmin} testid="cim-B" titulo={`No menos de ${Bmin.toFixed(2)} m`} />
+            <Num label="L (en y)" value={g.cuadrada ? g.B : g.L} onChange={(v) => G({ L: v })} unit="m" min={Bmin} disabled={g.cuadrada} testid="cim-L" titulo={`No menos de ${Bmin.toFixed(2)} m`} />
             <Num label="Peralte h" value={g.h} onChange={(v) => G({ h: v })} unit="cm" step={5} min={10} testid="cim-h" />
             <Check label="cuadrada" value={g.cuadrada} onChange={(v) => G({ cuadrada: v, L: g.B })} testid="cim-cuadrada" />
             <Num label="Columna c1 (x)" value={g.c1} onChange={(v) => G({ c1: v })} unit="cm" step={5} min={15} />
@@ -188,7 +224,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
       {z.tipo === 'corrida' && <>
         <Bloque titulo="Geometría (por metro)" testid="cim-geo">
           <div className="cim-grid">
-            <Num label="Ancho B" value={g.B} onChange={(v) => G({ B: v })} unit="m" min={0.3} testid="cim-B" />
+            <Num label="Ancho B" value={g.B} onChange={(v) => G({ B: v })} unit="m" min={Bmin} testid="cim-B" titulo={`No menos de ${Bmin.toFixed(2)} m`} />
             <Num label="Peralte h" value={g.h} onChange={(v) => G({ h: v })} unit="cm" step={5} min={10} testid="cim-h" />
             <Num label="Muro t" value={g.t} onChange={(v) => G({ t: v })} unit="cm" step={1} min={10} />
             <Num label="Largo (planos)" value={g.Lz} onChange={(v) => G({ Lz: v })} unit="m" step={0.5} min={1} />
@@ -206,7 +242,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
         <Bloque titulo="Geometría" testid="cim-geo">
           <div className="cim-grid">
             <Num label="Largo L" value={g.L} onChange={(v) => G({ L: v })} unit="m" step={0.05} min={1} testid="cim-L" />
-            <Num label="Ancho B" value={g.B} onChange={(v) => G({ B: v })} unit="m" min={0.3} testid="cim-B" />
+            <Num label="Ancho B" value={g.B} onChange={(v) => G({ B: v })} unit="m" min={Bmin} testid="cim-B" titulo={`No menos de ${Bmin.toFixed(2)} m`} />
             <Num label="Losa h" value={g.h} onChange={(v) => G({ h: v })} unit="cm" step={5} min={10} testid="cim-h" />
             <Num label="Alma bw" value={g.bw} onChange={(v) => G({ bw: v })} unit="cm" step={5} min={15} />
             <Num label="Peralte H" value={g.H} onChange={(v) => G({ H: v })} unit="cm" step={5} min={30} testid="cim-Hct" />
@@ -258,7 +294,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
             <Num label="Talón" value={g.talon} onChange={(v) => G({ talon: v })} unit="m" min={0.2} />
             <Num label="Dentellón hk" value={g.hk} onChange={(v) => G({ hk: v })} unit="m" step={0.1} min={0} />
             <Num label="Dentellón bk" value={g.bk} onChange={(v) => G({ bk: v })} unit="m" min={0.2} />
-            <Num label="Suelo frente Df" value={g.Df} onChange={(v) => G({ Df: v })} unit="m" min={0} titulo="Tierra frente a la punta, desde el fondo de la base" />
+            <Num label="Suelo frente Df" value={g.Df} onChange={(v) => G({ Df: v })} unit="m" min={DfMin} titulo={`Tierra frente a la punta, desde el fondo de la base (no menos de ${DfMin.toFixed(2)} m)`} />
             <Num label="Largo (planos)" value={g.Lz} onChange={(v) => G({ Lz: v })} unit="m" step={0.5} min={1} />
           </div>
         </Bloque>
@@ -278,7 +314,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
             <Num label="Corona c" value={g.c} onChange={(v) => G({ c: v })} unit="m" min={0.3} />
             <Num label="Base B" value={g.B} onChange={(v) => G({ B: v })} unit="m" min={0.4} testid="cim-B" />
             <Num label="Talud del frente" value={g.m1} onChange={(v) => G({ m1: v })} unit="m" min={0} titulo="Proyección horizontal del paramento del frente" />
-            <Num label="Suelo frente Df" value={g.Df} onChange={(v) => G({ Df: v })} unit="m" min={0} />
+            <Num label="Suelo frente Df" value={g.Df} onChange={(v) => G({ Df: v })} unit="m" min={DfMin} titulo={`No menos de ${DfMin.toFixed(2)} m`} />
             <Num label="Largo (planos)" value={g.Lz} onChange={(v) => G({ Lz: v })} unit="m" step={0.5} min={1} />
           </div>
         </Bloque>
@@ -295,13 +331,13 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
         <Bloque titulo="Geometría" testid="cim-geo">
           <Sel label="Tipo" value={g.pos} onChange={(v) => G({ pos: v })} testid="cim-pos" opciones={[{ v: 'interior', t: 'Interior (trapecio simétrico)' }, { v: 'lindero', t: 'De lindero (medio trapecio)' }]} />
           <div className="cim-grid">
-            <Num label="Base B" value={g.B} onChange={(v) => G({ B: v, autoB: false })} unit="m" min={0.3} testid="cim-B" />
+            <Num label="Base B" value={g.B} onChange={(v) => G({ B: v, autoB: false })} unit="m" min={Bmin} testid="cim-B" />
             <Check label="B automática" value={g.autoB} onChange={(v) => G({ autoB: v })} testid="cim-autoB" />
             <Num label="Altura H" value={g.H} onChange={(v) => G({ H: v, autoH: false })} unit="m" min={0.3} />
             <Check label="H automática" value={g.autoH} onChange={(v) => G({ autoH: v })} />
             <Num label="Corona c" value={g.c} onChange={(v) => G({ c: v })} unit="m" min={0.2} />
             <Num label="Muro t" value={g.t} onChange={(v) => G({ t: v })} unit="m" step={0.01} min={0.1} />
-            <Num label="B mínima" value={g.Bmin} onChange={(v) => G({ Bmin: v })} unit="m" min={0.3} />
+            <Num label="B mínima" value={g.Bmin} onChange={(v) => G({ Bmin: v })} unit="m" min={Bmin} />
             <Num label="Factor de carga" value={g.FC} onChange={(v) => G({ FC: v })} step={0.1} min={1} />
             {g.pos === 'lindero' && <Num label="Desnivel retenido" value={g.Hrell} onChange={(v) => G({ Hrell: v })} unit="m" step={0.1} min={0} />}
             {g.pos === 'lindero' && <Num label="Perpendiculares a" value={g.Lreal} onChange={(v) => G({ Lreal: v })} unit="m" step={0.5} min={0.5} titulo="Separación real entre cimientos perpendiculares" />}
@@ -323,7 +359,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
             const C = CAMPO_SUELO[k]
             const propio = S[k] != null && S[k] !== ''
             return (
-              <Num key={k} label={C.t} unit={C.u} step={C.paso} titulo={C.titulo || ''}
+              <Num key={k} label={C.t} unit={C.u} step={C.paso} titulo={C.titulo || ''} min={k === 'Df' ? DfMin : C.min ?? null}
                 value={propio ? S[k] : (sueloObra[k] ?? '')} placeholder={sueloObra[k] == null ? 'igual' : ''}
                 propio={propio} onReset={() => { const n = { ...S }; delete n[k]; set({ suelo: n }) }}
                 onChange={(v) => set({ suelo: { ...S, [k]: v } })} testid={`cim-suelo-${k}`} />
@@ -345,7 +381,8 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
           <div className="cim-grid">
             <Num label="f′c" value={z.mat?.fc} onChange={(v) => set({ mat: { ...z.mat, fc: v } })} unit="kg/cm²" step={50} min={150} />
             <Num label="fy" value={z.mat?.fy} onChange={(v) => set({ mat: { ...z.mat, fy: v } })} unit="kg/cm²" step={200} />
-            <Num label="Recubrimiento" value={z.mat?.r} onChange={(v) => set({ mat: { ...z.mat, r: v } })} unit="cm" step={0.5} min={2} />
+            <Num label={z.tipo === 'liga' ? 'Recubrimiento arriba y lados' : 'Recubrimiento'} value={z.mat?.r} onChange={(v) => set({ mat: { ...z.mat, r: v } })} unit="cm" step={0.5} min={2} />
+            {z.tipo === 'liga' && <Num label="Recubrimiento abajo" value={z.mat?.rInf ?? 5} onChange={(v) => set({ mat: { ...z.mat, rInf: v } })} unit="cm" step={0.5} min={3} titulo="Contra el suelo" />}
           </div>
         )}
       </Bloque>
@@ -353,12 +390,12 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
       {z.arm && (
         <Bloque titulo="Armado" testid="cim-armado">
           {z.tipo === 'aislada' && <>
-            <Varilla label="Varillas en x (corren a lo largo de B)" arm={z.arm.x} onChange={(v) => A('x', v)} testid="cim-arm-x" />
-            <Varilla label="Varillas en y (corren a lo largo de L)" arm={z.arm.y} onChange={(v) => A('y', v)} testid="cim-arm-y" />
+            <Varilla label="Varillas en x (corren a lo largo de B, repartidas en L)" arm={z.arm.x} onChange={(v) => A('x', v)} testid="cim-arm-x" ancho={(g.cuadrada ? num(g.B) : num(g.L)) * 100} r={rC} />
+            <Varilla label="Varillas en y (corren a lo largo de L, repartidas en B)" arm={z.arm.y} onChange={(v) => A('y', v)} testid="cim-arm-y" ancho={num(g.B) * 100} r={rC} />
           </>}
           {z.tipo === 'corrida' && <>
-            <Varilla label="Transversal (por metro)" arm={z.arm.t} onChange={(v) => A('t', v)} testid="cim-arm-t" />
-            <Varilla label="Longitudinal" arm={z.arm.l} onChange={(v) => A('l', v)} testid="cim-arm-l" />
+            <Varilla label="Transversal (por metro)" arm={z.arm.t} onChange={(v) => A('t', v)} testid="cim-arm-t" porMetro />
+            <Varilla label="Longitudinal (repartidas en B)" arm={z.arm.l} onChange={(v) => A('l', v)} testid="cim-arm-l" ancho={num(g.B) * 100} r={rC} />
           </>}
           {z.tipo === 'liga' && <>
             <Varilla label="Arriba (en los apoyos)" arm={z.arm.sup} onChange={(v) => A('sup', v)} conN testid="cim-arm-sup" />
@@ -369,20 +406,22 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
             <Varilla label="Contratrabe: abajo" arm={z.arm.inf} onChange={(v) => A('inf', v)} conN testid="cim-arm-inf" />
             <Varilla label="Contratrabe: arriba" arm={z.arm.sup} onChange={(v) => A('sup', v)} conN testid="cim-arm-sup" />
             <Varilla label="Estribos" arm={z.arm.est} onChange={(v) => A('est', v)} conRamas />
-            <Varilla label="Aleros (por metro)" arm={z.arm.alero} onChange={(v) => A('alero', v)} />
-            <Varilla label="Losa longitudinal" arm={z.arm.long} onChange={(v) => A('long', v)} />
+            <Varilla label="Aleros (por metro)" arm={z.arm.alero} onChange={(v) => A('alero', v)} porMetro testid="cim-arm-alero" />
+            <Varilla label="Losa longitudinal (repartidas en B − bw)" arm={z.arm.long} onChange={(v) => A('long', v)} ancho={Math.max(1, num(g.B) * 100 - num(g.bw))} r={rC} />
           </>}
           {z.tipo === 'contencion' && <>
-            <Varilla label="Pantalla, cara del relleno (corridas)" arm={z.arm.pv} onChange={(v) => set({ arm: { ...z.arm, pv: v, ...(z.arm.bast?.on ? { bast: { ...z.arm.bast, s: v.s } } : {}) } })} testid="cim-arm-pv" />
+            <Varilla label="Pantalla, cara del relleno (corridas, por metro)" arm={z.arm.pv} onChange={(v) => set({ arm: { ...z.arm, pv: v, ...(z.arm.bast?.on ? { bast: { ...z.arm.bast, s: v.s } } : {}) } })} testid="cim-arm-pv" porMetro />
             <Varilla label="Bastones intercalados" arm={z.arm.bast} onChange={(v) => A('bast', { ...v, s: z.arm.pv.s })} conOn testid="cim-arm-bast" />
-            <Varilla label="Pantalla, cara exterior" arm={z.arm.pe} onChange={(v) => A('pe', v)} />
-            <Varilla label="Horizontales (cada cara)" arm={z.arm.ph} onChange={(v) => A('ph', v)} />
-            <Varilla label="Talón, arriba" arm={z.arm.ts} onChange={(v) => A('ts', v)} />
-            <Varilla label="Base, abajo" arm={z.arm.pi} onChange={(v) => A('pi', v)} />
-            <Varilla label="Base, longitudinales" arm={z.arm.pl} onChange={(v) => A('pl', v)} />
+            <Varilla label="Pantalla, cara exterior" arm={z.arm.pe} onChange={(v) => A('pe', v)} porMetro />
+            <Varilla label="Horizontales (cada cara)" arm={z.arm.ph} onChange={(v) => A('ph', v)} porMetro />
+            <Varilla label="Talón, arriba" arm={z.arm.ts} onChange={(v) => A('ts', v)} porMetro />
+            <Varilla label="Base, abajo" arm={z.arm.pi} onChange={(v) => A('pi', v)} porMetro />
+            <Varilla label="Base, longitudinales" arm={z.arm.pl} onChange={(v) => A('pl', v)} porMetro />
           </>}
         </Bloque>
       )}
+
+      {llevaCT(z) && <BloqueCT z={z} set={set} />}
     </div>
   )
 }

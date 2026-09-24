@@ -292,7 +292,23 @@ export function tiposDeZapata(apoyos, papeles, up, { tipos = 3, obra = {}, linde
 }
 
 /** Zapatas aisladas: una por tipo, con la envolvente del tipo y la revisión de cada apoyo */
-export function aisladasDesde(apoyos, papeles, up, { tipos = 3, obra = {}, archivo = '', linderos = {}, cont = null } = {}) {
+/**
+ * Claro libre de la contratrabe de liga de una zapata: a la columna vecina más
+ * cercana (en planta), menos la columna. Con varios apoyos, el mayor.
+ */
+export function claroLiga(apoyos, todos) {
+  let Ln = 0
+  for (const a of apoyos) {
+    let d = Infinity
+    for (const b of todos || []) if (b !== a && b.nudo !== a.nudo) d = Math.min(d, Math.hypot(b.x - a.x, b.y - a.y))
+    if (!Number.isFinite(d)) continue
+    const c = Math.max(a.col?.c1 || 30, a.col?.c2 || 30) / 100
+    Ln = Math.max(Ln, d - c)
+  }
+  return Ln > 0.3 ? Math.round(Ln * 20) / 20 : null
+}
+
+export function aisladasDesde(apoyos, papeles, up, { tipos = 3, obra = {}, archivo = '', linderos = {}, cont = null, todos = null } = {}) {
   const { grupos, conds, cargas } = tiposDeZapata(apoyos, papeles, up, { tipos, obra, linderos, cont })
   return grupos.map((g) => {
     const as = g.idx.map((i) => apoyos[i])
@@ -303,8 +319,10 @@ export function aisladasDesde(apoyos, papeles, up, { tipos = 3, obra = {}, archi
     const cols = g.idx.map((i) => (apoyos[i].col ? (conds[i].gira ? { c1: apoyos[i].col.c2, c2: apoyos[i].col.c1 } : apoyos[i].col) : null)).filter(Boolean)
     const c1 = cols.length ? Math.min(...cols.map((c) => c.c1)) : z.geo.c1
     const c2 = cols.length ? Math.min(...cols.map((c) => c.c2)) : z.geo.c2
+    const Ln = claroLiga(as, todos || apoyos)
     return {
       ...z,
+      ...(Ln ? { ct: { ...z.ct, Ln } } : {}),
       cargas: envolvente(g.idx.map((i) => cargas[i])),
       // y la zapata se revisa también con las de cada apoyo, cada una en sus ejes
       apoyos: g.idx.map((i) => ({ nudo: apoyos[i].nudo, cargas: cargas[i], T: conds[i].T })),

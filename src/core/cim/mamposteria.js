@@ -12,7 +12,7 @@
 // sobre sus escarpios), no con la admisible entera.
 // ══════════════════════════════════════════════════════════════
 
-import { CRITERIOS, SUELO, paso, check, f1, f2, f3, arriba, num } from './comun'
+import { CRITERIOS, SUELO, paso, check, f1, f2, f3, arriba, num, minimos } from './comun'
 import { MAMPOSTERIA } from './gravedad'
 import { rankine } from './suelo'
 
@@ -35,7 +35,7 @@ export function revisarMamposteria(z, obra = {}) {
   const lind = g.pos === 'lindero'
   const Wu = num(z.cargas?.CM?.w) + num(z.cargas?.CV?.w)
   const FC = num(g.FC, 1)
-  const c = num(g.c, 0.3), t = num(g.t, 0.15), Bmin = num(g.Bmin, C.Bmin)
+  const c = num(g.c, 0.3), t = num(g.t, 0.15), Bmin = Math.max(num(g.Bmin, C.Bmin), num(C.Bmin, 0.6))
   const gm = num(M.gm, 2.2), fm = num(M.fm, 20), vm = num(M.vm, 0.6)
   const qadm = num(S.qadm), gs = num(S.gs, 1.6), Df = num(S.Df, 1)
   const checks = [], secciones = [], avisos = []
@@ -169,6 +169,10 @@ export function revisarMamposteria(z, obra = {}) {
     checks.push(check('excentricidad', 'Excentricidad', e, B / 6, 'm', { grupo: 'Mampostería' }))
     secciones.push({ titulo: '4 · Excentricidad', pasos: pE })
   }
+
+  const mn = minimos(C, { B, Df, que: 'B' })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Mínimos', pasos: mn.pasos })
 
   const Lz = num(g.Lz, 1)
   const A = (B + c) / 2 * H

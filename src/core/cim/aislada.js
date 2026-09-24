@@ -19,8 +19,9 @@
 import {
   CRITERIOS, SUELO, MAT, paso, check, f0, f1, f2, f3, arriba, num,
   capacidadEfectiva, presiones, flexion, revisaParrilla, proponerParrilla,
-  cortante1D, penetracion, aplastamiento, anclaje, peraltes, varilla, txtArm, parrilla, kgm, GC,
+  cortante1D, penetracion, aplastamiento, anclaje, peraltes, varilla, txtArm, parrilla, kgm, GC, minimos, armEfectivo,
 } from './comun'
+import { nuevaCT, revisarCTAislada, proponerCT } from './ct'
 
 export function nuevaAislada(nombre = 'Z-1') {
   return {
@@ -28,6 +29,7 @@ export function nuevaAislada(nombre = 'Z-1') {
     geo: { B: 1.2, L: 1.2, h: 30, c1: 30, c2: 30, px: 'centro', py: 'centro', xc: 0, yc: 0, liga: true, cuadrada: true },
     cargas: { CM: { P: 12, Mx: 0, My: 0 }, CV: { P: 4, Mx: 0, My: 0 }, S: { P: 0, Mx: 0, My: 0 } },
     arm: { x: { num: 4, s: 20 }, y: { num: 4, s: 20 } },
+    ct: nuevaCT(),                     // su contratrabe de liga, a la altura del tope del dado
     mat: { ...MAT }, suelo: {},
   }
 }
@@ -138,11 +140,13 @@ function voladizo(qu, reg, eje, xf, dir, dCm) {
 /**
  * Todo lo que se revisa de la zapata, en números y en pasos.
  * @param obra { suelo, criterios } de la obra
+ * @param op.soloZapata  sin su CT ni el desplante (lo que ⚡ Proponer no mueve)
  */
-export function revisarAislada(z, obra = {}) {
+export function revisarAislada(z, obra = {}, op = {}) {
   const D = datos(z, obra)
   const { C, S, B, L, h, c1, c2, xc, yc, fc, fy, r } = D
-  const arm = { x: { num: 4, s: 20, ...(z.arm?.x || {}) }, y: { num: 4, s: 20, ...(z.arm?.y || {}) } }
+  // (si se programó la cantidad de varillas, su separación en el ancho que les toca)
+  const arm = { x: armEfectivo({ num: 4, s: 20, ...(z.arm?.x || {}) }, { W: L * 100, r }), y: armEfectivo({ num: 4, s: 20, ...(z.arm?.y || {}) }, { W: B * 100, r }) }
   const hm = h / 100
   // las cargas de diseño y, si vino de RAM agrupando apoyos, las de cada uno:
   // la envolvente junta la P más pesada con el M más grande, pero con el
@@ -211,15 +215,21 @@ export function revisarAislada(z, obra = {}) {
   if (!D.g.liga && (Math.abs(xc) > 1e-6 || Math.abs(yc) > 1e-6)) {
     avisos.push('Columna corrida sin trabe de liga: la excentricidad la toma sólo el suelo.')
   }
-  if (D.g.liga && (Math.abs(xc) > 1e-6 || Math.abs(yc) > 1e-6)) {
-    const u0 = cmb.ultimas[0], s0 = cmb.servicio[0]
-    const e = Math.hypot(xc, yc)
+  // lo que le toca a su contratrabe de liga: la liga en tensión y compresión
+  // con la Pu más grande y, si es de lindero o de esquina con liga, el N·e
+  // (en cada dirección el suyo; la CT es una para las dos)
+  const eLiga = D.g.liga ? Math.max(Math.abs(xc), Math.abs(yc)) : 0
+  const PuMax = Math.max(...cmb.ultimas.map((c) => c.P))
+  const MeCT = eLiga > 1e-6 ? Math.max(...cmb.ultimas.map((c) => Math.max(0, c.P) * eLiga)) : 0
+  const ctSolic = { Pu: PuMax, Me: MeCT, c: Math.abs(xc) >= Math.abs(yc) ? c1 : c2 }
+  if (eLiga > 1e-6) {
+    const s0 = cmb.servicio[0]
     secciones.push({
       titulo: 'Trabe de liga (toma la excentricidad de la columna)',
       pasos: [
-        paso('Excentricidad de la columna', 'e = distancia del centro de la columna al de la base', `x = ${f3(xc)} · y = ${f3(yc)}`, e, 'm'),
-        paso('Momento de servicio para la liga', 'M = N · e', `= ${f2(s0.P)} × ${f3(e)}`, s0.P * e, 't·m'),
-        paso('Momento último para la liga', 'Mu = Nu · e', `= ${f2(u0.P)} × ${f3(e)}`, u0.P * e, 't·m', { nota: 'diséñala en Secciones con este momento' }),
+        paso('Excentricidad de la columna', 'e = distancia del centro de la columna al de la base', `x = ${f3(xc)} · y = ${f3(yc)}`, eLiga, 'm', { nota: 'la mayor de las dos direcciones' }),
+        paso('Momento de servicio para la liga', 'M = N · e', `= ${f2(s0.P)} × ${f3(eLiga)}`, s0.P * eLiga, 't·m'),
+        paso('Momento último para la liga', 'Mu = Nu · e', '', MeCT, 't·m', { nota: 'lo toma su contratrabe de liga (abajo) y la liga que sigue' }),
       ],
     })
   }
@@ -325,10 +335,16 @@ export function revisarAislada(z, obra = {}) {
       : `El aplastamiento no pasa ni con 4 % de arranques: la columna de ${f0(c1)}×${f0(c2)} es chica para ${f2(ap.Pu)} t; agrándala o sube f′c.`)
   }
 
-  // peralte mínimo
+  // peralte, ancho y desplante mínimos
   const hMin = C.hMin
   checks.push(check('peralte', 'Peralte mínimo', hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${hMin} cm` }))
-  secciones.push({ titulo: 'Aplastamiento y peralte mínimo', pasos: [...ap.pasos, paso('Peralte mínimo', `h ≥ ${hMin} cm`, `h = ${f1(h)}`, h >= hMin ? 'cumple' : 'no cumple', '', { ok: h >= hMin })] })
+  const mn = minimos(C, { B: Math.min(B, L), Df: op.soloZapata ? null : Df, que: 'B, L' })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Aplastamiento y mínimos', pasos: [...ap.pasos, paso('Peralte mínimo', `h ≥ ${hMin} cm`, `h = ${f1(h)}`, h >= hMin ? 'cumple' : 'no cumple', '', { ok: h >= hMin }), ...mn.pasos] })
+
+  // su contratrabe de liga
+  const CT = op.soloZapata ? null : revisarCTAislada(z, obra, ctSolic)
+  if (CT) { checks.push(...CT.checks); secciones.push(CT.seccion); avisos.push(...CT.avisos) }
 
   // cantidades
   const gX = parrilla({ num: arm.x.num, s: arm.x.s, W: L * 100, r }), gY = parrilla({ num: arm.y.num, s: arm.y.s, W: B * 100, r })
@@ -348,6 +364,7 @@ export function revisarAislada(z, obra = {}) {
       B, L, h, c1, c2, xc, yc, dX, dY, abajoX, qe: sGov.qe, W, q: sGov.q, qu: Math.max(...conc.map((k) => k.qu - k.qd)),
       region: sGov.pr.region, ganchoX: aX.gancho, ganchoY: aY.gancho, nX: gX.n, nY: gY.n, pen: penG.P.rect,
       AsX: flX.As, AsY: flY.As, AsReqX: flX.AsReq, AsReqY: flY.AsReq, arm,
+      ct: CT?.datos || null, ctSolic, Bmin: num(C.Bmin, 0.6),
     },
     resumen: `Zapata ${posicionTexto(D.g)} de ${f2(B)} × ${f2(L)} m, h = ${f1(h)} cm, `
       + `${txtArm(arm.x)} en x y ${txtArm(arm.y)} en y${aX.gancho || aY.gancho ? ' (con gancho)' : ''}, f′c = ${fc} kg/cm²`,
@@ -373,7 +390,8 @@ export function proponerAislada(z, obra = {}) {
   const r = num(z.mat?.r, 5), fc = num(z.mat?.fc, 250), fy = num(z.mat?.fy, 4200)
   const BMAX = 10, HMAX = 200
   let arm = { x: { num: 4, s: 20 }, y: { num: 4, s: 20 } }
-  const prueba = (g, a = arm) => revisarAislada({ ...z, geo: g, arm: a }, obra)
+  // la zapata sola: su CT y el desplante no se arreglan con B ni h
+  const prueba = (g, a = arm) => revisarAislada({ ...z, geo: g, arm: a }, obra, { soloZapata: true })
   const pasa = (R, ids) => ids.every((id) => R.checks.find((c) => c.id === id)?.ok)
   const concOk = (R) => pasa(R, ['penetracion', 'cortanteX', 'cortanteY', 'peralte'])
     && !R.secciones.some((s) => s.pasos.some((p) => p.v === 'no alcanza'))
@@ -428,7 +446,10 @@ export function proponerAislada(z, obra = {}) {
     break                                         // lo que queda (aplastamiento) no lo arregla la zapata
   }
   if (geo.cuadrada) geo.L = geo.B
-  return { geo, arm }
+  // y su contratrabe de liga: la CT-1 si alcanza
+  const Rf = revisarAislada({ ...z, geo, arm }, obra, { soloZapata: true })
+  const ct = proponerCT({ ...z, geo, arm }, obra, Rf.datos.ctSolic)
+  return { geo, arm, ct }
 }
 
 /** Peso propio (t) de la zapata, por si alguien lo quiere sumar a mano */

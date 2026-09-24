@@ -17,7 +17,7 @@ import { corridasMax } from '../propuesta'
 import {
   CRITERIOS, SUELO, MAT, paso, check, f1, f2, f3, arriba, abajo, num,
   capacidadEfectiva, flexion, revisaParrilla, proponerParrilla, parrilla,
-  cortante1D, anclaje, varilla, txtArm, kgm, GC,
+  cortante1D, anclaje, varilla, txtArm, kgm, GC, minimos, armEfectivo,
 } from './comun'
 
 export function nuevaContratrabe(nombre = 'ZT-1') {
@@ -143,7 +143,8 @@ export function revisarContratrabe(z, obra = {}) {
   const arm = {
     inf: { num: 5, n: 3, ...(z.arm?.inf || {}) }, sup: { num: 5, n: 3, ...(z.arm?.sup || {}) },
     est: { num: 3, ramas: 2, s: 20, ...(z.arm?.est || {}) },
-    alero: { num: 4, s: 25, ...(z.arm?.alero || {}) }, long: { num: 3, s: 30, ...(z.arm?.long || {}) },
+    alero: armEfectivo({ num: 4, s: 25, ...(z.arm?.alero || {}) }, { porMetro: true }),
+    long: armEfectivo({ num: 3, s: 30, ...(z.arm?.long || {}) }, { W: Math.max(1, B * 100 - bw), r }),
   }
   const cmb = combinacionesContratrabe(z.columnas, C, H / 100)
   const checks = [], secciones = [], avisos = []
@@ -294,6 +295,9 @@ export function revisarContratrabe(z, obra = {}) {
     ],
   })
   checks.push(check('peralte', 'Peralte de la losa', C.hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${C.hMin} cm` }))
+  const mn = minimos(C, { B, Df, que: 'B' })
+  checks.push(...mn.checks)
+  secciones.push({ titulo: 'Mínimos', pasos: mn.pasos })
 
   const nE = Math.ceil(L * 100 / arm.est.s) + 1
   const perE = 2 * (bw - 2 * r) / 100 + 2 * (H - 2 * r) / 100 + 0.2
