@@ -410,6 +410,19 @@ def base_de_datos():
 
 
 def decodificar(crudo):
+    u"""(texto, codificación). Las tablas que escribe RAM van en UTF-8 o ANSI sin
+    marca; las de fábrica pueden traer BOM o venir en UTF-16: se respeta."""
+    if crudo[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        return crudo.decode('utf-16'), 'utf-16'
+    if crudo[:3] == b'\xef\xbb\xbf':
+        return crudo[3:].decode('utf-8', 'replace'), 'utf-8-sig'
+    # UTF-16 sin marca: medio archivo son ceros
+    if crudo[:200].count(b'\x00') > len(crudo[:200]) // 3:
+        for cod in ('utf-16-le', 'utf-16-be'):
+            try:
+                return crudo.decode(cod), cod
+            except UnicodeDecodeError:
+                pass
     for cod in ('utf-8', 'cp1252'):
         try:
             return crudo.decode(cod), cod
@@ -425,7 +438,7 @@ def leer_tabla(ruta):
     with open(ruta, 'rb') as f:
         crudo = f.read()
     texto, cod = decodificar(crudo)
-    lineas = [l.rstrip(u'\r') for l in texto.split(u'\n')]
+    lineas = [l.rstrip(u'\r').lstrip(u'\ufeff') for l in texto.split(u'\n')]
     enc, filas = None, []
     for l in lineas:
         if not l.strip() or l.startswith(u'//') or l.startswith(u'['):
@@ -672,20 +685,38 @@ def raices_de_materiales(db):
 
 
 def leer_con_leo(ruta):
-    u"""(leo, encabezado, filas) de una tabla de RAM, o None."""
+    u"""(leo, encabezado, filas) de una tabla de RAM, o None. No exige la
+    línea «//infotable»: basta la plantilla entre corchetes y un encabezado
+    con Name, separado por tabuladores."""
     try:
+        if os.path.getsize(ruta) > 4 * 1024 * 1024:
+            return None
+        previo = leer_tabla(ruta)
         with open(ruta, 'rb') as f:
             texto, _cod = decodificar(f.read())
     except Exception:
         return None
-    lineas = [l.rstrip(u'\r') for l in texto.split(u'\n')]
-    if not lineas or not lineas[0].startswith(u'//infotable'):
+    lineas = [l.rstrip(u'\r').lstrip(u'\ufeff').strip() for l in texto.split(u'\n')]
+    leo = next((l for l in lineas if l.startswith(u'[') and l.endswith(u']')), None)
+    if not leo or not previo or not previo[0] or len(previo[0]) < 2:
         return None
-    leo = next((l for l in lineas if l.startswith(u'[')), None)
-    previo = leer_tabla(ruta)
-    if not leo or not previo or not previo[0]:
+    if u'name' not in [c.strip().lower() for c in previo[0]]:
         return None
     return leo, previo[0], previo[1]
+
+
+def muestra(ruta, n=110):
+    u"""Cómo empieza un archivo, para el diagnóstico."""
+    try:
+        with open(ruta, 'rb') as f:
+            crudo = f.read(600)
+        texto, cod = decodificar(crudo)
+        util = sum(1 for ch in texto[:200] if ch.isprintable() or ch in u'\t\r\n')
+        if util < len(texto[:200]) * 0.85:
+            return u'binario: ' + u' '.join(u'%02x' % (c if isinstance(c, int) else ord(c)) for c in crudo[:24])
+        return u'%s: %s' % (cod, texto[:n].replace(u'\r', u'').replace(u'\n', u' | ').replace(u'\t', u' → '))
+    except Exception as e:
+        return u'no se pudo leer (%s)' % e
 
 
 def plantillas_de_mamposteria(db):
@@ -697,10 +728,11 @@ def plantillas_de_mamposteria(db):
             carpeta = os.path.join(raiz, g)
             if g.lower() == u'personales' or not os.path.isdir(carpeta):
                 continue
-            for f in sorted(os.listdir(carpeta)):
-                if not f.lower().endswith(u'.mat'):
-                    continue
-                ruta = os.path.join(carpeta, f)
+            archivos = []
+            for dirpath, _d, files in os.walk(carpeta):
+                archivos += [os.path.join(dirpath, f) for f in sorted(files)]
+            for ruta in archivos:
+                f = os.path.basename(ruta)
                 t = leer_con_leo(ruta)
                 if not t:
                     continue
@@ -766,9 +798,52 @@ def instalar_mamposteria(db, lista):
         log(u'  !! No encontré la tabla de mampostería de RAM que sirve de formato para:')
         for f in faltan:
             log(u'       %s' % f)
-        log(u'     Mándale esta salida a quien mantiene la app; las tablas de materiales que vi:')
-        for ruta, leo, enc in vistos[:40]:
-            log(u'       %s  %s  %s' % (ruta, leo, u' '.join(enc)))
+        log(u'     Mándale esta salida a quien mantiene la app.')
+        if vistos:
+            log(u'     Las tablas de materiales que sí pude leer:')
+            for ruta, leo, enc in vistos[:40]:
+                log(u'       %s  %s  %s' % (ruta, leo, u' '.join(enc)))
+        diagnostico(db)
+
+
+def diagnostico(db):
+    u"""Qué hay donde RAM guarda sus materiales: carpetas, archivos y cómo empiezan."""
+    log(u'')
+    log(u'  Diagnóstico — dónde busqué las tablas de materiales de RAM:')
+    bases = [(u'junto a RAM (sys.executable)', os.path.dirname(sys.executable or u''))]
+    for var in ('PROGRAMFILES', 'PROGRAMW6432'):
+        if os.environ.get(var):
+            bases.append((var, os.path.join(os.environ[var], 'Bentley', 'Engineering', 'RAM Elements')))
+    bases.append((u'ProgramData', os.path.dirname(db)))
+    lineas = 0
+    for etq, b in bases:
+        r = os.path.join(b, 'Database', 'Materials')
+        existe = os.path.isdir(r)
+        log(u'    %s: %s  %s' % (etq, r, u'(existe)' if existe else u'(no existe)'))
+        if not existe:
+            continue
+        try:
+            grupos = sorted(os.listdir(r))
+        except Exception as e:
+            log(u'      no se pudo listar (%s)' % e)
+            continue
+        log(u'      grupos: %s' % u', '.join(grupos))
+        for g in sorted(grupos, key=lambda x: (x.lower() != u'united states', x.lower()))[:2]:
+            carpeta = os.path.join(r, g)
+            if not os.path.isdir(carpeta):
+                continue
+            for dirpath, _d, files in os.walk(carpeta):
+                for f in sorted(files):
+                    if lineas >= 40:
+                        log(u'      …')
+                        return
+                    ruta = os.path.join(dirpath, f)
+                    try:
+                        kb = os.path.getsize(ruta) / 1024.0
+                    except Exception:
+                        kb = -1
+                    log(u'      %s (%.1f KB) — %s' % (os.path.relpath(ruta, r), kb, muestra(ruta)))
+                    lineas += 1
 
 
 log(u'=' * 70)
