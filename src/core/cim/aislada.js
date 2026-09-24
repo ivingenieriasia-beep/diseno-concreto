@@ -48,31 +48,47 @@ export const posicionTexto = (g) => {
   return 'céntrica'
 }
 
-const ZERO = { P: 0, Mx: 0, My: 0 }
+const ZERO = { P: 0, Mx: 0, My: 0, Vx: 0, Vy: 0 }
 const carga = (c, k) => ({ ...ZERO, ...(c?.[k] || {}) })
 const signo = (v) => (v < 0 ? -1 : 1)
 
-/** Combinaciones: de servicio para el suelo, últimas para el concreto */
-export function combinaciones(cargas, C) {
+/**
+ * Combinaciones: de servicio para el suelo, últimas para el concreto.
+ * Cada una trae P, los momentos en el pie de la columna (Mcx, Mcy) y en el
+ * desplante (Mx, My = M + V·h, con h en m): el cortante de la columna también
+ * voltea la zapata. El sismo va en los dos sentidos de su axial (carga y
+ * descarga la columna) y siempre agrandando los momentos que ya hay.
+ */
+export function combinaciones(cargas, C, hm = 0) {
   const cm = carga(cargas, 'CM'), cv = carga(cargas, 'CV'), s = carga(cargas, 'S')
-  const suma = (a, b, k = 1, kb = 1) => ({ P: k * a.P + kb * b.P, Mx: k * a.Mx + kb * b.Mx, My: k * a.My + kb * b.My })
-  const serv = suma(cm, cv)
-  const ult = suma(cm, cv, C.fcm, C.fcv)
+  const base = (a, k = 1, b = ZERO, kb = 1) => {
+    const P = k * a.P + kb * b.P, Mcx = k * a.Mx + kb * b.Mx, Mcy = k * a.My + kb * b.My
+    const Vx = k * a.Vx + kb * b.Vx, Vy = k * a.Vy + kb * b.Vy
+    return { P, Mcx, Mcy, Mx: Mcx + Vy * hm, My: Mcy + Vx * hm }
+  }
+  const serv = base(cm, 1, cv, 1)
+  const ult = base(cm, C.fcm, cv, C.fcv)
   const out = {
     servicio: [{ id: 'CM + CV', ...serv, k: 1 }],
     ultimas: [{ id: `${C.fcm} CM + ${C.fcv} CV`, ...ult }],
   }
-  const hayS = Math.abs(s.P) + Math.abs(s.Mx) + Math.abs(s.My) > 1e-9
+  const hayS = ['P', 'Mx', 'My', 'Vx', 'Vy'].some((k) => Math.abs(s[k]) > 1e-9)
   if (hayS) {
-    // el sismo va en el sentido que más le pesa a la base: suma su axial y
-    // agranda los momentos que ya hay
-    const conS = (base, f) => ({
-      P: f * (base.P + Math.abs(s.P)),
-      Mx: f * (base.Mx + signo(base.Mx) * Math.abs(s.Mx)),
-      My: f * (base.My + signo(base.My) * Math.abs(s.My)),
-    })
-    out.servicio.push({ id: 'CM + CV + S', ...conS(serv, 1), k: C.kS })
-    out.ultimas.push({ id: `${C.facc} (CM + CV + S)`, ...conS(serv, C.facc) })
+    const Sx = Math.abs(s.Mx) + Math.abs(s.Vy) * hm, Sy = Math.abs(s.My) + Math.abs(s.Vx) * hm
+    const conS = (b, f, sg) => {
+      const dx = signo(b.Mx), dy = signo(b.My)
+      return {
+        P: f * (b.P + sg * Math.abs(s.P)),
+        Mcx: f * (b.Mcx + dx * Math.abs(s.Mx)), Mcy: f * (b.Mcy + dy * Math.abs(s.My)),
+        Mx: f * (b.Mx + dx * Sx), My: f * (b.My + dy * Sy),
+      }
+    }
+    for (const sg of [1, -1]) {
+      if (sg < 0 && Math.abs(s.P) < 1e-9) continue
+      const t = sg > 0 ? '+' : '−'
+      out.servicio.push({ id: `CM + CV ${t} S`, ...conS(serv, 1, sg), k: C.kS })
+      out.ultimas.push({ id: `${C.facc} (CM + CV ${t} S)`, ...conS(serv, C.facc, sg) })
+    }
   }
   return out
 }
@@ -87,11 +103,16 @@ function datos(z, obra = {}) {
   return { C, S, g, m, B, L, h, c1, c2, xc, yc, fc: num(m.fc, 250), fy: num(m.fy, 4200), r: num(m.r, 5) }
 }
 
-/** Excentricidad de la resultante (m) de una combinación */
-function excentricidad(D, cmb) {
+/**
+ * Excentricidad (m) de la resultante de una combinación con el peso W de la
+ * zapata y el relleno (centrado): e = (N·c + M) / (N + W). Sin trabe de liga
+ * la carga de la columna entra en su lugar (c); con liga, al centro.
+ */
+function excentricidad(D, cmb, W = 0) {
   const off = D.g.liga ? { x: 0, y: 0 } : { x: D.xc, y: D.yc }
-  const N = cmb.P
-  return { ex: off.x + (N > 0 ? cmb.My / N : 0), ey: off.y + (N > 0 ? cmb.Mx / N : 0) }
+  const Nt = cmb.P + W
+  if (!(Nt > 0)) return { ex: 0, ey: 0, Nt }
+  return { ex: (cmb.P * off.x + cmb.My) / Nt, ey: (cmb.P * off.y + cmb.Mx) / Nt, Nt }
 }
 
 /** Área de la intersección de dos rectángulos {x0,x1,y0,y1} */
@@ -122,36 +143,69 @@ export function revisarAislada(z, obra = {}) {
   const D = datos(z, obra)
   const { C, S, B, L, h, c1, c2, xc, yc, fc, fy, r } = D
   const arm = { x: { num: 4, s: 20, ...(z.arm?.x || {}) }, y: { num: 4, s: 20, ...(z.arm?.y || {}) } }
-  const cmb = combinaciones(z.cargas, C)
+  const hm = h / 100
+  // las cargas de diseño y, si vino de RAM agrupando apoyos, las de cada uno:
+  // la envolvente junta la P más pesada con el M más grande, pero con el
+  // sismo descargando rige a veces el apoyo ligero de la esquina
+  const deApoyos = (z.apoyos || []).map((a) => {
+    const c = combinaciones(a.cargas, C, hm)
+    const et = (x) => ({ ...x, id: `nudo ${a.nudo} · ${x.id}`, nudo: a.nudo })
+    return { servicio: c.servicio.map(et), ultimas: c.ultimas.map(et) }
+  })
+  const cmb0 = combinaciones(z.cargas, C, hm)
+  const cmb = {
+    servicio: [...cmb0.servicio, ...deApoyos.flatMap((c) => c.servicio)],
+    ultimas: [...cmb0.ultimas, ...deApoyos.flatMap((c) => c.ultimas)],
+  }
+  // (en la memoria van las de diseño y, de los apoyos, sólo la que rige)
   const checks = [], secciones = [], avisos = []
+  const qadm = num(S.qadm), gs = num(S.gs, 1.6), Df = num(S.Df, 1)
 
   // ── 1. Suelo ────────────────────────────────────────────────
+  // con el peso de la zapata y del relleno W (NTC: la presión con el área
+  // efectiva y las cargas que llegan al desplante). Con la carga centrada es
+  // lo mismo que la hoja: N/A ≤ qe = qadm − W/A.
+  const W = B * L * (GC * hm + gs * Math.max(0, Df - hm))
   const qeG = capacidadEfectiva({ ...S, h })
-  const qeS = capacidadEfectiva({ ...S, h }, C.kS)
+  // se informa en neto, como la hoja: q = (N + W)/A′ − W/A ≤ qe = k qadm − W/A
+  const wA = W / (B * L)
   const suelo = cmb.servicio.map((c) => {
-    const { ex, ey } = excentricidad(D, c)
-    const pr = presiones(c.P, B, L, ex, ey)
-    const qe = c.k === 1 ? qeG.qe : qeS.qe
-    return { c, ex, ey, pr, qe, u: pr.q / qe }
+    const { ex, ey, Nt } = excentricidad(D, c, W)
+    const pr = presiones(Nt, B, L, ex, ey)
+    const qe = c.k * qadm - wA
+    const q = Nt > 0 ? pr.q - wA : Infinity
+    return { c, ex, ey, Nt, pr, q, qe, u: q / qe }
   })
   const sGov = suelo.reduce((a, b) => (b.u > a.u ? b : a))
   const pSuelo = [
-    ...qeG.pasos,
-    ...(cmb.servicio.length > 1 ? qeS.pasos.map((p) => ({ ...p, t: 'Capacidad efectiva con sismo' })) : []),
+    paso('Peso de la zapata y del relleno', 'W = B L [γc h + γs (Df − h)]', `= ${f2(B)} × ${f2(L)} × (${GC} × ${f2(hm)} + ${f2(gs)} × ${f2(Math.max(0, Df - hm))})`, W, 't'),
+    { ...qeG.pasos[0], nota: 'qadm menos W/A: lo que queda para la columna' },
   ]
-  for (const s of suelo) {
+  const hayV = cmb.servicio.some((c) => Math.abs(c.Mx - c.Mcx) + Math.abs(c.My - c.Mcy) > 1e-9)
+  if (deApoyos.length) pSuelo.push(paso('Apoyos de RAM', `además de las cargas de diseño, las de sus ${deApoyos.length} apoyos`, (z.apoyos || []).map((a) => a.nudo).join(', '), sGov.c.nudo ? `rige el nudo ${sGov.c.nudo}` : 'rigen las de diseño', ''))
+  for (const s of suelo.filter((x) => !x.c.nudo || x === sGov)) {
     const et = cmb.servicio.length > 1 ? ` (${s.c.id})` : ''
-    pSuelo.push(paso(`Carga de servicio${et}`, 'N', s.c.id, s.c.P, 't'))
+    pSuelo.push(paso(`Carga de la columna${et}`, 'N', s.c.id, s.c.P, 't'))
+    if (hayV) pSuelo.push(paso('Momentos en el desplante', 'M = M(columna) + V h', `Mx = ${f2(s.c.Mcx)} → ${f2(s.c.Mx)} · My = ${f2(s.c.Mcy)} → ${f2(s.c.My)}`, '', 't·m'))
+    pSuelo.push(paso('Carga en el desplante', 'N + W', `= ${f2(s.c.P)} + ${f2(W)}`, s.Nt, 't', s.Nt > 0 ? {} : { ok: false, nota: 'la zapata se levanta: el sismo le quita más de lo que pesa' }))
+    if (!(s.Nt > 0)) continue
     if (Math.abs(s.ex) > 1e-6 || Math.abs(s.ey) > 1e-6) {
-      pSuelo.push(paso('Excentricidades', 'ex = My/N (+ x col) · ey = Mx/N (+ y col)', `ex = ${f3(s.ex)} · ey = ${f3(s.ey)}`, '', 'm'))
-      pSuelo.push(paso('Área efectiva', 'A′ = (B − 2|ex|)(L − 2|ey|)', `= ${f2(s.pr.Bp)} × ${f2(s.pr.Lp)}`, s.pr.Ap, 'm²'))
+      pSuelo.push(paso('Excentricidades', `ex = (${D.g.liga ? '' : 'N xc + '}My) / (N + W) · ey = (${D.g.liga ? '' : 'N yc + '}Mx) / (N + W)`, `ex = ${f3(s.ex)} · ey = ${f3(s.ey)}`, '', 'm'))
+      pSuelo.push(paso('Área efectiva', 'A′ = (B − 2|ex|)(L − 2|ey|)', `= ${f2(Math.max(0, s.pr.Bp))} × ${f2(Math.max(0, s.pr.Lp))}`, s.pr.Ap, 'm²', s.pr.sinArea ? { ok: false, nota: 'la resultante sale de la base' } : {}))
     } else pSuelo.push(paso('Área de la base', 'A = B × L', `= ${f2(B)} × ${f2(L)}`, B * L, 'm²'))
-    pSuelo.push(paso('Presión de contacto', 'q = N / A′', `= ${f2(s.c.P)} / ${f3(s.pr.Ap)}`, s.pr.q, 't/m²', { ok: s.u <= 1, lim: `≤ qe = ${f2(s.qe)}` }))
-    if (s.pr.despega) pSuelo.push(paso('Presiones elásticas en las esquinas', 'q = N/A (1 ± 6ex/B ± 6ey/L)', `máx ${f2(s.pr.qmax)} · mín ${f2(s.pr.qmin)}`, 'la base se despega en una orilla', '', { nota: 'la resultante sale del núcleo central' }))
+    if (!s.pr.sinArea) {
+      const lim = { ok: s.u <= 1, lim: `≤ qe = ${f2(s.qe)}${s.c.k !== 1 ? ` (${s.c.k} qadm − W/A)` : ''}` }
+      if (Math.abs(s.ex) > 1e-6 || Math.abs(s.ey) > 1e-6) {
+        pSuelo.push(paso('Presión con el peso', 'q′ = (N + W) / A′', `= ${f2(s.Nt)} / ${f3(s.pr.Ap)}`, s.pr.q, 't/m²'))
+        pSuelo.push(paso('Presión neta', 'q = q′ − W / A', `= ${f2(s.pr.q)} − ${f2(wA)}`, s.q, 't/m²', lim))
+      } else pSuelo.push(paso('Presión de contacto', 'q = N / A', `= ${f2(s.c.P)} / ${f3(B * L)}`, s.q, 't/m²', lim))
+      if (s.pr.despega) pSuelo.push(paso('Presiones elásticas en las esquinas', 'q = (N + W)/A (1 ± 6ex/B ± 6ey/L)', `máx ${f2(s.pr.qmax)} · mín ${f2(s.pr.qmin)}`, 'la base se despega en una orilla', '', { nota: 'la resultante sale del núcleo central' }))
+    }
   }
-  checks.push(check('suelo', 'Presión en el suelo', sGov.pr.q, sGov.qe, 't/m²', { grupo: 'Suelo', nota: sGov.c.id }))
-  if (sGov.pr.sinArea) avisos.push('La resultante cae fuera de la base: agranda la zapata o ponle trabe de liga.')
-  else if (!(sGov.u <= 1) && B * L >= 25) avisos.push(`El suelo pide una zapata de más de ${f2(B)} × ${f2(L)} m (qe = ${f2(sGov.qe)} t/m²): para esta carga conviene losa de cimentación, pilas o mejorar el suelo.`)
+  checks.push(check('suelo', 'Presión en el suelo', sGov.q, sGov.qe, 't/m²', { grupo: 'Suelo', nota: sGov.c.id }))
+  if (!(sGov.Nt > 0)) avisos.push(`Con ${sGov.c.id} la zapata se levanta (N + W = ${f2(sGov.Nt)} t): agrándala o hazla más pesada, o liga la columna a las vecinas.`)
+  else if (sGov.pr.sinArea) avisos.push(`Con ${sGov.c.id} la resultante cae fuera de la base: agranda la zapata o ponle trabe de liga.`)
+  else if (!(sGov.u <= 1) && B * L >= 25) avisos.push(`El suelo pide una zapata de más de ${f2(B)} × ${f2(L)} m (qadm = ${f2(qadm)} t/m²): para esta carga conviene losa de cimentación, pilas o mejorar el suelo.`)
   secciones.push({ titulo: 'Presión en el suelo (cargas de servicio)', pasos: pSuelo })
 
   if (!D.g.liga && (Math.abs(xc) > 1e-6 || Math.abs(yc) > 1e-6)) {
@@ -172,18 +226,29 @@ export function revisarAislada(z, obra = {}) {
 
   // ── 2. Concreto ─────────────────────────────────────────────
   // capa de abajo: la dirección con más momento por metro
+  // la reacción del suelo con el peso (0.9 W: el peso que estabiliza no se
+  // infla) sobre el área efectiva, menos ese peso repartido en toda la base:
+  // con carga centrada queda Nu / A, como siempre
+  const Wu = 0.9 * W
+  const todo = { x0: -B / 2, x1: B / 2, y0: -L / 2, y1: L / 2 }
   const conc = cmb.ultimas.map((c) => {
-    const { ex, ey } = excentricidad(D, c)
-    const pr = presiones(c.P, B, L, ex, ey)
-    const qu = pr.q
-    const cargaEn = (rect) => qu * inter(rect, pr.region)
+    const { ex, ey, Nt } = excentricidad(D, c, Wu)
+    const pr = presiones(Math.max(Nt, 0), B, L, ex, ey)
+    const qu = pr.sinArea ? 0 : pr.q
+    const qd = Wu / (B * L)
+    const cargaEn = (rect) => qu * inter(rect, pr.region) - qd * inter(rect, todo)
     const fx = { d: xc + c1 / 200, i: xc - c1 / 200 }, fy_ = { d: yc + c2 / 200, i: yc - c2 / 200 }
-    return { c, ex, ey, pr, qu, cargaEn, fx, fy: fy_ }
+    return { c, ex, ey, Nt, pr, qu, qd, cargaEn, fx, fy: fy_ }
   })
+  // el voladizo con la reacción sobre el área efectiva menos el peso en todo
+  const vol = (k, eje, xf, dir, d) => {
+    const a = voladizo(k.qu, k.pr.region, eje, xf, dir, d), b = voladizo(k.qd, todo, eje, xf, dir, d)
+    return { Mu: a.Mu - b.Mu, Vu: a.Vu - b.Vu }
+  }
   const momentos = (k, dx, dy) => {
-    const X1 = voladizo(k.qu, k.pr.region, 'x', k.fx.d, 1, dx), X2 = voladizo(k.qu, k.pr.region, 'x', k.fx.i, -1, dx)
-    const Y1 = voladizo(k.qu, k.pr.region, 'y', k.fy.d, 1, dy), Y2 = voladizo(k.qu, k.pr.region, 'y', k.fy.i, -1, dy)
-    return { Mx: Math.max(X1.Mu, X2.Mu), Vx: Math.max(X1.Vu, X2.Vu), My: Math.max(Y1.Mu, Y2.Mu), Vy: Math.max(Y1.Vu, Y2.Vu) }
+    const X1 = vol(k, 'x', k.fx.d, 1, dx), X2 = vol(k, 'x', k.fx.i, -1, dx)
+    const Y1 = vol(k, 'y', k.fy.d, 1, dy), Y2 = vol(k, 'y', k.fy.i, -1, dy)
+    return { Mx: Math.max(X1.Mu, X2.Mu, 0), Vx: Math.max(X1.Vu, X2.Vu, 0), My: Math.max(Y1.Mu, Y2.Mu, 0), Vy: Math.max(Y1.Vu, Y2.Vu, 0) }
   }
   // tanteo con el peralte de la capa de abajo para decidir el orden
   const d0 = h - r - varilla(arm.x.num).diam / 2
@@ -197,16 +262,20 @@ export function revisarAislada(z, obra = {}) {
 
   // penetración con cada combinación última
   const pen = conc.map((k) => {
-    return { k, P: penetracion({ Pu: k.c.P, Mux: k.c.Mx, Muy: k.c.My, c1, c2, xc, yc, B, L, d: dMed, fc, carga: k.cargaEn }) }
+    return { k, P: penetracion({ Pu: k.c.P, Mux: k.c.Mcx, Muy: k.c.Mcy, c1, c2, xc, yc, B, L, d: dMed, fc, carga: k.cargaEn }) }
   })
   const penG = pen.reduce((a, b) => ((b.P.u || 0) > (a.P.u || 0) ? b : a))
   checks.push(check('penetracion', 'Penetración', penG.P.vu, penG.P.vcR, 'kg/cm²', { grupo: 'Cortante', ok: penG.P.ok, nota: penG.P.posicion }))
 
   const secU = []
-  for (const k of conc) {
+  const kGov = [gov('Mx').k, gov('My').k, penG.k]
+  for (const k of conc.filter((x) => !x.c.nudo || kGov.includes(x))) {
     const et = conc.length > 1 ? ` (${k.c.id})` : ''
     secU.push(paso(`Carga última${et}`, 'Nu', k.c.id, k.c.P, 't'))
-    secU.push(paso('Reacción última del suelo', 'qu = Nu / A′', `= ${f2(k.c.P)} / ${f3(k.pr.Ap)}`, k.qu, 't/m²'))
+    if (Math.abs(k.ex) > 1e-6 || Math.abs(k.ey) > 1e-6) {
+      secU.push(paso('Reacción del suelo con el peso', 'qu = (Nu + 0.9 W) / A′', `= (${f2(k.c.P)} + ${f2(Wu)}) / ${f3(k.pr.Ap)}`, k.qu, 't/m²'))
+      secU.push(paso('Menos el peso, en toda la base', 'qd = 0.9 W / (B L)', `= ${f2(Wu)} / ${f3(B * L)}`, k.qd, 't/m²', { nota: 'la losa trabaja con qu en el área efectiva y −qd en toda la base' }))
+    } else secU.push(paso('Reacción última neta', 'qu − qd = Nu / A', `= ${f2(k.c.P)} / ${f3(B * L)}`, k.qu - k.qd, 't/m²'))
   }
   secciones.push({ titulo: 'Reacción última del suelo', pasos: secU })
   secciones.push({ titulo: `Penetración${pen.length > 1 ? ` (rige ${penG.k.c.id})` : ''}`, pasos: [paso('Peralte útil medio', 'd = (dx + dy)/2', `= (${f1(dX)} + ${f1(dY)})/2`, dMed, 'cm'), ...penG.P.pasos] })
@@ -276,7 +345,7 @@ export function revisarAislada(z, obra = {}) {
   return {
     tipo: 'aislada', ok, checks, secciones, avisos, cant,
     datos: {
-      B, L, h, c1, c2, xc, yc, dX, dY, abajoX, qe: qeG.qe, qeS: qeS.qe, q: sGov.pr.q, qu: Math.max(...conc.map((k) => k.qu)),
+      B, L, h, c1, c2, xc, yc, dX, dY, abajoX, qe: sGov.qe, W, q: sGov.q, qu: Math.max(...conc.map((k) => k.qu - k.qd)),
       region: sGov.pr.region, ganchoX: aX.gancho, ganchoY: aY.gancho, nX: gX.n, nY: gY.n, pen: penG.P.rect,
       AsX: flX.As, AsY: flY.As, AsReqX: flX.AsReq, AsReqY: flY.AsReq, arm,
     },

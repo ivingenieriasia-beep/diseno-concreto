@@ -107,7 +107,20 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
           )}
         </Bloque>
         <Bloque titulo="Cargas en la columna (servicio)">
-          <Cargas z={z} set={set} campos={[{ k: 'P', t: 'P (t)' }, { k: 'Mx', t: 'Mx (t·m)', titulo: 'Momento alrededor de x: corre la resultante en y' }, { k: 'My', t: 'My (t·m)', titulo: 'Momento alrededor de y: corre la resultante en x' }]} />
+          <Cargas z={z} set={set} campos={[
+            { k: 'P', t: 'P (t)' },
+            { k: 'Mx', t: 'Mx (t·m)', titulo: 'Momento que corre la resultante en y' },
+            { k: 'My', t: 'My (t·m)', titulo: 'Momento que corre la resultante en x' },
+            { k: 'Vx', t: 'Vx (t)', titulo: 'Cortante de la columna en x: en el desplante suma Vx·h a My' },
+            { k: 'Vy', t: 'Vy (t)', titulo: 'Cortante de la columna en y: en el desplante suma Vy·h a Mx' },
+          ]} />
+          {z.apoyos?.length > 0 && (
+            <div className="cim-nota" data-testid="cim-apoyos">
+              Además se revisa con las cargas de cada uno de sus {z.apoyos.length} apoyo(s) de RAM (nudo{z.apoyos.length > 1 ? 's' : ''} {z.apoyos.map((a) => a.nudo).join(', ')}):
+              con el sismo descargando, el más ligero puede ser el que manda.{' '}
+              <button className="cim-mini" onClick={() => set({ apoyos: [] })} title="Revisar sólo con las cargas de arriba">quitar</button>
+            </div>
+          )}
         </Bloque>
       </>}
 
@@ -142,7 +155,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
           <button className="cim-mini" onClick={() => {
             const cs = z.columnas || []
             const x = cs.length ? Math.min(num(g.L), Math.max(...cs.map((c) => +c.x)) + 3) : 0.3
-            set({ columnas: [...cs, { x, c: 30, cb: 30, CM: { P: 15, M: 0 }, CV: { P: 5, M: 0 }, S: { P: 0, M: 0 } }], geo: { ...g, L: Math.max(num(g.L), x + 0.3) } })
+            set({ columnas: [...cs, { x, c: 30, cb: 30, CM: { P: 15, M: 0, V: 0 }, CV: { P: 5, M: 0, V: 0 }, S: { P: 0, M: 0, V: 0 } }], geo: { ...g, L: Math.max(num(g.L), x + 0.3) } })
           }}>＋ columna</button>
           <button className="cim-mini" data-testid="cim-centrar" title="Ajusta los voladizos para que la resultante caiga al centro" onClick={() => { const c = centrarResultante(z); if (c) set(c) }}>centrar resultante</button>
         </>}>
@@ -162,7 +175,8 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
                     <div key={cs}>
                       <span className="cim-caso">{cs}</span>
                       <Num value={c[cs]?.P ?? 0} onChange={(v) => K(cs, 'P', v)} unit="t" step={0.5} ancho={78} />
-                      <Num value={c[cs]?.M ?? 0} onChange={(v) => K(cs, 'M', v)} unit="t·m" step={0.1} ancho={84} />
+                      <Num value={c[cs]?.M ?? 0} onChange={(v) => K(cs, 'M', v)} unit="t·m" step={0.1} ancho={84} titulo="Momento que corre la resultante a lo largo (+ hacia la derecha)" />
+                      <Num value={c[cs]?.V ?? 0} onChange={(v) => K(cs, 'V', v)} unit="t" step={0.1} ancho={70} titulo="Cortante de la columna a lo largo: en el desplante suma V·H al momento" />
                     </div>
                   ))}
                 </div>

@@ -156,7 +156,7 @@ export async function memoriaPdf(lista, obra, { projectName = '' } = {}) {
 
   parrafo(doc, ctx, 'Memoria de cálculo de la cimentación', { tam: 16, negrita: true, despues: 1 })
   parrafo(doc, ctx, projectName || 'Proyecto sin nombre', { tam: 10, color: [107, 103, 96], despues: 4 })
-  parrafo(doc, ctx, `Criterio: el suelo se revisa con cargas de servicio contra la capacidad efectiva qe = qadm − relleno − peso propio (área efectiva de Meyerhof B′ = B − 2e con excentricidad); el concreto con cargas factorizadas 1.3 CM + 1.5 CV (y 1.1 (CM + CV + S) con sismo) conforme a las NTC-Concreto: FR = 0.9 en flexión y 0.75 en cortante. Los muros de contención con empuje de Rankine y los cimientos de piedra conforme a NTC-Mampostería 8.4.`, { tam: 8.6, despues: 3 })
+  parrafo(doc, ctx, `Criterio: el suelo se revisa con cargas de servicio (CM + CV y CM + CV ± S, el sismo cargando y descargando) contra la capacidad efectiva qe = qadm − W/A, con W el peso de la zapata y el relleno; con excentricidad, e = (M + V h)/(N + W) y el área efectiva de Meyerhof B′ = B − 2e; el concreto con cargas factorizadas 1.3 CM + 1.5 CV (y 1.1 (CM + CV + S) con sismo) conforme a las NTC-Concreto: FR = 0.9 en flexión y 0.75 en cortante. Los muros de contención con empuje de Rankine y los cimientos de piedra conforme a NTC-Mampostería 8.4.`, { tam: 8.6, despues: 3 })
   tabla(doc, ctx, [
     { t: 'Suelo de la obra', w: 60 }, { t: 'Valor', w: 30, align: 'right' },
     { t: 'Suelo de la obra', w: 64 }, { t: 'Valor', w: 29.9, align: 'right' },

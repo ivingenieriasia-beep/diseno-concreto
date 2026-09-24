@@ -223,6 +223,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
     modelo: d.modelo || {}, combos: d.combinaciones || [], casos: d.casos || [], envueltas,
     model, grupos, reacciones, flechas,
     conMedidas: medidas.size > 0,
+    secciones: d.secciones || {},
     // columnas con P, M22 y M33 simultáneos (sincronizar.py de ahora); 0 en un modelo de antes
     conFlexo,
   }

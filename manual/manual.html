@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.01"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.02"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -126,7 +126,7 @@
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.01</b>Septiembre de 2026</div>
+    <div><b>Versión 3.02</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -731,7 +731,7 @@
   </figure>
   <ol class="pasos">
     <li><b>+ Nuevo</b> y el tipo. Arranca dimensionado y armado con cargas de ejemplo.</li>
-    <li>Captura las cargas de <b>servicio</b> por caso: CM, CV y S (sismo). En la zapata aislada, P, Mx y My; en la corrida, w y M por metro; en la contratrabe, las de cada columna.</li>
+    <li>Captura las cargas de <b>servicio</b> por caso: CM, CV y S (sismo). En la zapata aislada, P, Mx, My y el cortante de la columna Vx, Vy; en la corrida, w y M por metro; en la contratrabe, P, M y V de cada columna.</li>
     <li><b>⚡ Proponer</b>: la base más chica que aguanta el suelo, el peralte más chico que pasa el concreto y la parrilla con menos acero que ancla, todo a cada 5 cm y vuelto a revisar con las varillas elegidas.</li>
     <li>Ajusta lo que quieras en el formulario o en el dibujo; las revisiones se recalculan al momento.</li>
   </ol>
@@ -771,12 +771,29 @@
     <li><b>Zapatas aisladas:</b> di cuántos tipos quieres; la app agrupa por el ancho que pide cada columna y la tabla dice cuántos apoyos van en cada tipo. <b>Crear</b> hace una zapata por tipo, con la envolvente de sus apoyos, o <b>una para todos</b>.</li>
     <li><b>Sobre un eje:</b> con los apoyos de una fila, <b>zapata corrida</b> (la carga por metro del muro) o <b>corrida con contratrabe</b> (cada columna con su P y su M, y el sismo en el sentido que más la voltea).</li>
   </ol>
-  <p>Cada cimiento guarda de qué nudos salió y lo dice arriba de su formulario. Si el modelo cambia, vuelve a crearlos o edítalos a mano.</p>
+  <p>Cada cimiento guarda de qué nudos salió y lo dice arriba de su formulario. Una zapata tipo se revisa además con la reacción de <b>cada uno</b> de sus apoyos:
+  la envolvente junta la P más pesada con el M más grande, pero con el sismo descargando puede mandar la columna ligera de la esquina. La columna de cada apoyo sale del modelo con su sección real.</p>
+
+  <h3>La planta de cimentación</h3>
+  <figure>
+    <img src="img/cim-planta.png" alt="">
+    <figcaption><b>Cimentación.</b> El edificio de prueba: una contratrabe en el eje de los nudos 1, 5 y 9, y nueve zapatas en dos tipos. Cada apoyo con su % de utilización con su propia reacción; a la derecha, cuántos apoyos tienen cimiento y cada cimiento con su peor %.</figcaption>
+  </figure>
+  <p>Después de crear, la ventana se queda abierta en la vista <b>Cimentación</b> (la otra, <b>Cargas</b>, es la de antes): cada apoyo con su cimiento dibujado a escala, las aisladas como cuadros y las corridas y contratrabes como franjas sobre su eje.</p>
+  <ul>
+    <li><b>Color y %:</b> la utilización del cimiento con la reacción de ese apoyo, lo más exigido de todas sus revisiones. Verde hasta 85 %, ámbar hasta 100 %, rojo si no cumple.</li>
+    <li><b>Sin cimiento:</b> círculo punteado. <b>elegir los que faltan</b> los selecciona para crearles el suyo.</li>
+    <li><b>En dos cimientos:</b> anillo rojo y aviso; borra el que sobre.</li>
+    <li><b>Clic en un cimiento</b> (en la planta o en la lista) lo abre.</li>
+    <li>Los % se calculan con las reacciones del modelo de hoy: al resincronizar, la planta dice cuáles ya no alcanzan.</li>
+  </ul>
 
   <div class="caja nota">
     <span class="t">Cargas</span>
-    El suelo se revisa con cargas de <b>servicio</b>: CM + CV y, con sismo, CM + CV + S contra 1.33 qadm. El concreto, con cargas <b>últimas</b>: 1.3 CM + 1.5 CV y 1.1 (CM + CV + S).
-    El sismo se suma en el sentido desfavorable. El peso propio y el relleno no se suman a la carga: se descuentan de qadm (la capacidad efectiva <b>qe</b>).
+    El suelo se revisa con cargas de <b>servicio</b>: CM + CV y, con sismo, CM + CV ± S contra 1.33 qadm. El concreto, con cargas <b>últimas</b>: 1.3 CM + 1.5 CV y 1.1 (CM + CV ± S).
+    El sismo va en los dos sentidos de su axial (carga y descarga la columna; la que descarga rige en las de orilla) y siempre agrandando los momentos.
+    El cortante de la columna llega al desplante: M + V·h. La presión se informa como en la hoja, contra <b>qe = qadm − W/A</b> (W el peso de la zapata y del relleno);
+    con excentricidad, e = (M + V h)/(N + W) y q = (N + W)/A′ − W/A, que es lo mismo que (N + W)/A′ ≤ qadm.
   </div>
 
   <h3>Memoria y planos</h3>
@@ -811,7 +828,7 @@
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 9, con H del modelo.</td></tr>
-    <tr><td><b>Cimentaciones</b></td><td>Las hojas de la oficina, corregidas. Suelo con cargas de servicio contra qe = qadm − γs (Df − h) − γc h, en t/m² (la hoja restaba t/m³ a kg/m²), con el área efectiva de Meyerhof B′ = B − 2e; con sismo, 1.33 qadm.
+    <tr><td><b>Cimentaciones</b></td><td>Las hojas de la oficina, corregidas. Suelo con cargas de servicio contra qe = qadm − γs (Df − h) − γc h, en t/m² (la hoja restaba t/m³ a kg/m²), con el área efectiva de Meyerhof B′ = B − 2e y e = (M + V h)/(N + W); con sismo, 1.33 qadm y el sismo cargando y descargando.
       Concreto con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S): FR 0.9 en flexión y 0.75 en cortante; VcR = 0.5 FR b d √f'c (reducido si h &gt; 70 cm); penetración FR (0.5 + γ) √f'c ≤ FR √f'c con la sección crítica de 4, 3 o 2 lados; aplastamiento FR 0.65, √(A2/A1) ≤ 2, y el excedente con arranques.
       Acero: el calculado, 4/3 de él o el mínimo, nunca menos que 0.0018 b h. Anclaje con L<sub>d</sub> × As,req/As,prov (≥ 30 cm) o gancho a 90°.
       Muros: Rankine con talud, empuje × 1.5 para el concreto, FS de volteo 2.0 y de deslizamiento 1.5, resultante en el tercio medio. Mampostería: NTC-Mampostería, tabla 8.4 en linderos (capítulo 11).</td></tr>

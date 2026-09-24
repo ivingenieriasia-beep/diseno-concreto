@@ -9,10 +9,10 @@ import { revisarContratrabe, nuevaContratrabe, presionRigida, diagramas, centrar
 import { revisarContencion, nuevaContencion, fuerzasMuro } from '../src/core/cim/contencion'
 import { revisarGravedad, nuevaGravedad } from '../src/core/cim/gravedad'
 import { revisarMamposteria, nuevaMamposteria, tabla84 } from '../src/core/cim/mamposteria'
-import { TIPOS_CIM, crearCim, revisarCim, nombreLibre, estadoCim } from '../src/core/cim'
+import { TIPOS_CIM, crearCim, revisarCim, nombreLibre, estadoCim, tipoCim } from '../src/core/cim'
 import { dibujarCim } from '../src/core/cim/dibujo'
 import { parseModeloRam } from '../src/core/ramModel'
-import { apoyosDe, papelesPorDefecto, cargasDeApoyo, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente } from '../src/core/cim/reacciones'
+import { apoyosDe, papelesPorDefecto, cargasDeApoyo, sismosDeApoyo, aZapata, ladoRequerido, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente } from '../src/core/cim/reacciones'
 
 const valor = (R, titulo) => R.secciones.flatMap((s) => s.pasos).find((p) => p.t === titulo)?.v
 const chk = (R, id) => R.checks.find((c) => c.id === id)
@@ -95,22 +95,42 @@ describe('zapata aislada', () => {
   const excel = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, B: 0.7, L: 0.7, h: 20, c1: 20, c2: 20 }, cargas: { CM: { P: 3.29, Mx: 0, My: 0 }, CV: { P: 0.91, Mx: 0, My: 0 } }, arm: { x: { num: 3, s: 23 }, y: { num: 3, s: 23 } } }
   it('la céntrica de la hoja cumple con su armado (0.70 × 0.70, #3 @ 23)', () => {
     const R = revisarAislada(excel, obra)
+    // centrada: N/A ≤ qe = 9.92 t/m² (9 920 kg/m²), como la hoja
     expect(chk(R, 'suelo').act).toBeCloseTo(4.2 / 0.49, 6)
-    expect(chk(R, 'suelo').res).toBeCloseTo(9.92, 6)          // qe de la hoja (9 920 kg/m²)
+    expect(chk(R, 'suelo').res).toBeCloseTo(9.92, 6)
+    expect(valor(R, 'Capacidad efectiva')).toBeCloseTo(9.92, 6)
     expect(R.ok).toBe(true)
   })
   it('lindero: con trabe de liga el suelo trabaja parejo; sin liga el área efectiva se desploma', () => {
     const z = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, px: 'min', B: 1.5, L: 1.5 }, cargas: { CM: { P: 20 }, CV: { P: 8 } } }
     const con = revisarAislada(z, obra), sin = revisarAislada({ ...z, geo: { ...z.geo, liga: false } }, obra)
     expect(chk(con, 'suelo').act).toBeCloseTo(28 / 2.25, 6)
-    expect(chk(sin, 'suelo').act).toBeGreaterThan(4 * chk(con, 'suelo').act)
+    expect(chk(sin, 'suelo').act).toBeGreaterThan(3 * chk(con, 'suelo').act)   // el peso centrado la modera
     expect(con.secciones.some((s) => /liga/.test(s.titulo))).toBe(true)
     expect(chk(con, 'penetracion').nota).toBe('borde')
   })
-  it('momentos: la resultante se corre y la presión sube', () => {
+  it('momentos: la resultante se corre con N + W y la presión sube', () => {
     const z = { ...excel, geo: { ...excel.geo, B: 1.5, L: 1.5 }, cargas: { CM: { P: 10, Mx: 0, My: 1 }, CV: { P: 2, Mx: 0, My: 0.5 } } }
     const R = revisarAislada(z, obra)
-    expect(chk(R, 'suelo').act).toBeCloseTo(12 / ((1.5 - 2 * 0.125) * 1.5), 6)
+    const W = 2.25 * (2.4 * 0.2 + 1.5 * 0.6), e = 1.5 / (12 + W)
+    expect(chk(R, 'suelo').act).toBeCloseTo((12 + W) / ((1.5 - 2 * e) * 1.5) - W / 2.25, 6)
+  })
+  it('el cortante de la columna también voltea: M + V·h en el desplante', () => {
+    const z = { ...excel, geo: { ...excel.geo, B: 1.5, L: 1.5, h: 40 }, cargas: { CM: { P: 10, Mx: 0, My: 1, Vx: 2 }, CV: { P: 2 } } }
+    const R = revisarAislada(z, obra)
+    const W = 2.25 * (2.4 * 0.4 + 1.5 * 0.4), e = (1 + 2 * 0.4) / (12 + W)
+    expect(chk(R, 'suelo').act).toBeCloseTo((12 + W) / ((1.5 - 2 * e) * 1.5) - W / 2.25, 6)
+  })
+  it('el sismo también descarga la columna: CM + CV − S (la de orilla)', () => {
+    const z = { ...excel, geo: { ...excel.geo, B: 1.6, L: 1.6, h: 40 }, cargas: { CM: { P: 11 }, CV: { P: 2.5 }, S: { P: 7.5, My: 6, Vx: 3 } } }
+    const R = revisarAislada(z, obra)
+    expect(R.secciones[0].pasos.some((p) => /CM \+ CV − S/.test(p.t))).toBe(true)
+    // rige la que descarga: con 6 t de columna y 7.2 t·m la resultante se va a la orilla
+    expect(chk(R, 'suelo').nota).toBe('CM + CV − S')
+    const p = proponerAislada(z, obra)
+    const R2 = revisarAislada({ ...z, ...p }, obra)
+    expect(R2.ok).toBe(true)
+    expect(p.geo.B).toBeGreaterThan(1.6)
   })
   it('la columna se coloca al centro, al lindero o en la esquina', () => {
     const c = centroColumna({ B: 1.2, L: 1.2, c1: 30, c2: 30, px: 'min', py: 'max' })
@@ -129,8 +149,10 @@ describe('zapata corrida bajo muro', () => {
   it('la de la hoja: q = w / B y la capacidad efectiva bien restada', () => {
     const z = { ...nuevaCorrida(), geo: { ...nuevaCorrida().geo, B: 0.8, h: 20, t: 15, muro: 'concreto' }, mat: { fc: 300, fy: 4200, r: 5 } }
     const R = revisarCorrida(z, { suelo: { qadm: 13.52, gs: 1.739, Df: 0.8 } })
+    const qe = 13.52 - 1.739 * 0.6 - 2.4 * 0.2
+    expect(valor(R, 'Capacidad efectiva')).toBeCloseTo(qe, 6)
     expect(chk(R, 'suelo').act).toBeCloseTo(5.95 / 0.8, 6)
-    expect(chk(R, 'suelo').res).toBeCloseTo(13.52 - 1.739 * 0.6 - 2.4 * 0.2, 6)
+    expect(chk(R, 'suelo').res).toBeCloseTo(qe, 6)
   })
   it('muro de mampostería: la flexión va a t/4 dentro del muro (más momento que en la cara)', () => {
     const base = { ...nuevaCorrida(), geo: { ...nuevaCorrida().geo, B: 1.2, t: 30 } }
@@ -347,5 +369,83 @@ describe('robustez de las propuestas', () => {
   it('con suelo de 15 t/m² y cargas comunes todo cumple', () => {
     const obra = { suelo: { qadm: 15, Df: 1 } }
     for (const t of TIPOS_CIM) expect(revisarCim(crearCim(t.id, [], obra), obra).ok, t.id).toBe(true)
+  })
+})
+
+// El primer modelo real de RAM Elements (el edificio de prueba, 12 apoyos, Y
+// vertical) con las reacciones por caso de sincronizar.py.
+describe('reacciones de un modelo real de RAM', () => {
+  const R = parseModeloRam(readFileSync(resolve(__dirname, 'fixtures/modelo_edificio_prueba.json'), 'utf8'), 'modelo.json')
+  const A = apoyosDe(R)
+  const pap = papelesPorDefecto(R.casos)
+  const nudo = (n) => A.apoyos.find((a) => a.nudo === n)
+
+  it('lee los apoyos, sus columnas y los papeles de los casos', () => {
+    expect(A.up).toBe('y')
+    expect(A.conCasos).toBe(true)
+    expect(A.apoyos).toHaveLength(12)
+    expect(nudo('17').col).toMatchObject({ c1: 30, c2: 30 })
+    expect(pap).toEqual({ CM: 'CM', CV: 'CV', SX: 'S', SXN: 'S', SZ: 'S', SZN: 'S' })
+  })
+
+  it('signos: con el sismo en +X la zapata se carga hacia +X (momento y cortante)', () => {
+    // SX empuja el edificio a +X: el nudo 1 (en X = 0) se levanta, y su
+    // columna empuja la zapata hacia +X, que es donde va la resultante
+    const s = sismosDeApoyo(nudo('1'), pap, 'y')
+    expect(s.SX.P).toBeLessThan(0)
+    expect(s.SX.My).toBeGreaterThan(5)
+    expect(s.SX.Vx).toBeGreaterThan(3)
+    // y con SZ hacia +Z (el eje y de la zapata)
+    expect(s.SZ.Mx).toBeGreaterThan(5)
+    expect(s.SZ.Vy).toBeGreaterThan(2)
+    // la conversión general: N·e = ŵ × M
+    expect(aZapata({ fx: 0, fy: 10, fz: 0, mx: 0, my: 0, mz: 2 }, 'y', ['x', 'z'])).toMatchObject({ P: 10, My: 2 })
+    expect(aZapata({ fx: 0, fy: 0, fz: 10, mx: 2, my: 0, mz: 0 }, 'z', ['x', 'y'])).toMatchObject({ P: 10, Mx: 2 })
+  })
+
+  it('contratrabe del eje X = 0: el volteo de las P y el de los momentos se suman', () => {
+    const fila = A.apoyos.filter((a) => Math.abs(a.x) < 1e-6)
+    const z = contratrabeDesde(fila, pap, 'y')
+    const S = z.columnas.map((c) => c.S)
+    // el sismo del eje (SZ): el extremo de atrás se levanta, el de adelante se
+    // carga, y los momentos de las columnas empujan hacia el mismo lado
+    const tm = z.columnas.reduce((s, c) => s + c.x, 0) / z.columnas.length
+    const porP = z.columnas.reduce((s, c) => s + c.S.P * (c.x - tm), 0)
+    const porM = S.reduce((s, c) => s + c.M, 0)
+    expect(Math.sign(porP)).toBe(Math.sign(porM))
+    expect(z.origen.ram.resumen).toMatch(/sismo del eje: SZ/)
+    const p = { ...z, ...tipoCim('contratrabe').proponer(z, {}) }
+    expect(revisarCim(p, {}).ok).toBe(true)
+  })
+
+  it('las aisladas se revisan con cada apoyo: en las esquinas rige el sismo descargando', () => {
+    const cargas = A.apoyos.map((a) => cargasDeApoyo(a, pap, 'y'))
+    // la esquina ligera pide más base que una interior con el doble de carga
+    const lado = (n) => ladoRequerido(cargas[A.apoyos.indexOf(nudo(n))], {})
+    expect(lado('9')).toBeGreaterThan(lado('21'))
+    const zs = aisladasDesde(A.apoyos, pap, 'y', { tipos: 3 })
+    expect(zs.every((z) => z.apoyos.length === z.origen.ram.nudos.length)).toBe(true)
+    for (const z of zs) {
+      const p = { ...z, ...tipoCim('aislada').proponer(z, {}) }
+      expect(revisarCim(p, {}).ok).toBe(true)
+      // y cumple con la reacción de cada uno de sus apoyos
+      for (const a of z.apoyos) expect(revisarCim({ ...p, cargas: a.cargas, apoyos: [] }, {}).ok).toBe(true)
+    }
+  })
+
+  it('sin la revisión por apoyo, la envolvente se queda corta en la esquina', () => {
+    const cargas = A.apoyos.map((a) => cargasDeApoyo(a, pap, 'y'))
+    const i9 = A.apoyos.indexOf(nudo('9')), i17 = A.apoyos.indexOf(nudo('17'))
+    const z = aisladasDesde([nudo('9'), nudo('17')], pap, 'y', { tipos: 1 })[0]
+    const conEnv = { ...z, apoyos: [] }
+    const p = { ...conEnv, ...tipoCim('aislada').proponer(conEnv, {}) }
+    // diseñada sólo con la envolvente (P del 17 con los M de todos) no pasa con la del 9
+    const R9 = revisarCim({ ...p, cargas: cargas[i9], apoyos: [] }, {})
+    const R17 = revisarCim({ ...p, cargas: cargas[i17], apoyos: [] }, {})
+    expect(R17.ok).toBe(true)
+    expect(estadoCim(R9).u).toBeGreaterThan(estadoCim(R17).u)
+    // con sus apoyos, la propuesta cubre a los dos
+    const q = { ...z, ...tipoCim('aislada').proponer(z, {}) }
+    expect(revisarCim({ ...q, cargas: cargas[i9], apoyos: [] }, {}).ok).toBe(true)
   })
 })

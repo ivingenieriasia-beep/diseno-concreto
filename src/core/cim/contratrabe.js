@@ -34,12 +34,16 @@ export function nuevaContratrabe(nombre = 'ZT-1') {
   }
 }
 
-const Z = { P: 0, M: 0 }
+const Z = { P: 0, M: 0, V: 0 }
 
-/** Cargas por columna de cada combinación (el sismo en los dos sentidos) */
-export function combinacionesContratrabe(columnas, C) {
+/**
+ * Cargas por columna de cada combinación (el sismo en los dos sentidos). El
+ * momento de cada columna se lleva al desplante: M + V·H (H en m), con V el
+ * cortante de la columna a lo largo del eje.
+ */
+export function combinacionesContratrabe(columnas, C, Hm = 0) {
   const cols = columnas || []
-  const de = (c, k) => ({ ...Z, ...(c[k] || {}) })
+  const de = (c, k) => { const q = { ...Z, ...(c[k] || {}) }; return { P: num(q.P), M: num(q.M) + num(q.V) * Hm } }
   const serv = cols.map((c) => ({ x: num(c.x), c: num(c.c, 30), P: de(c, 'CM').P + de(c, 'CV').P, M: de(c, 'CM').M + de(c, 'CV').M }))
   const ult = cols.map((c) => ({ x: num(c.x), c: num(c.c, 30), P: C.fcm * de(c, 'CM').P + C.fcv * de(c, 'CV').P, M: C.fcm * de(c, 'CM').M + C.fcv * de(c, 'CV').M }))
   const out = { servicio: [{ id: 'CM + CV', cargas: serv, k: 1 }], ultimas: [{ id: `${C.fcm} CM + ${C.fcv} CV`, cargas: ult }] }
@@ -56,10 +60,11 @@ export function combinacionesContratrabe(columnas, C) {
 
 /**
  * Presión lineal del suelo por metro de zapata (t/m) bajo cargas de columna.
- * @returns { R, e, w(x), wmax, contacto }
+ * @returns { R, e, w(x), wNeto(x), wmax, contacto }
  */
-export function presionRigida(cargas, L) {
-  const R = cargas.reduce((s, c) => s + c.P, 0)
+export function presionRigida(cargas, L, W = 0) {
+  // W: peso centrado (zapata y relleno) que se suma a la resultante
+  const R = cargas.reduce((s, c) => s + c.P, 0) + W
   const Mo = cargas.reduce((s, c) => s + c.P * (c.x - L / 2) + c.M, 0)
   const e = R > 0 ? Mo / R : 0
   let w, contacto
@@ -74,7 +79,9 @@ export function presionRigida(cargas, L) {
       : (x) => (x > a ? 0 : (2 * R / a) * (a - x) / a)
   }
   const wmax = Math.max(w(0), w(L))
-  return { R, e, w, wmax, contacto }
+  // lo que carga la contratrabe: la presión menos ese peso, repartido en L
+  const wNeto = (x) => w(x) - W / L
+  return { R, e, w, wNeto, wmax, contacto, W }
 }
 
 /**
@@ -138,35 +145,45 @@ export function revisarContratrabe(z, obra = {}) {
     est: { num: 3, ramas: 2, s: 20, ...(z.arm?.est || {}) },
     alero: { num: 4, s: 25, ...(z.arm?.alero || {}) }, long: { num: 3, s: 30, ...(z.arm?.long || {}) },
   }
-  const cmb = combinacionesContratrabe(z.columnas, C)
+  const cmb = combinacionesContratrabe(z.columnas, C, H / 100)
   const checks = [], secciones = [], avisos = []
   const fuera = (z.columnas || []).filter((c) => num(c.x) - num(c.c, 30) / 200 < -1e-6 || num(c.x) + num(c.c, 30) / 200 > L + 1e-6)
   if (fuera.length) avisos.push(`${fuera.length} columna(s) quedan fuera de la zapata: revisa sus x o el largo L.`)
   if (!(z.columnas || []).length) avisos.push('La contratrabe no tiene columnas.')
 
   // ── suelo ──
-  const qeG = capacidadEfectiva({ ...S, h: hEq }), qeS = capacidadEfectiva({ ...S, h: hEq }, C.kS)
+  // con el peso de la zapata y del relleno W (centrado): R = ΣP + W,
+  // e = Σ[P (x − L/2) + M] / R y q = R / (B (L − 2|e|)) ≤ qadm; con carga
+  // centrada es lo mismo que la hoja (ΣP/(B L) ≤ qe)
+  const qadm = num(S.qadm), gs = num(S.gs, 1.6), Df = num(S.Df, 1)
+  const W = B * L * (GC * hEq / 100 + gs * Math.max(0, Df - hEq / 100))
+  const qeG = capacidadEfectiva({ ...S, h: hEq })
   const pS = [
     paso('Espesor equivalente', 'hₑ = (B h + bw (H − h)) / B', `= (${f1(B * 100)} × ${f1(h)} + ${f1(bw)} × ${f1(H - h)}) / ${f1(B * 100)}`, hEq, 'cm'),
-    ...qeG.pasos, ...(cmb.servicio.length > 1 ? qeS.pasos.map((p) => ({ ...p, t: 'Capacidad efectiva con sismo' })) : []),
+    paso('Peso de la zapata y del relleno', 'W = B L [γc hₑ + γs (Df − hₑ)]', `= ${f2(B)} × ${f2(L)} × (${GC} × ${f2(hEq / 100)} + ${f2(gs)} × ${f2(Math.max(0, Df - hEq / 100))})`, W, 't'),
+    { ...qeG.pasos[0], nota: 'qadm menos W/(B L): lo que queda para las columnas' },
   ]
+  // en neto, como la hoja: q = R / (B L′) − W/(B L) ≤ qe = k qadm − W/(B L)
+  const wA = W / (B * L)
   const sue = cmb.servicio.map((c) => {
-    const P = presionRigida(c.cargas, L)
+    const P = presionRigida(c.cargas, L, W)
     const Lp = L - 2 * Math.abs(P.e)
-    const q = Lp > 0 ? P.R / (B * Lp) : Infinity
-    const qe = c.k === 1 ? qeG.qe : qeS.qe
-    return { c, P, Lp, q, qe, u: q / qe, qmax: P.wmax / B }
+    const qb = P.R > 0 && Lp > 0 ? P.R / (B * Lp) : Infinity
+    const q = qb - wA, qe = c.k * qadm - wA
+    return { c, P, Lp, qb, q, qe, u: q / qe, qmax: P.wmax / B }
   })
   for (const s of sue) {
     const et = sue.length > 1 ? ` (${s.c.id})` : ''
-    pS.push(paso(`Resultante${et}`, 'R = ΣP', s.c.cargas.map((k) => f2(k.P)).join(' + '), s.P.R, 't'))
+    pS.push(paso(`Resultante${et}`, 'R = ΣP + W', `${s.c.cargas.map((k) => f2(k.P)).join(' + ')} + ${f2(W)}`, s.P.R, 't', s.P.R > 0 ? {} : { ok: false, nota: 'la zapata se levanta' }))
     pS.push(paso('Excentricidad', 'e = Σ[P (x − L/2) + M] / R', '', s.P.e, 'm'))
-    pS.push(paso('Presión de contacto', 'q = R / (B (L − 2|e|))', `= ${f2(s.P.R)} / (${f2(B)} × ${f3(s.Lp)})`, s.q, 't/m²', { ok: s.u <= 1, lim: `≤ qe = ${f2(s.qe)}` }))
+    pS.push(paso('Presión con el peso', 'q′ = R / (B (L − 2|e|))', `= ${f2(s.P.R)} / (${f2(B)} × ${f3(s.Lp)})`, s.qb, 't/m²'))
+    pS.push(paso('Presión neta', 'q = q′ − W / (B L)', `= ${f2(s.qb)} − ${f2(wA)}`, s.q, 't/m²', { ok: s.u <= 1, lim: `≤ qe = ${f2(s.qe)}${s.c.k !== 1 ? ` (${s.c.k} qadm − W/A)` : ''}` }))
     if (Math.abs(s.P.e) > L / 6) pS.push(paso('Presión lineal', 'la resultante sale del tercio medio', `contacto en ${f2(s.P.contacto)} m`, s.qmax, 't/m²', { nota: 'la zapata se despega en un extremo' }))
   }
   const sG = sue.reduce((a, b) => (b.u > a.u ? b : a))
   checks.push(check('suelo', 'Presión en el suelo', sG.q, sG.qe, 't/m²', { grupo: 'Suelo', nota: sG.c.id }))
-  if (!(sG.u <= 1) && B >= 5) avisos.push(`El suelo pide una zapata de más de ${f2(B)} m de ancho (qe = ${f2(sG.qe)} t/m²): conviene losa de cimentación o mejorar el suelo.`)
+  if (!(sG.P.R > 0)) avisos.push(`Con ${sG.c.id} la zapata se levanta: el sismo le quita más de lo que pesa.`)
+  else if (!(sG.u <= 1) && B >= 5) avisos.push(`El suelo pide una zapata de más de ${f2(B)} m de ancho (qadm = ${f2(qadm)} t/m²): conviene losa de cimentación o mejorar el suelo.`)
   if (Math.abs(sG.P.e) > 0.05 * L) avisos.push(`La resultante está a ${f2(sG.P.e)} m del centro: «Centrar la resultante» ajusta los voladizos.`)
   secciones.push({ titulo: 'Presión en el suelo (cargas de servicio, método rígido)', pasos: pS })
 
@@ -174,9 +191,12 @@ export function revisarContratrabe(z, obra = {}) {
   const ve = varilla(arm.est.num), vi = varilla(arm.inf.num), vs = varilla(arm.sup.num)
   const rInf = r + ve.diam + vi.diam / 2, rSup = r + ve.diam + vs.diam / 2
   const dInf = H - rInf, dSup = H - rSup
+  // la presión con 0.9 W (el peso que estabiliza no se infla) menos ese peso:
+  // lo que de verdad dobla la contratrabe
+  const Wu = 0.9 * W
   const ult = cmb.ultimas.map((c) => {
-    const P = presionRigida(c.cargas, L)
-    const dg = diagramas(c.cargas, L, P.w)
+    const P = presionRigida(c.cargas, L, Wu)
+    const dg = diagramas(c.cargas, L, P.wNeto)
     return { c, P, dg, env: envolvente(dg, c.cargas, Math.min(dInf, dSup)) }
   })
   const gM = (k) => ult.reduce((a, b) => (b.env[k] > a.env[k] ? b : a))
@@ -211,8 +231,9 @@ export function revisarContratrabe(z, obra = {}) {
   const pD = []
   for (const k of ult) {
     const et = ult.length > 1 ? ` (${k.c.id})` : ''
-    pD.push(paso(`Resultante última${et}`, 'Ru', '', k.P.R, 't'))
-    pD.push(paso('Presión lineal última', 'w(x) = R/L (1 + 12 e (x − L/2)/L²)', `e = ${f3(k.P.e)} m`, `${f2(k.P.w(0))} a ${f2(k.P.w(L))}`, 't/m'))
+    pD.push(paso(`Resultante última${et}`, 'Ru = ΣPu + 0.9 W', `+ ${f2(Wu)}`, k.P.R, 't'))
+    pD.push(paso('Presión lineal última', 'w(x) = Ru/L (1 + 12 e (x − L/2)/L²)', `e = ${f3(k.P.e)} m`, `${f2(k.P.w(0))} a ${f2(k.P.w(L))}`, 't/m'))
+    pD.push(paso('La que dobla la contratrabe', 'w(x) − 0.9 W / L', `− ${f2(Wu / L)}`, `${f2(k.P.wNeto(0))} a ${f2(k.P.wNeto(L))}`, 't/m'))
   }
   pD.push(paso('Momento máximo abajo (bajo columnas)', 'M+ en la cara de la columna', `a ${f2(uMp.env.xMp)} m`, Mp, 't·m'))
   pD.push(paso('Momento máximo arriba (entre columnas)', 'M−', `a ${f2(uMn.env.xMn)} m`, Mn, 't·m'))
@@ -245,7 +266,9 @@ export function revisarContratrabe(z, obra = {}) {
   const a = Math.max(0, (B - bw / 100) / 2)
   const va = varilla(arm.alero.num)
   const dA = h - r - va.diam / 2
-  const quMax = Math.max(...ult.map((k) => k.P.wmax)) / B
+  // el alero: la presión bajo él menos su propio peso y el del relleno encima
+  const qdA = 0.9 * (GC * h / 100 + gs * Math.max(0, Df - h / 100))
+  const quMax = Math.max(0, Math.max(...ult.map((k) => k.P.wmax)) / B - qdA)
   const MuA = (quMax * a * a) / 2
   const VuA = quMax * Math.max(0, a - dA / 100)
   const FA = flexion({ Mu: MuA, b: 100, d: dA, h, fc, fy, nombre: 'del alero, por metro' })
@@ -285,8 +308,8 @@ export function revisarContratrabe(z, obra = {}) {
   return {
     tipo: 'contratrabe', ok, checks, secciones, avisos, cant,
     datos: {
-      L, B, h, bw, H, a, dInf, dSup, claro, Mp, Mn, Vu, q: sG.q, qe: sG.qe,
-      diag: uMp.dg, diagN: uMn.dg, presion: { w0: uMp.P.w(0), wL: uMp.P.w(L), e: uMp.P.e }, gancho: AA.gancho,
+      L, B, h, bw, H, a, dInf, dSup, claro, Mp, Mn, Vu, q: sG.q, qe: sG.qe, W,
+      diag: uMp.dg, diagN: uMn.dg, presion: { w0: uMp.P.wNeto(0), wL: uMp.P.wNeto(L), e: uMp.P.e }, gancho: AA.gancho,
       AsA: FA.As, AsReqA: FA.AsReq, AsL, arm, fI, fS, cc,
     },
     resumen: `Zapata corrida con contratrabe de ${f2(L)} × ${f2(B)} m, losa de ${f1(h)} cm, contratrabe ${f1(bw)} × ${f1(H)} cm `
@@ -299,7 +322,7 @@ export function centrarResultante(z) {
   const cols = z.columnas || []
   if (!cols.length) return null
   const C = CRITERIOS
-  const serv = combinacionesContratrabe(cols, C).servicio[0].cargas
+  const serv = combinacionesContratrabe(cols, C, num(z.geo.H, 60) / 100).servicio[0].cargas
   const R = serv.reduce((s, c) => s + c.P, 0)
   if (R <= 0) return null
   const x1 = Math.min(...serv.map((c) => c.x)), xn = Math.max(...serv.map((c) => c.x))

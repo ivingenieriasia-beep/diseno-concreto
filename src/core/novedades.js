@@ -14,6 +14,7 @@ import imgCimDetallador from '../assets/novedades/cim-detallador.webp'
 import imgCimContencion from '../assets/novedades/cim-contencion.webp'
 import imgCimRam from '../assets/novedades/cim-ram.webp'
 import imgMemPrellenado from '../assets/novedades/mem-prellenado.webp'
+import imgCimPlanta from '../assets/novedades/cim-planta.webp'
 
 export const TIPOS = {
   nuevo: { etiqueta: 'NUEVO', fondo: '#dcf3ec', color: '#1a7a5e' },
@@ -27,6 +28,30 @@ export const TIPOS = {
  * lo que hay que hacer para aprovecharla.
  */
 export const NOVEDADES = [
+  {
+    version: '3.02',
+    fecha: '2026-09-24',
+    lema: 'Con el primer modelo real de RAM: la planta de cimentación, y el sismo, el cortante y el peso de la zapata en su lugar.',
+    aviso: 'Las zapatas que se crearon desde RAM con la 3.01 conviene crearlas otra vez: ahora se revisan con el sismo descargando cada apoyo, con su cortante y con la reacción de cada uno.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'Planta de cimentación',
+        texto: 'En ⚡ Desde RAM cada apoyo aparece con su cimiento a escala (aisladas, corridas y contratrabes), el % de utilización de cada uno con su propia reacción y cuántos faltan. Clic en un cimiento para abrirlo; si resincronizas un modelo más cargado, ahí se ve cuál ya no alcanza.',
+        donde: 'Cimentaciones → ⚡ Desde RAM → Cimentación',
+        img: imgCimPlanta,
+        alt: 'Planta con una contratrabe y nueve zapatas, cada una con su porcentaje',
+      },
+    ],
+    cambios: [
+      { tipo: 'arreglo', texto: 'Signos de los momentos de RAM: con el sismo en +X la zapata se carga hacia +X. Antes, en X quedaba al revés, y en una contratrabe el momento de las columnas se restaba al volteo en vez de sumarse.' },
+      { tipo: 'mejora', texto: 'El sismo carga y descarga cada columna: también se revisa CM + CV − S, la que rige en las de orilla.' },
+      { tipo: 'mejora', texto: 'La excentricidad cuenta con el peso de la zapata y el relleno: e = (M + V h)/(N + W). Con carga centrada, idéntico a la hoja.' },
+      { tipo: 'nuevo', texto: 'El cortante de la columna llega al desplante (M + V·h): Vx y Vy en la aislada, V en cada columna de la contratrabe.' },
+      { tipo: 'mejora', texto: 'Una zapata tipo se revisa con cada uno de sus apoyos, no sólo con la envolvente: la esquina ligera puede mandar.' },
+      { tipo: 'mejora', texto: 'La columna de cada apoyo sale del modelo con su sección real, en vez de 30 × 30.' },
+    ],
+  },
   {
     version: '3.01',
     fecha: '2026-09-24',

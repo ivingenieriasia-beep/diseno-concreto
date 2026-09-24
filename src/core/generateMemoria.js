@@ -568,7 +568,7 @@ function cimentacionHTML(cimientos, obra) {
     return `${v.toFixed(d)}${u ? ` ${esc(u)}` : ''}`
   }
   const revs = cimientos.map((z) => ({ z, R: revisarCim(z, obra) }))
-  let h = `<p style="text-align:justify">El suelo se revisó con cargas de servicio contra la capacidad efectiva qe = qadm − relleno − peso propio (área efectiva B′ = B − 2e con excentricidad); el concreto, con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S), conforme a las NTC-Concreto. Los muros de contención con el empuje de Rankine y los cimientos de piedra conforme a las NTC-Mampostería 8.4.</p>`
+  let h = `<p style="text-align:justify">El suelo se revisó con cargas de servicio (CM + CV y CM + CV ± S) contra la capacidad efectiva qe = qadm − W/A, con W el peso de la zapata y del relleno (con excentricidad, e = (M + V h)/(N + W) y el área efectiva B′ = B − 2e); el concreto, con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S), conforme a las NTC-Concreto. Los muros de contención con el empuje de Rankine y los cimientos de piedra conforme a las NTC-Mampostería 8.4.</p>`
   h += `<table class="calc"><thead><tr><th>Cimiento</th><th>Tipo</th><th>Solución</th><th>Estado</th></tr></thead><tbody>${revs.map(({ z, R }) => `<tr><td>${esc(z.nombre)}</td><td>${esc(tipoCim(z.tipo).nombre)}</td><td>${esc(R.resumen)}</td><td style="color:${R.ok ? '#15803d' : '#dc2626'};font-weight:700">${R.ok ? 'VERIFICADO' : 'NO PASA'}</td></tr>`).join('')}</tbody></table>`
   for (const { z, R } of revs) {
     h += `<h4 style="margin:18px 0 4px">${esc(z.nombre)} · ${esc(tipoCim(z.tipo).nombre)}</h4><p>${esc(R.resumen)}</p>`
