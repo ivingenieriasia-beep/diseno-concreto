@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 """Inject IV Ingenierías auth gate into built index.html - uses rfind to find the REAL <body> tag"""
+import os
+import re
 import sys
+
+
+def app_version():
+    """La versión de la app, de src/core/constants.js: la misma que dice la app."""
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'core', 'constants.js')
+    with open(ruta, 'r', encoding='utf-8') as f:
+        m = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", f.read())
+    if not m:
+        print("ERROR: APP_VERSION not found in " + ruta)
+        sys.exit(1)
+    return m.group(1)
 
 LOGIN_BLOCK = '''<!-- IV Auth Gate -->
 <div id="iv-auth-gate" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);font-family:Arial,sans-serif">
@@ -21,7 +34,7 @@ LOGIN_BLOCK = '''<!-- IV Auth Gate -->
 <input id="iv-p" type="password" placeholder="Contrase&#241;a" style="padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none"/>
 <button type="submit" style="padding:12px;border:none;border-radius:8px;background:#1a7a5e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Ingresar</button>
 </form>
-<p style="margin:16px 0 0;font-size:10px;color:#9ca3af">v0.2 &#183; NTC-2023</p>
+<p style="margin:16px 0 0;font-size:10px;color:#9ca3af">v__IV_VERSION__ &#183; NTC-2023</p>
 </div></div>
 <script>
 (function(){
@@ -55,10 +68,11 @@ if idx == -1:
     print("ERROR: <body> not found")
     sys.exit(1)
 
+version = app_version()
 insert_at = idx + len('<body>')
-out = html[:insert_at] + '\n' + LOGIN_BLOCK + '\n' + html[insert_at:]
+out = html[:insert_at] + '\n' + LOGIN_BLOCK.replace('__IV_VERSION__', version) + '\n' + html[insert_at:]
 
 with open(dst, 'w', encoding='utf-8') as f:
     f.write(out)
 
-print(f"OK: auth injected at position {idx} into {dst} ({len(out):,} bytes)")
+print(f"OK: auth v{version} injected at position {idx} into {dst} ({len(out):,} bytes)")
