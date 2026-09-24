@@ -9,7 +9,7 @@ const KEY = 'iv_autosave_v1'
 const RECENTS = 'iv_recents_v1'
 const MAX_RECENTS = 6
 
-export const PROJECT_VERSION = 5
+export const PROJECT_VERSION = 6
 
 /** Bajada de cargas vacía: la forma que toma un proyecto sin nada capturado */
 export const emptyCargas = () => ({ losas: [], muros: [], tableros: [], unidad: 'kg' })
@@ -19,10 +19,11 @@ export function hasCargas(c) {
 }
 
 /** Empaqueta el estado del proyecto tal como se guarda en el .json */
-export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null, model = null, rutaRam = '' }) {
+export function packProject({ projectName = '', dxfScale = 1, sections = [], columns = [], cargas = null, model = null, rutaRam = '', cimentacion = null }) {
   return {
     version: PROJECT_VERSION, projectName, dxfScale, sections, columns,
     cargas: cargas || emptyCargas(),
+    cimentacion: cimentacion || { cimientos: [], suelo: {}, criterios: {} },
     model: model || null,   // geometría del modelo de RAM, común a todas las trabes
     rutaRam,                // carpeta de Windows donde el script deja el modelo.json
     savedAt: new Date().toISOString(),
@@ -30,7 +31,8 @@ export function packProject({ projectName = '', dxfScale = 1, sections = [], col
 }
 
 export function isEmptyProject(p) {
-  return !p || ((p.sections?.length || 0) === 0 && (p.columns?.length || 0) === 0 && !hasCargas(p.cargas))
+  return !p || ((p.sections?.length || 0) === 0 && (p.columns?.length || 0) === 0 && !hasCargas(p.cargas)
+    && (p.cimentacion?.cimientos?.length || 0) === 0)
 }
 
 export function saveSnapshot(project) {

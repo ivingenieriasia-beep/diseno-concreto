@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.0"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.01"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -119,14 +119,14 @@
 <div class="portada">
   <div class="marca">IV Ingenierías · Estructuras</div>
   <h1>Auxiliar IV con RAM Elements</h1>
-  <div class="sub">Manual de uso para el equipo: del modelo analizado en RAM a las secciones armadas, pasando por la agrupación de trabes.</div>
+  <div class="sub">Manual de uso para el equipo: del modelo analizado en RAM a las secciones armadas y la cimentación, pasando por la agrupación de trabes.</div>
   <svg class="fondo" width="520" height="520" viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="1.6">
     <path d="M10 90V20M40 90V20M70 90V20M95 90V20"/>
     <path d="M10 20h85M10 43h85M10 66h85M10 90h85"/>
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.0</b>Septiembre de 2026</div>
+    <div><b>Versión 3.01</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -193,10 +193,11 @@
     <li><b>8</b>Crear las secciones con su armado</li>
     <li><b>9</b>Revisar y detallar</li>
     <li><b>10</b>Deflexiones</li>
-    <li><b>11</b>Los criterios de la app</li>
-    <li><b>12</b>Problemas frecuentes</li>
-    <li><b>13</b>Práctica con el edificio de prueba</li>
-    <li><b>14</b>Referencia rápida</li>
+    <li><b>11</b>Cimentaciones</li>
+    <li><b>12</b>Los criterios de la app</li>
+    <li><b>13</b>Problemas frecuentes</li>
+    <li><b>14</b>Práctica con el edificio de prueba</li>
+    <li><b>15</b>Referencia rápida</li>
   </ul>
 </section>
 
@@ -210,7 +211,7 @@
     <div class="n ram"><b>sincronizar.py</b><span class="d">En la consola de Python de RAM: lee geometría, secciones y resultados.</span></div>
     <div class="n"><b>modelo.json</b><span class="d">En la carpeta de la obra. Es lo que la app lee.</span></div>
     <div class="n"><b>Auxiliar IV</b><span class="d">Un grupo por descripción, con demandas y medidas reales.</span></div>
-    <div class="n"><b>Secciones</b><span class="d">Armado, alzados, verificación y memoria.</span></div>
+    <div class="n"><b>Secciones y cimientos</b><span class="d">Armado, alzados, cimentación, verificación y memoria.</span></div>
   </div>
   <div class="vuelta">
     <b>La vuelta:</b> cuando el modelo todavía no está agrupado, el módulo <b>Agrupación</b> propone las T (y las C de las columnas), tú eliges o acomodas, y
@@ -221,7 +222,7 @@
   <p>Todos los <code>.py</code> los genera la app; no hay que editarlos. Corren dentro de RAM, así que ven el modelo que tengas abierto.</p>
   <table>
     <thead><tr><th style="width:24%">Script</th><th>Qué hace</th><th style="width:28%">Qué toca</th></tr></thead>
-    <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM, los desplazamientos de las trabes para las flechas y, en cada columna, P, M22 y M33 simultáneos de cada combinación.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
+    <tr><td><b>sincronizar.py</b></td><td>Lee el modelo analizado y lo escribe en <code>modelo.json</code>, con las medidas reales de cada sección sacadas de las tablas de RAM, los desplazamientos de las trabes para las flechas, en cada columna P, M22 y M33 simultáneos de cada combinación y las reacciones de los apoyos por caso de carga.</td><td>Sólo escribe <code>modelo.json</code> en la carpeta de la obra.</td></tr>
     <tr><td><b>instalar_catalogo.py</b></td><td>Da de alta nuestras secciones y concretos en el grupo <b>Personales</b> de RAM.</td><td>La base de datos de RAM, con respaldo en el Escritorio.</td></tr>
     <tr><td><b>aplicar_agrupacion.py</b></td><td>Pone a cada miembro la descripción (T1, T2… o C1, C2…) y la sección de la agrupación elegida.</td><td>El modelo abierto. Deja un «Deshacer» en <code>1 Agrupación</code>.</td></tr>
     <tr><td><b>edificio_prueba.py</b></td><td>Construye y analiza un edificio de práctica.</td><td>Sólo un modelo nuevo y vacío.</td></tr>
@@ -417,7 +418,7 @@
   <p>Cómo se arman:</p>
   <ol>
     <li>Los tramos colineales y seguidos se encadenan en <b>trabes continuas</b>: una trabe continua es una sola sección.</li>
-    <li>A cada trabe su <b>sección mínima</b>: la de menos concreto del catálogo que da el momento con una cuantía cómoda y el cortante con estribos que se pueden armar (criterios en el capítulo 11).</li>
+    <li>A cada trabe su <b>sección mínima</b>: la de menos concreto del catálogo que da el momento con una cuantía cómoda y el cortante con estribos que se pueden armar (criterios en el capítulo 12).</li>
     <li>Las trabes con la misma sección mínima forman una clase. De la más grande a la más chica, una clase <b>sube</b> a la sección del grupo de arriba si cabe y si su trabe más cargada la aprovecharía al menos al umbral:
       <b>Pocos grupos 50 %</b>, <b>Equilibrada 65 %</b>, <b>Ajustada 80 %</b>. Umbral más bajo, menos grupos y más concreto.</li>
     <li>Cada grupo pasa por el mismo motor que arma las secciones (capítulo 8): si sale <b>✓</b>, se puede armar con esa sección.</li>
@@ -650,6 +651,19 @@
     <li><b>Verificar → Memoria de cálculo</b> y <b>Exportar a Double Check</b> para la revisión cruzada.</li>
     <li><b>Exportar DXF</b> o <b>SVG</b> para los planos.</li>
   </ul>
+  <div class="dos">
+    <div>
+      <h3 style="margin-top:0">La memoria se llena sola</h3>
+      <p>Al abrir <b>Memoria de cálculo</b>, los datos que la app ya conoce llegan escritos, y bajo cada uno dice de dónde salió:</p>
+      <ul>
+        <li><b>Del modelo de RAM:</b> niveles (los que tienen trabes arriba del desplante), altura de entrepiso (la más común) y un área aproximada (el rectángulo de cada nivel).</li>
+        <li><b>De Pesos Unitarios:</b> CM de losa (la de entrepiso más pesada), CM de muro, CV de entrepiso y de azotea, y el área de los tableros, que manda sobre la del modelo.</li>
+      </ul>
+      <p>Sólo se llenan los campos vacíos o que siguen con su valor de fábrica: lo que escribiste no se toca. <b>↻ Llenar con Pesos Unitarios y el modelo</b> los vuelve a tomar.
+      Si el proyecto tiene cimientos, el Word trae su capítulo (capítulo 11).</p>
+    </div>
+    <figure style="margin:0"><img src="img/mem-prellenado.png" alt=""></figure>
+  </div>
 </section>
 
 <!-- ═════════════════════════ 10 ═════════════════════════ -->
@@ -696,7 +710,93 @@
 
 <!-- ═════════════════════════ 11 ═════════════════════════ -->
 <section class="cap salto">
-  <h2><span class="n">11</span>Los criterios de la app</h2>
+  <h2><span class="n">11</span>Cimentaciones</h2>
+  <p class="entrada">Zapatas aisladas, corridas bajo muro, corridas con contratrabe, muros de contención de concreto y de piedra, y cimientos de mampostería: dimensionados, armados y detallados, con su memoria paso a paso. Las cargas se capturan o salen de las reacciones de RAM.</p>
+
+  <p>La pestaña <b>Cimentaciones</b> está siempre, junto a Columnas. Arriba: <b>🪨 Suelo y criterios</b> de la obra, <b>⚡ Desde RAM</b>, la <b>📄 Memoria PDF</b> y los planos <b>DXF</b> y <b>SVG</b>.
+  Debajo, un chip por cimiento, con un punto que dice si cumple, y <b>+ Nuevo</b>.</p>
+
+  <h3>Primero, el suelo de la obra</h3>
+  <ol class="pasos">
+    <li><b>🪨 Suelo y criterios</b>: la capacidad admisible <b>qadm</b> del estudio de mecánica de suelos, el peso volumétrico γs, la profundidad de desplante Df y, para empujes y deslizamiento, φ, c y μ.</li>
+    <li>Si el estudio no da qadm, la calculadora de <b>Meyerhof</b> la estima con c, φ, B, Df y el factor de seguridad; <b>Usar qadm</b> la pasa a la obra.</li>
+    <li>Los criterios (factores de carga, FS de volteo y deslizamiento, separaciones y calibres que se prueban, peralte y ancho mínimos) son los de la oficina; aquí se cambian para toda la obra.</li>
+  </ol>
+  <p>Un cimiento puede tener su propio suelo (bloque <b>Suelo</b> de su formulario): lo que captures ahí manda sobre el de la obra, y <b>propio ↺</b> lo regresa.</p>
+
+  <h3>Un cimiento a mano</h3>
+  <figure>
+    <img src="img/cim-aislada.png" alt="">
+    <figcaption><b>Zapata de lindero con trabe de liga.</b> A la izquierda el formulario; al centro el dibujo, que se arrastra, y la memoria; a la derecha las revisiones con su aprovechamiento.</figcaption>
+  </figure>
+  <ol class="pasos">
+    <li><b>+ Nuevo</b> y el tipo. Arranca dimensionado y armado con cargas de ejemplo.</li>
+    <li>Captura las cargas de <b>servicio</b> por caso: CM, CV y S (sismo). En la zapata aislada, P, Mx y My; en la corrida, w y M por metro; en la contratrabe, las de cada columna.</li>
+    <li><b>⚡ Proponer</b>: la base más chica que aguanta el suelo, el peralte más chico que pasa el concreto y la parrilla con menos acero que ancla, todo a cada 5 cm y vuelto a revisar con las varillas elegidas.</li>
+    <li>Ajusta lo que quieras en el formulario o en el dibujo; las revisiones se recalculan al momento.</li>
+  </ol>
+
+  <h3>El dibujo se arrastra</h3>
+  <ul>
+    <li><b>Manijas naranjas</b>: cambian B, L, h, alturas, espesores, punta y talón, a cada 5 cm. Mientras arrastras, la escala no se mueve.</li>
+    <li><b>La columna</b> se arrastra: pegada a una orilla queda de <b>lindero</b>, a dos de <b>esquina</b>, al centro <b>céntrica</b>. En la contratrabe cada columna corre a lo largo del eje.</li>
+    <li><b>Clic en una etiqueta de varilla</b> (<code>#4 @ 20</code>) abre el selector de # y separación.</li>
+    <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> deshace, igual que <b>↶ deshacer</b>. Cada cimiento se duplica o se borra desde su formulario.</li>
+  </ul>
+  <figure>
+    <img src="img/cim-contencion.png" alt="">
+    <figcaption><b>Muro de contención.</b> Empuje de Rankine con sobrecarga, bastones intercalados en la pantalla con su altura de corte, dentellón y la presión bajo la base.</figcaption>
+  </figure>
+
+  <h3>Los seis tipos</h3>
+  <table>
+    <thead><tr><th style="width:24%">Tipo</th><th>Qué revisa</th></tr></thead>
+    <tr><td><b>Zapata aislada</b></td><td>Céntrica, de lindero o de esquina, con momentos. Suelo con el área efectiva B′ × L′; penetración con la sección crítica de 4, 3 o 2 lados y transferencia de momento; cortante como viga ancha; flexión en las cuatro caras; anclaje recto o con gancho; aplastamiento, con los arranques que hagan falta. En lindero o esquina, con <b>trabe de liga</b> (toma N·e y el suelo trabaja parejo) o sin ella.</td></tr>
+    <tr><td><b>Zapata corrida</b></td><td>Por metro, bajo muro de concreto (sección crítica en la cara) o de mampostería (a t/4 dentro del muro), al centro o de lindero. Suelo, cortante, flexión transversal, anclaje y el acero longitudinal de temperatura.</td></tr>
+    <tr><td><b>Corrida con contratrabe</b></td><td>Varias columnas sobre un eje, por el método rígido (presión lineal). Diagramas de cortante y momento de la contratrabe, armado abajo y arriba con los motores de la app, estribos, y los aleros como voladizos. <b>Centrar resultante</b> ajusta los voladizos para que la presión salga pareja.</td></tr>
+    <tr><td><b>Muro de contención</b></td><td>De concreto armado, en voladizo: volteo, deslizamiento (con dentellón y pasivo si lo pides), resultante en el tercio medio y presión máxima; pantalla, talón y punta a flexión y cortante; anclaje de la pantalla en la base; temperatura.</td></tr>
+    <tr><td><b>Muro de piedra</b></td><td>De gravedad, de piedra braza: la misma estabilidad, juntas sin tensión a cada altura, y compresión y cortante en la mampostería. ⚡ Proponer prueba también inclinar el frente.</td></tr>
+    <tr><td><b>Cimiento de mampostería</b></td><td>Trapecio o medio trapecio (lindero), como la hoja de la oficina: el ancho por suelo, el escarpio por cortante y a 1.5 del vuelo y, en lindero, la separación máxima de muros perpendiculares (tabla 8.4 de la NTC-Mampostería).</td></tr>
+  </table>
+
+  <h3>Desde las reacciones de RAM</h3>
+  <figure>
+    <img src="img/cim-ram.png" alt="">
+    <figcaption><b>⚡ Desde RAM.</b> Los apoyos del modelo con su carga de servicio; doce columnas agrupadas en tres tipos de zapata por el ancho que pide cada una.</figcaption>
+  </figure>
+  <ol class="pasos">
+    <li>Sincroniza con un <code>sincronizar.py</code> actual: lee las reacciones de cada <b>caso de carga</b>. La ventana toma sola el último modelo; también puedes <b>abrir modelo.json…</b>.</li>
+    <li>Revisa el <b>papel de cada caso</b>: muerta (CM), viva (CV), sismo (S) o no usar. Sale del nombre del caso; cámbialo si tu modelo los llama distinto.</li>
+    <li>Elige apoyos en la planta: clic, <kbd>Mayús</kbd>+clic para sumar, o arrastra una ventana; <b>todos</b> y <b>ninguno</b>.</li>
+    <li><b>Zapatas aisladas:</b> di cuántos tipos quieres; la app agrupa por el ancho que pide cada columna y la tabla dice cuántos apoyos van en cada tipo. <b>Crear</b> hace una zapata por tipo, con la envolvente de sus apoyos, o <b>una para todos</b>.</li>
+    <li><b>Sobre un eje:</b> con los apoyos de una fila, <b>zapata corrida</b> (la carga por metro del muro) o <b>corrida con contratrabe</b> (cada columna con su P y su M, y el sismo en el sentido que más la voltea).</li>
+  </ol>
+  <p>Cada cimiento guarda de qué nudos salió y lo dice arriba de su formulario. Si el modelo cambia, vuelve a crearlos o edítalos a mano.</p>
+
+  <div class="caja nota">
+    <span class="t">Cargas</span>
+    El suelo se revisa con cargas de <b>servicio</b>: CM + CV y, con sismo, CM + CV + S contra 1.33 qadm. El concreto, con cargas <b>últimas</b>: 1.3 CM + 1.5 CV y 1.1 (CM + CV + S).
+    El sismo se suma en el sentido desfavorable. El peso propio y el relleno no se suman a la carga: se descuentan de qadm (la capacidad efectiva <b>qe</b>).
+  </div>
+
+  <h3>Memoria y planos</h3>
+  <ul>
+    <li>Al centro, <b>Memoria paso a paso</b>: cada revisión con su fórmula, la sustitución y el resultado. Es la misma que va al PDF y al Word.</li>
+    <li><b>📄 Memoria PDF</b> del cimiento seleccionado, o de <b>todos</b> con su tabla resumen, en <code>2 Salidas\Memoria</code>.</li>
+    <li><b>DXF</b> a escala real y por capas, de uno o de <b>todos</b>, y <b>SVG</b> del seleccionado, en <code>2 Salidas\Planos</code>.</li>
+    <li><b>Verificar → Memoria de cálculo</b>: el Word trae el capítulo de cimentación con el criterio, la tabla resumen y cada cimiento con su dibujo, sus revisiones y sus pasos.</li>
+  </ul>
+
+  <div class="caja ojo">
+    <span class="t">Cuando no hay cimiento que cumpla</span>
+    ⚡ Proponer se detiene en límites razonables (aislada hasta 10 m, corrida hasta 6 m, peralte hasta 2 m) y la revisión dice por qué no alcanza:
+    un suelo muy pobre (conviene losa, pilas o mejorar el suelo), una columna chica para su carga (el aplastamiento no pasa ni con 4 % de arranques) o la resultante fuera de la base.
+  </div>
+</section>
+
+<!-- ═════════════════════════ 12 ═════════════════════════ -->
+<section class="cap salto">
+  <h2><span class="n">12</span>Los criterios de la app</h2>
   <p class="entrada">Para saber qué está suponiendo la app cuando propone, y qué no revisa.</p>
 
   <table>
@@ -711,6 +811,10 @@
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 9, con H del modelo.</td></tr>
+    <tr><td><b>Cimentaciones</b></td><td>Las hojas de la oficina, corregidas. Suelo con cargas de servicio contra qe = qadm − γs (Df − h) − γc h, en t/m² (la hoja restaba t/m³ a kg/m²), con el área efectiva de Meyerhof B′ = B − 2e; con sismo, 1.33 qadm.
+      Concreto con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S): FR 0.9 en flexión y 0.75 en cortante; VcR = 0.5 FR b d √f'c (reducido si h &gt; 70 cm); penetración FR (0.5 + γ) √f'c ≤ FR √f'c con la sección crítica de 4, 3 o 2 lados; aplastamiento FR 0.65, √(A2/A1) ≤ 2, y el excedente con arranques.
+      Acero: el calculado, 4/3 de él o el mínimo, nunca menos que 0.0018 b h. Anclaje con L<sub>d</sub> × As,req/As,prov (≥ 30 cm) o gancho a 90°.
+      Muros: Rankine con talud, empuje × 1.5 para el concreto, FS de volteo 2.0 y de deslizamiento 1.5, resultante en el tercio medio. Mampostería: NTC-Mampostería, tabla 8.4 en linderos (capítulo 11).</td></tr>
     <tr><td><b>Deflexiones</b></td><td>Con CS = 1·CM + 1·CV: elástica de RAM × I<sub>RAM</sub>/I<sub>e</sub> (Branson, sección agrietada con el armado); diferida 2/(1 + 50ρ′) × inmediata de CS (clase 1); límites L/240 + 0.5 cm y L/480 + 0.3 cm, voladizos al doble (capítulo 10).</td></tr>
   </table>
 
@@ -721,13 +825,14 @@
       <li><b>Cortante y esbeltez en columnas</b>: ni la agrupación ni la propuesta de columnas los revisan todavía.</li>
       <li><b>Segunda iteración</b>: la agrupación usa las demandas del análisis con las secciones de hoy; por eso se aplica, se reanaliza y se vuelve a agrupar.</li>
       <li><b>Zona extrema de castillos</b> a la mitad: es criterio de la oficina, no de la norma.</li>
+      <li><b>Cimentaciones</b>: asentamientos, losas de cimentación y pilas, ni la interacción suelo-estructura (la contratrabe usa el método rígido). La trabe de liga da su momento, pero se diseña en Secciones.</li>
     </ul>
   </div>
 </section>
 
-<!-- ═════════════════════════ 12 ═════════════════════════ -->
+<!-- ═════════════════════════ 13 ═════════════════════════ -->
 <section class="cap salto">
-  <h2><span class="n">12</span>Problemas frecuentes</h2>
+  <h2><span class="n">13</span>Problemas frecuentes</h2>
   <p class="entrada">Casi todos tienen que ver con cómo se corrió el script o con la carpeta.</p>
 
   <table>
@@ -748,13 +853,15 @@
     <tr><td>Deflexiones: «? sin armado»</td><td>El proyecto no tiene esa sección.</td><td>Créala desde <b>Reportes de RAM</b>; mientras, sólo se ve la elástica de RAM, que se queda corta.</td></tr>
     <tr><td>La planta de Agrupación no se parece a la de RAM</td><td>Se giró.</td><td><b>↻ girar</b> hasta que diga <code>X↓ Z← · como RAM</code>.</td></tr>
     <tr><td>El aplicar dice que falta una sección</td><td>No se aplicó la agrupación: falta el catálogo en esa computadora.</td><td><b>instalar_catalogo.py</b>, reinicia RAM y vuelve a aplicar. Si además dice que un miembro «se quedó con» otra sección al probar, cierra el modelo sin guardar.</td></tr>
+    <tr><td>Cimentaciones → Desde RAM: el modelo no trae reacciones, o sólo por combinación</td><td>El <code>sincronizar.py</code> es de una versión anterior: sin los casos no se pueden separar CM, CV y S.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
+    <tr><td>Un cimiento no cumple ni con ⚡ Proponer</td><td>Suelo muy pobre, columna chica para su carga o resultante fuera de la base.</td><td>Lee el aviso bajo el veredicto: dice qué no alcanza y qué conviene.</td></tr>
     <tr><td>Agrupación → Columnas: «Este modelo.json es de un sincronizar.py anterior»</td><td>Las columnas no traen M22 ni las fuerzas de cada combinación.</td><td>Genera el script otra vez, córrelo y sincroniza.</td></tr>
   </table>
 </section>
 
-<!-- ═════════════════════════ 13 ═════════════════════════ -->
+<!-- ═════════════════════════ 14 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">13</span>Práctica con el edificio de prueba</h2>
+  <h2><span class="n">14</span>Práctica con el edificio de prueba</h2>
   <p class="entrada">Para aprender el flujo completo sin tocar una obra: un script construye en RAM un edificio pequeño, todo en 15×20 y sin agrupar, como cuando se empieza a estructurar.</p>
 
   <div class="caja nota">
@@ -778,9 +885,9 @@
   </ol>
 </section>
 
-<!-- ═════════════════════════ 14 ═════════════════════════ -->
+<!-- ═════════════════════════ 15 ═════════════════════════ -->
 <section class="cap">
-  <h2><span class="n">14</span>Referencia rápida</h2>
+  <h2><span class="n">15</span>Referencia rápida</h2>
 
   <h3>Dónde queda cada cosa</h3>
   <table>
@@ -791,7 +898,8 @@
     <tr><td>La carpeta de la app en cada obra</td><td><code>PROCESO\Auxiliar IV</code> (la arma crear-proyectoiv.bat)</td></tr>
     <tr><td>El proyecto y el modelo</td><td><code>Auxiliar IV\proyecto.json</code> y <code>Auxiliar IV\modelo.json</code></td></tr>
     <tr><td>Deshacer una agrupación</td><td><code>Auxiliar IV\1 Agrupación\Deshacer agrupación &lt;fecha&gt;.py</code></td></tr>
-    <tr><td>Memoria, planos, Double Check</td><td><code>Auxiliar IV\2 Salidas\…</code></td></tr>
+    <tr><td>Memoria, planos, Double Check</td><td><code>Auxiliar IV\2 Salidas\…</code> (la memoria PDF de la cimentación en <code>Memoria</code>, sus DXF en <code>Planos</code>)</td></tr>
+    <tr><td>Suelo y criterios de la obra</td><td>Cimentaciones → <b>🪨 Suelo y criterios</b>; se guardan con el proyecto.</td></tr>
     <tr><td>Versiones anteriores</td><td><code>Auxiliar IV\3 Respaldos</code></td></tr>
     <tr><td>Acomodo manual en curso</td><td>El navegador (se recupera al volver con el mismo modelo)</td></tr>
   </table>
@@ -808,6 +916,8 @@
     <tr><td><b>Armado propuesto</b></td><td>El que pone la app al crear una sección; se marca hasta que lo edites.</td></tr>
     <tr><td><b>Tramo</b></td><td>En Deflexiones: la parte de una trabe continua entre dos apoyos, o un voladizo.</td></tr>
     <tr><td><b>Ie</b></td><td>Inercia efectiva de la sección agrietada (Branson), con el armado de la sección.</td></tr>
+    <tr><td><b>qe</b></td><td>Capacidad efectiva del suelo: qadm menos el relleno sobre el cimiento y su peso propio. Contra ella se compara la presión de las cargas.</td></tr>
+    <tr><td><b>B′ (área efectiva)</b></td><td>El ancho que de verdad apoya cuando la carga no cae al centro: B − 2e (Meyerhof).</td></tr>
     <tr><td><b>Estaciones</b></td><td>Los puntos a lo largo de cada miembro donde RAM da resultados.</td></tr>
     <tr><td><b>sin nombre</b></td><td>Los miembros sin descripción en RAM: todavía no agrupados.</td></tr>
   </table>
@@ -818,6 +928,7 @@
     <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> (en RAM)</td><td>Correr el script abierto en la consola de Python.</td></tr>
     <tr><td><kbd>Mayús</kbd> + clic derecho</td><td>En el explorador de Windows: <b>Copiar como ruta</b>.</td></tr>
     <tr><td><kbd>Mayús</kbd> / <kbd>Ctrl</kbd> + clic, <kbd>Esc</kbd></td><td>En la planta de Agrupación: sumar o quitar trabes, y limpiar.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>En Cimentaciones: deshacer (medidas, varillas, cimientos borrados).</td></tr>
     <tr><td><kbd>Enter</kbd> / <kbd>Mayús</kbd>+<kbd>Enter</kbd></td><td>En el buscador de miembros de Agrupación: seleccionar su trabe, o sumarla.</td></tr>
   </table>
 </section>

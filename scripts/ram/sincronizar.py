@@ -17,7 +17,8 @@ Lo que cambia respecto a los reportes impresos:
     tiene etiquetados (T2, T2A, T5, C1…). No hace falta casar nombres de
     archivo ni repartir miembros a mano entre trabes parecidas.
 
-  · Van también las reacciones de los nudos con apoyo, para cimentación.
+  · Van también las reacciones de los nudos con apoyo, por combinación y por
+    caso de carga (muerta, viva, sismo), para el módulo de Cimentaciones.
 
 Cómo correrlo:
   RAM Elements → Inicio → Python Console → «Ejecutar archivo…» → este .py
@@ -810,10 +811,13 @@ def exportar(destino, log=log):
             log(u'  %.1f s' % (time.perf_counter() - t1))
 
     # ── Reacciones ───────────────────────────────────────────
+    # por combinación (lo de siempre) y por caso: la cimentación se revisa con
+    # cargas de servicio (muerta y viva por separado) y el sismo aparte
+    leer = usadas + [c['id'] for c in casos if c['id'] not in usadas]
     reacciones = []
     for nid in apoyos:
         por = {}
-        for c in usadas:
+        for c in leer:
             try:
                 r = R.node_reaction(nid, c)
                 por[c] = [round(r.fx, 4), round(r.fy, 4), round(r.fz, 4),

@@ -51,17 +51,22 @@ describe('pestañas recordadas', () => {
       removeItem: (k) => { m.delete(k) },
     })
   })
+  // Cimentaciones es fija: siempre abierta y la primera de los módulos
   it('guarda y recupera', () => {
     guardarAbiertos(['pesos', 'bdglobal'])
-    expect(cargarAbiertos()).toEqual(['pesos', 'bdglobal'])
+    expect(cargarAbiertos()).toEqual(['cimentaciones', 'pesos', 'bdglobal'])
   })
   it('descarta ids que ya no existen o que no son de pestaña', () => {
     guardarAbiertos(['pesos', 'doublecheck', 'fantasma'])
-    expect(cargarAbiertos()).toEqual(['pesos'])
+    expect(cargarAbiertos()).toEqual(['cimentaciones', 'pesos'])
   })
-  it('sin nada guardado devuelve vacío y no revienta con basura', () => {
-    expect(cargarAbiertos()).toEqual([])
+  it('sin nada guardado sólo están las fijas, y no revienta con basura', () => {
+    expect(cargarAbiertos()).toEqual(['cimentaciones'])
     localStorage.setItem('iv_modulos_abiertos_v1', 'no es json')
-    expect(cargarAbiertos()).toEqual([])
+    expect(cargarAbiertos()).toEqual(['cimentaciones'])
+  })
+  it('la fija va primero aunque se haya guardado en otro lugar', () => {
+    guardarAbiertos(['pesos', 'cimentaciones'])
+    expect(cargarAbiertos()).toEqual(['cimentaciones', 'pesos'])
   })
 })

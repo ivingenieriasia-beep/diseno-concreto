@@ -10,6 +10,10 @@ import imgSincronizar from '../assets/novedades/sincronizar.webp'
 import imgAgrTrabes from '../assets/novedades/agr-trabes.webp'
 import imgAgrColumnas from '../assets/novedades/agr-columnas.webp'
 import imgDeflexiones from '../assets/novedades/deflexiones.webp'
+import imgCimDetallador from '../assets/novedades/cim-detallador.webp'
+import imgCimContencion from '../assets/novedades/cim-contencion.webp'
+import imgCimRam from '../assets/novedades/cim-ram.webp'
+import imgMemPrellenado from '../assets/novedades/mem-prellenado.webp'
 
 export const TIPOS = {
   nuevo: { etiqueta: 'NUEVO', fondo: '#dcf3ec', color: '#1a7a5e' },
@@ -23,6 +27,55 @@ export const TIPOS = {
  * lo que hay que hacer para aprovecharla.
  */
 export const NOVEDADES = [
+  {
+    version: '3.01',
+    fecha: '2026-09-24',
+    lema: 'Llega Cimentaciones: zapatas, corridas, contratrabes, muros de contención y mampostería, dimensionados y armados con su memoria paso a paso, con tus cargas o con las reacciones de RAM.',
+    aviso: 'Es la primera entrega del módulo: úsalo en obras reales y anota lo que falte. Para traer las reacciones por caso de carga, vuelve a generar sincronizar.py desde la app y sincroniza.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'Cimentaciones',
+        texto: 'Seis tipos: zapata aislada (céntrica, de lindero o de esquina, con momentos y trabe de liga), corrida bajo muro, corrida con contratrabe, muro de contención de concreto y de piedra, y cimiento de mampostería. ⚡ Proponer dimensiona y arma con el criterio de nuestras hojas, corregido.',
+        donde: 'Pestaña Cimentaciones, junto a Columnas',
+        img: imgCimDetallador,
+        alt: 'Zapata de lindero con su planta, su corte y las revisiones al lado',
+      },
+      {
+        tipo: 'nuevo',
+        titulo: 'Detallador que se arrastra',
+        texto: 'Las manijas naranjas cambian las medidas a cada 5 cm, la columna se lleva al lindero con el mouse y un clic en una etiqueta cambia el # y la separación. Las revisiones se recalculan al instante y Ctrl+Z deshace.',
+        donde: 'Cimentaciones → el dibujo de cada cimiento',
+        img: imgCimContencion,
+        alt: 'Corte de un muro de contención con sus manijas, empujes y presiones',
+      },
+      {
+        tipo: 'nuevo',
+        titulo: 'Desde las reacciones de RAM',
+        texto: 'Los apoyos del modelo en planta con su carga de servicio. La app agrupa las columnas en los tipos de zapata que pidas, o arma una corrida o una contratrabe con los apoyos de un eje; cada cimiento recuerda de qué nudos salió.',
+        donde: 'Cimentaciones → ⚡ Desde RAM',
+        img: imgCimRam,
+        alt: 'Planta con los doce apoyos del modelo y tres tipos de zapata',
+      },
+      {
+        tipo: 'mejora',
+        titulo: 'La Memoria se llena sola',
+        texto: 'Niveles, altura de entrepiso y área salen del modelo de RAM; las cargas de losa, de muro y vivas, de Pesos Unitarios. La Memoria Word trae ya el capítulo de cimentación, con dibujos y revisiones.',
+        donde: 'Verificar → Memoria de cálculo',
+        img: imgMemPrellenado,
+        alt: 'Datos del proyecto prellenados, cada uno con su origen',
+      },
+    ],
+    cambios: [
+      { tipo: 'nuevo', texto: 'Memoria de la cimentación en PDF: fórmula, sustitución y resultado de cada revisión, con el dibujo de cada cimiento y una tabla resumen.' },
+      { tipo: 'nuevo', texto: 'Planos DXF por capas, a escala, y SVG, de un cimiento o de todos.' },
+      { tipo: 'nuevo', texto: 'Suelo y criterios de la obra en un solo lugar, con la calculadora de capacidad de carga de Meyerhof.' },
+      { tipo: 'nuevo', texto: 'Aplastamiento con arranques: si la columna pasa de lo que aguanta el concreto, la app dice cuánto acero debe anclar en la zapata.' },
+      { tipo: 'mejora', texto: 'sincronizar.py lee las reacciones de cada caso de carga, además de las de cada combinación.' },
+      { tipo: 'mejora', texto: 'Cuando no hay cimiento que cumpla (suelo muy pobre, columna chica, resultante fuera de la base), la revisión dice por qué y qué conviene.' },
+      { tipo: 'arreglo', texto: 'Respecto de las hojas: la capacidad efectiva restaba t/m³ a kg/m²; la presión se revisa con el área efectiva de Meyerhof B′ = B − 2e; el factor de profundidad usa atan(Df/B).' },
+    ],
+  },
   {
     version: '3.0',
     fecha: '2026-09-23',

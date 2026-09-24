@@ -19,6 +19,9 @@ import { columnSectionSvgString, interactionSvgString } from './columnsSvg'
 import { analyzeGroup, unitLabel } from './longitudinal'
 import { elevationSvg, diagramSvg } from './longitudinalSvg'
 import { guardarSalida } from './carpeta'
+import { revisarCim, tipoCim } from './cim'
+import { dibujoParaDocumento } from './cim/planos'
+import { SUELO } from './cim/comun'
 
 // ── palette ──
 const TEAL = '4ECAC4', INK = '0F172A', GREY = '6B7280', SUB = '334155'
@@ -164,7 +167,7 @@ const imgPara = (img) => new Paragraph({
 // ══════════════════════════════════════════════════════════════
 // Main entry
 // ══════════════════════════════════════════════════════════════
-export async function generateMemoriaDocx({ sections = [], columns = [], meta = {}, dcheck = null } = {}) {
+export async function generateMemoriaDocx({ sections = [], columns = [], meta = {}, dcheck = null, cimientos = [], obraCim = {} } = {}) {
   const M = normalizeMeta(meta)
   const computed = sections.map((t) => ({ t, R: computeSectionResults(t) }))
 
@@ -394,6 +397,9 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
     colBlocks.push(para([run('[Sin columnas capturadas] ', { bold: true, color: 'B45309' }), run('Agregue columnas en la pestaña "Columnas" para incluir aquí su diseño por flexocompresión.')], { align: AlignmentType.JUSTIFIED }))
   }
 
+  // ── Cimentación: los cimientos del módulo, con su memoria paso a paso ──
+  const cimBlocks = await bloquesCimentacion(cimientos, obraCim)
+
   // ── Intro text ──
   const introTxt = M.descripcion?.trim()
     ? M.descripcion.trim()
@@ -468,8 +474,8 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
     para('El estado límite de servicio se revisó conforme a las NTC 2023, las cuales establecen que la deflexión vertical máxima permisible está en función de la longitud de los elementos (L/240, siendo L la longitud del elemento horizontal). Las deflexiones actuantes obtenidas del modelo resultaron menores a las permisibles, por lo que el diseño propuesto es aceptable.', { align: AlignmentType.JUSTIFIED }),
     H2('Diseño de columnas', columns.length > 0),
     ...colBlocks,
-    H2('Diseño de cimentación'),
-    para([run('[Sección en desarrollo] ', { bold: true, color: 'B45309' }), run('Se realizará la revisión del diseño de cimentación a base de zapatas aisladas y corridas y contratrabes. Pendiente de captura.')], { align: AlignmentType.JUSTIFIED }),
+    H2('Diseño de cimentación', cimientos.length > 0),
+    ...cimBlocks,
 
     H1('Anexos'),
     para('Planos de estructuración.'),
@@ -501,4 +507,58 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
   const name = (M.proyecto || 'memoria').trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '') || 'memoria'
   // en 2 Salidas\Memoria si la carpeta de la obra está conectada; si no, se descarga
   return guardarSalida(`MEMORIA-${name}.docx`, blob, { sub: 'memoria', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+}
+
+// ══════════════════════════════════════════════════════════════
+// Cimentación (módulo Cimentaciones): criterio, suelo, resumen y, por
+// cimiento, su detallado, sus revisiones y su memoria paso a paso
+// ══════════════════════════════════════════════════════════════
+const fmtV = (v, u) => {
+  if (typeof v !== 'number') return `${v ?? ''}`
+  if (!Number.isFinite(v)) return '∞'
+  const a = Math.abs(v)
+  const d = a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : 3
+  return `${v.toFixed(d)}${u ? ` ${u}` : ''}`
+}
+
+async function bloquesCimentacion(cimientos, obra) {
+  if (!cimientos.length) {
+    return [para([run('[Sin cimientos capturados] ', { bold: true, color: 'B45309' }), run('Agregue los cimientos en la pestaña Cimentaciones (a mano o desde las reacciones de RAM) para incluir aquí su diseño.')], { align: AlignmentType.JUSTIFIED })]
+  }
+  const S = { ...SUELO, ...(obra.suelo || {}) }
+  const out = []
+  out.push(para(`El suelo se revisó con cargas de servicio (CM + CV, y CM + CV + S con sismo) contra la capacidad efectiva qe = qadm − relleno − peso propio, con el área efectiva B′ = B − 2e cuando la carga es excéntrica. El concreto se diseñó con cargas factorizadas (1.3 CM + 1.5 CV y 1.1 (CM + CV + S)) conforme a las NTC-Concreto: flexión con FR = 0.9, cortante como viga ancha y por penetración con FR = 0.75, anclaje de las varillas y aplastamiento. Los muros de contención se revisaron con el empuje de Rankine (volteo, deslizamiento, presiones y elementos de concreto) y los cimientos de piedra conforme a las NTC-Mampostería 8.4. Capacidad admisible del estudio: qadm = ${fmtV(S.qadm)} t/m²; peso volumétrico del suelo ${fmtV(S.gs)} t/m³; desplante ${fmtV(S.Df)} m.`, { align: AlignmentType.JUSTIFIED }))
+  const revs = cimientos.map((z) => ({ z, R: revisarCim(z, obra) }))
+  out.push(dataTable(['Cimiento', 'Tipo', 'Solución', 'Estado'], revs.map(({ z, R }) => [
+    z.nombre, tipoCim(z.tipo).nombre, R.resumen,
+    [run(R.ok ? 'VERIFICADO' : 'NO PASA', { size: 14, bold: true, color: R.ok ? OKC : BADC })],
+  ]), [1100, 2000, 5300, 1238], { size: 15 }))
+  for (const { z, R } of revs) {
+    out.push(para([run(`${z.nombre} · ${tipoCim(z.tipo).nombre}`, { bold: true, size: 22 })], { before: 240, after: 60 }))
+    out.push(para(R.resumen, { align: AlignmentType.JUSTIFIED }))
+    if (R.avisos?.length) for (const a of R.avisos) out.push(bullet([run(a, { color: 'B45309' })]))
+    try {
+      const d = dibujoParaDocumento(z, obra, R)
+      if (d) {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${d.W} ${d.H}" width="${d.W}" height="${d.H}"><rect width="100%" height="100%" fill="#fff"/>${d.inner}</svg>`
+        const img = await prep(await svgToPng(svg, d.W, d.H).catch(() => null), 600)
+        if (img) out.push(imgPara(img))
+      }
+    } catch { /* sin dibujo */ }
+    out.push(dataTable(['Revisión', 'Actuante', 'Resistente / límite', 'Aprov.'], R.checks.map((c) => [
+      [run(`${c.ok ? '✓' : '✗'} ${c.titulo}`, { size: 15, color: c.ok ? OKC : BADC })],
+      c.unidad === 'FS' ? c.nota : `${fmtV(c.act)} ${c.unidad}`,
+      c.unidad === 'FS' ? `≥ ${fmtV(c.act)}` : `${fmtV(c.res)} ${c.unidad}`,
+      Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—',
+    ]), [3600, 2000, 2800, 1238], { size: 15 }))
+    for (const sec of R.secciones) {
+      out.push(para([run(sec.titulo, { bold: true, color: '1F2937' })], { before: 120, after: 40 }))
+      out.push(dataTable(CALC_HEAD, sec.pasos.map((p) => [
+        p.t, p.f, p.n,
+        [run(`${fmtV(p.v, p.u)}${p.ok != null ? (p.ok ? ' ✓' : ' ✗') : ''}`, { size: 15, bold: p.ok === false, color: p.ok === false ? BADC : p.ok ? OKC : INK }),
+          ...(p.lim ? [run(`  ${p.lim}`, { size: 13, color: GREY })] : [])],
+      ]), CALC_COLS, { size: 15 }))
+    }
+  }
+  return out
 }

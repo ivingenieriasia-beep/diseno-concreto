@@ -8,6 +8,15 @@
 
 export const MODULOS = [
   {
+    id: 'cimentaciones',
+    nombre: 'Cimentaciones',
+    tipo: 'pestana',
+    fijo: true,              // siempre abierta, la primera del lado de módulos
+    icono: 'cimiento',
+    resumen: 'Zapatas aisladas (céntricas, con momentos, de lindero y esquina), corridas bajo muro y con contratrabe, muros de contención de concreto y de piedra, y cimientos de mampostería, con su detallado.',
+    palabras: ['cimentacion', 'cimentaciones', 'zapata', 'zapatas', 'aislada', 'corrida', 'contratrabe', 'lindero', 'excentrica', 'muro', 'contencion', 'mamposteria', 'piedra', 'braza', 'cimiento', 'suelo', 'capacidad', 'meyerhof', 'penetracion', 'reacciones'],
+  },
+  {
     id: 'pesos',
     nombre: 'Pesos Unitarios',
     tipo: 'pestana',
@@ -101,12 +110,16 @@ export function abrirVentana(mod) {
 // ── Pestañas abiertas: se recuerdan entre sesiones ───────────
 const LS_TABS = 'iv_modulos_abiertos_v1'
 
+/** Los módulos fijos van siempre abiertos y primero, antes de los que abriste */
+export const MODULOS_FIJOS = MODULOS.filter((m) => m.fijo).map((m) => m.id)
+export const conFijos = (ids) => [...MODULOS_FIJOS, ...(ids || []).filter((id) => !MODULOS_FIJOS.includes(id))]
+
 export function cargarAbiertos() {
   try {
     const raw = localStorage.getItem(LS_TABS)
     const ids = raw ? JSON.parse(raw) : []
-    return Array.isArray(ids) ? ids.filter((id) => getModulo(id)?.tipo === 'pestana') : []
-  } catch { return [] }
+    return conFijos(Array.isArray(ids) ? ids.filter((id) => getModulo(id)?.tipo === 'pestana') : [])
+  } catch { return conFijos([]) }
 }
 
 export function guardarAbiertos(ids) {

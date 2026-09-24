@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { generateMemoria } from '../core/generateMemoria'
 import { generateMemoriaDocx } from '../core/generateMemoriaDocx'
 import useColumnStore from '../store/useColumnStore'
+import useLoadsStore from '../store/useLoadsStore'
+import useCimStore from '../store/useCimStore'
+import { prellenado } from '../core/memoriaDatos'
+import { modeloGuardado } from '../core/ramSync'
+import { parseModeloRam } from '../core/ramModel'
 
 const LS_KEY = 'iv_memoria_meta'
 
@@ -21,18 +26,31 @@ function loadMeta() {
   return blankMeta()
 }
 
-function Field({ label, children, full }) {
+function Field({ label, children, full, fuente }) {
   return (
     <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
       <label className="field-label">{label}</label>
       {children}
+      {fuente && <div data-testid="mem-fuente" style={{ fontSize: 10, color: '#1a7a5e', marginTop: 2, fontFamily: 'var(--font-mono)' }}>↳ {fuente}</div>}
     </div>
   )
 }
 
+const DE_FABRICA = blankMeta()
+/** Lo que el diálogo puede llenar solo, si el campo está vacío o con el valor de fábrica */
+const LLENABLES = ['area', 'niveles', 'hEntrepiso', 'cmEntrepiso', 'cmMuro', 'cvEntrepiso', 'cvAzotea']
+
 export default function MemoriaDialog({ open, onClose, sections, projectName }) {
   const columns = useColumnStore((s) => s.columns)
+  const losas = useLoadsStore((s) => s.losas)
+  const muros = useLoadsStore((s) => s.muros)
+  const tableros = useLoadsStore((s) => s.tableros)
+  const cimientos = useCimStore((s) => s.cimientos)
+  const sueloCim = useCimStore((s) => s.suelo)
+  const criteriosCim = useCimStore((s) => s.criterios)
   const [meta, setMeta] = useState(loadMeta)
+  const [fuentes, setFuentes] = useState({})
+  const [sugerido, setSugerido] = useState({ valores: {}, fuente: {} })
   const [dcheck, setDcheck] = useState(null)
   const [dcheckName, setDcheckName] = useState('')
   const [dcheckErr, setDcheckErr] = useState('')
@@ -46,13 +64,43 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
     if (!m.proyecto && projectName) m.proyecto = projectName
     m.fecha = m.fecha || new Date().toLocaleDateString('es-MX')
     setMeta(m)
-  }, [open, projectName])
+    setFuentes({})
+    // lo que ya se capturó en Pesos Unitarios y lo que dice el modelo de RAM
+    let vivo = true
+    modeloGuardado().then((g) => {
+      let R = null
+      try { if (g?.datos) { const r = parseModeloRam(g.datos, g.archivo || 'modelo.json'); if (r.ok) R = r } } catch { /* sin modelo */ }
+      if (!vivo) return
+      const P = prellenado({ losas, muros, tableros }, R)
+      setSugerido(P)
+      const auto = {}
+      setMeta((prev) => {
+        const n = { ...prev }
+        for (const k of LLENABLES) {
+          if (P.valores[k] == null) continue
+          const v = String(prev[k] ?? '').trim()
+          if (!v || v === String(DE_FABRICA[k] ?? '')) { n[k] = P.valores[k]; auto[k] = P.fuente[k] }
+        }
+        return n
+      })
+      setFuentes(auto)
+    })
+    return () => { vivo = false }
+  }, [open, projectName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
   const set = (k) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setMeta((prev) => ({ ...prev, [k]: v }))
+    setFuentes((f) => { if (!f[k]) return f; const n = { ...f }; delete n[k]; return n })
+  }
+  const hayPrellenado = Object.keys(sugerido.valores).some((k) => LLENABLES.includes(k))
+  const llenarTodo = () => {
+    const n = {}, auto = {}
+    for (const k of LLENABLES) if (sugerido.valores[k] != null) { n[k] = sugerido.valores[k]; auto[k] = sugerido.fuente[k] }
+    setMeta((prev) => ({ ...prev, ...n }))
+    setFuentes(auto)
   }
 
   function handleDcheck(e) {
@@ -87,7 +135,7 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
     persist()
     setBusy(true)
     try {
-      await generateMemoriaDocx({ sections, columns, meta, dcheck })
+      await generateMemoriaDocx({ sections, columns, meta, dcheck, cimientos, obraCim: { suelo: sueloCim, criterios: criteriosCim } })
       onClose()
     } catch (err) {
       alert('No se pudo generar el documento Word: ' + (err?.message || err))
@@ -98,7 +146,7 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
 
   function handlePdf() {
     persist()
-    generateMemoria({ sections, columns, meta, dcheck })
+    generateMemoria({ sections, columns, meta, dcheck, cimientos, obraCim: { suelo: sueloCim, criterios: criteriosCim } })
     onClose()
   }
 
@@ -127,7 +175,7 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-tx1)' }}>Generar memoria de cálculo</div>
             <div style={{ fontSize: 11, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-              {sections.length} trabe(s) · {columns.length} columna(s) · NTC-2023
+              {sections.length} trabe(s) · {columns.length} columna(s) · {cimientos.length} cimiento(s) · NTC-2023
             </div>
           </div>
           <button onClick={onClose} style={{
@@ -138,7 +186,15 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
 
         {/* Body */}
         <div style={{ padding: 20, overflowY: 'auto' }}>
-          <div className="section-title">Datos del proyecto</div>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1 }}>Datos del proyecto</span>
+            {hayPrellenado && (
+              <button data-testid="mem-llenar" onClick={llenarTodo} title="Toma niveles y altura del modelo de RAM, y cargas y área de Pesos Unitarios"
+                style={{ fontSize: 10.5, textTransform: 'none', letterSpacing: 0, padding: '2px 8px', borderRadius: 99, border: '1px solid var(--color-accent)', background: 'transparent', color: 'var(--color-accent2)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                ↻ Llenar con Pesos Unitarios y el modelo
+              </button>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
             <Field label="Proyecto" full>
               <input className="field-input" style={inputStyle} value={meta.proyecto} onChange={set('proyecto')} placeholder="ej: Casa habitación Terrasoles" />
@@ -146,13 +202,13 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
             <Field label="Ubicación" full>
               <input className="field-input" style={inputStyle} value={meta.ubicacion} onChange={set('ubicacion')} placeholder="Calle, fraccionamiento, ciudad" />
             </Field>
-            <Field label="Área de construcción (m²)">
+            <Field label="Área de construcción (m²)" fuente={fuentes.area}>
               <input className="field-input" style={inputStyle} value={meta.area} onChange={set('area')} placeholder="111" />
             </Field>
-            <Field label="Niveles">
+            <Field label="Niveles" fuente={fuentes.niveles}>
               <input className="field-input" style={inputStyle} value={meta.niveles} onChange={set('niveles')} placeholder="2" />
             </Field>
-            <Field label="Altura de entrepiso (m)">
+            <Field label="Altura de entrepiso (m)" fuente={fuentes.hEntrepiso}>
               <input className="field-input" style={inputStyle} value={meta.hEntrepiso} onChange={set('hEntrepiso')} placeholder="2.90" />
             </Field>
             <Field label="Fecha">
@@ -173,10 +229,10 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
 
           <div className="section-title" style={{ marginTop: 16 }}>Cargas (kg/m²)</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginTop: 8 }}>
-            <Field label="CM losa"><input className="field-input" style={inputStyle} value={meta.cmEntrepiso} onChange={set('cmEntrepiso')} /></Field>
-            <Field label="CM muro"><input className="field-input" style={inputStyle} value={meta.cmMuro} onChange={set('cmMuro')} /></Field>
-            <Field label="CV entrepiso"><input className="field-input" style={inputStyle} value={meta.cvEntrepiso} onChange={set('cvEntrepiso')} /></Field>
-            <Field label="CV azotea"><input className="field-input" style={inputStyle} value={meta.cvAzotea} onChange={set('cvAzotea')} /></Field>
+            <Field label="CM losa" fuente={fuentes.cmEntrepiso}><input className="field-input" style={inputStyle} value={meta.cmEntrepiso} onChange={set('cmEntrepiso')} /></Field>
+            <Field label="CM muro" fuente={fuentes.cmMuro}><input className="field-input" style={inputStyle} value={meta.cmMuro} onChange={set('cmMuro')} /></Field>
+            <Field label="CV entrepiso" fuente={fuentes.cvEntrepiso}><input className="field-input" style={inputStyle} value={meta.cvEntrepiso} onChange={set('cvEntrepiso')} /></Field>
+            <Field label="CV azotea" fuente={fuentes.cvAzotea}><input className="field-input" style={inputStyle} value={meta.cvAzotea} onChange={set('cvAzotea')} /></Field>
           </div>
 
           <div className="section-title" style={{ marginTop: 16 }}>Verificación cruzada</div>
@@ -221,10 +277,10 @@ export default function MemoriaDialog({ open, onClose, sections, projectName }) 
           </span>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-secondary" style={{ fontSize: 13 }} onClick={onClose} disabled={busy}>Cancelar</button>
-            <button className="btn btn-secondary" style={{ fontSize: 13 }} disabled={sections.length === 0 || busy} onClick={handlePdf}>
+            <button className="btn btn-secondary" style={{ fontSize: 13 }} disabled={sections.length + columns.length + cimientos.length === 0 || busy} onClick={handlePdf}>
               Vista PDF
             </button>
-            <button className="btn btn-primary" style={{ fontSize: 13 }} disabled={sections.length === 0 || busy} onClick={handleWord}>
+            <button className="btn btn-primary" data-testid="mem-word" style={{ fontSize: 13 }} disabled={sections.length + columns.length + cimientos.length === 0 || busy} onClick={handleWord}>
               {busy ? 'Generando…' : 'Generar Word (.docx)'}
             </button>
           </div>

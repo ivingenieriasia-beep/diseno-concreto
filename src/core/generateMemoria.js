@@ -5,6 +5,8 @@
 // marcados para Columnas y Cimentación (a llenar después).
 // ══════════════════════════════════════════════════════════════
 
+import { revisarCim, tipoCim } from './cim'
+import { dibujoParaDocumento } from './cim/planos'
 import {
   CSS as DETAIL_CSS, LOGO_SVG,
   computeSectionResults, renderFlexion, renderCortante,
@@ -315,7 +317,7 @@ function longitudinalHTML(t) {
     ${alzados}`
 }
 
-function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, logoSrc, forWord = false }) {
+function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, logoSrc, forWord = false, cimHTML = '' }) {
   // Pre-compute every section's results once
   const computed = sections.map((t) => ({ t, R: computeSectionResults(t) }))
 
@@ -499,12 +501,10 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
       ${columnasHTML(columnsArr, M)}
 
       <h3 class="mem">Diseño de cimentación</h3>
-      <div class="placeholder">
-        <b>Sección en desarrollo.</b><br>
-        Se realizará la revisión del diseño de cimentación a base de zapatas aisladas y corridas y
-        contratrabes.<br>
-        <span style="font-size:9.5pt">Pendiente de captura.</span>
-      </div>
+      ${cimHTML || `<div class="placeholder">
+        <b>Sin cimientos capturados.</b><br>
+        Agregue los cimientos en la pestaña Cimentaciones (a mano o desde las reacciones de RAM) para incluir aquí su diseño.
+      </div>`}
       ${brandFooter(M)}
     </div>
 
@@ -530,7 +530,7 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
 // ══════════════════════════════════════════════════════════════
 // SVG → PNG data URL (used by the cover logo & section details)
 // ══════════════════════════════════════════════════════════════
-export function svgToPng(svgString, fallbackW = 400, fallbackH = 300) {
+export function svgToPng(svgString, fallbackW = 400, fallbackH = 300, s = 2) {
   return new Promise((resolve, reject) => {
     const src = svgString.includes('xmlns=')
       ? svgString
@@ -540,7 +540,7 @@ export function svgToPng(svgString, fallbackW = 400, fallbackH = 300) {
     img.onload = () => {
       const w = img.width || fallbackW
       const h = img.height || fallbackH
-      const s = 2 // supersample for crisp print
+      // s: supersample for crisp print
       const cv = document.createElement('canvas')
       cv.width = Math.round(w * s); cv.height = Math.round(h * s)
       const ctx = cv.getContext('2d')
@@ -558,11 +558,35 @@ export function svgToPng(svgString, fallbackW = 400, fallbackH = 300) {
 // ══════════════════════════════════════════════════════════════
 // Output 1 — printable HTML (PDF via browser print)
 // ══════════════════════════════════════════════════════════════
-export function generateMemoria({ sections = [], columns = [], meta = {}, dcheck = null } = {}) {
+/** Cimentación en HTML: dibujo vectorial, revisiones y memoria paso a paso de cada cimiento */
+function cimentacionHTML(cimientos, obra) {
+  if (!cimientos.length) return ''
+  const fv = (v, u) => {
+    if (typeof v !== 'number') return esc(v ?? '')
+    if (!Number.isFinite(v)) return '∞'
+    const a = Math.abs(v), d = a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : 3
+    return `${v.toFixed(d)}${u ? ` ${esc(u)}` : ''}`
+  }
+  const revs = cimientos.map((z) => ({ z, R: revisarCim(z, obra) }))
+  let h = `<p style="text-align:justify">El suelo se revisó con cargas de servicio contra la capacidad efectiva qe = qadm − relleno − peso propio (área efectiva B′ = B − 2e con excentricidad); el concreto, con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S), conforme a las NTC-Concreto. Los muros de contención con el empuje de Rankine y los cimientos de piedra conforme a las NTC-Mampostería 8.4.</p>`
+  h += `<table class="calc"><thead><tr><th>Cimiento</th><th>Tipo</th><th>Solución</th><th>Estado</th></tr></thead><tbody>${revs.map(({ z, R }) => `<tr><td>${esc(z.nombre)}</td><td>${esc(tipoCim(z.tipo).nombre)}</td><td>${esc(R.resumen)}</td><td style="color:${R.ok ? '#15803d' : '#dc2626'};font-weight:700">${R.ok ? 'VERIFICADO' : 'NO PASA'}</td></tr>`).join('')}</tbody></table>`
+  for (const { z, R } of revs) {
+    h += `<h4 style="margin:18px 0 4px">${esc(z.nombre)} · ${esc(tipoCim(z.tipo).nombre)}</h4><p>${esc(R.resumen)}</p>`
+    const d = dibujoParaDocumento(z, obra, R)
+    if (d) h += `<div style="text-align:center;margin:8px 0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${d.W} ${d.H}" style="max-width:100%;height:auto" font-family="DM Mono, monospace">${d.inner}</svg></div>`
+    h += `<table class="calc"><thead><tr><th>Revisión</th><th>Actuante</th><th>Resistente / límite</th><th>Aprov.</th></tr></thead><tbody>${R.checks.map((c) => `<tr><td style="color:${c.ok ? '#15803d' : '#dc2626'}">${c.ok ? '✓' : '✗'} ${esc(c.titulo)}</td><td>${c.unidad === 'FS' ? esc(c.nota) : `${fv(c.act)} ${esc(c.unidad)}`}</td><td>${c.unidad === 'FS' ? `≥ ${fv(c.act)}` : `${fv(c.res)} ${esc(c.unidad)}`}</td><td>${Number.isFinite(c.u) ? `${Math.round(c.u * 100)} %` : '—'}</td></tr>`).join('')}</tbody></table>`
+    for (const sec of R.secciones) {
+      h += `<div style="font-weight:700;margin:10px 0 2px">${esc(sec.titulo)}</div><table class="calc"><tbody>${sec.pasos.map((p) => `<tr><td>${esc(p.t)}</td><td style="font-family:monospace">${esc(p.f)}</td><td style="font-family:monospace;color:#6b7280">${esc(p.n)}</td><td style="text-align:right;${p.ok === false ? 'color:#dc2626;font-weight:700' : p.ok ? 'color:#15803d' : ''}">${fv(p.v, p.u)}${p.ok != null ? (p.ok ? ' ✓' : ' ✗') : ''}${p.lim ? `<br><span style="font-size:8.5pt;color:#6b7280">${esc(p.lim)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`
+    }
+  }
+  return h
+}
+
+export function generateMemoria({ sections = [], columns = [], meta = {}, dcheck = null, cimientos = [], obraCim = {} } = {}) {
   const M = normalizeMeta(meta)
   const logoSrc = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(LOGO_SVG)))}`
   const renderFig = (t) => `<div class="sec-svg">${sectionSvgString(t)}</div>`
-  const body = buildMemoriaBody({ sections, M, dcheck, columnsArr: columns, renderFig, logoSrc })
+  const body = buildMemoriaBody({ sections, M, dcheck, columnsArr: columns, renderFig, logoSrc, cimHTML: cimentacionHTML(cimientos, obraCim) })
 
   const doc = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Memoria de Cálculo${M.proyecto ? ` — ${esc(M.proyecto)}` : ''}</title>

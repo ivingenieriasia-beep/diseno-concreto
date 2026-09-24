@@ -3,6 +3,7 @@ import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { timeAgo } from '../core/autosave'
 import Novedades from './Novedades'
+import useCimStore from '../store/useCimStore'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 
 const SCALE_PRESETS = [
@@ -34,7 +35,8 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
   const columns = useColumnStore((s) => s.columns)
   const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
   const columnsCount = columns.length
-  const hasContent = sections.length > 0 || columnsCount > 0
+  const nCimientos = useCimStore((s) => s.cimientos.length)
+  const hasContent = sections.length > 0 || columnsCount > 0 || nCimientos > 0
 
   const [arrastre, setArrastre] = useState(null) // { from, over, lado }
   const envRef = useRef(null)

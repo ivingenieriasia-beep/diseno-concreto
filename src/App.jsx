@@ -9,6 +9,7 @@ import ColumnsView from './components/ColumnsView'
 import LongitudinalView from './components/LongitudinalView'
 import AgrupacionView from './components/AgrupacionView'
 import DeflexionesView from './components/DeflexionesView'
+import CimentacionesView from './components/CimentacionesView'
 import LoadsView from './components/LoadsView'
 import ModuleLauncher from './components/ModuleLauncher'
 import LoadCenter from './components/LoadCenter'
@@ -17,7 +18,8 @@ import MemoriaDialog from './components/MemoriaDialog'
 import useBeamStore from './store/useBeamStore'
 import useColumnStore from './store/useColumnStore'
 import useLoadsStore from './store/useLoadsStore'
-import { getModulo, abrirVentana, cargarAbiertos, guardarAbiertos } from './core/modules'
+import useCimStore from './store/useCimStore'
+import { getModulo, abrirVentana, cargarAbiertos, guardarAbiertos, conFijos } from './core/modules'
 import { svgToDxf } from './core/svgToDxf'
 import { columnsGridSvg } from './core/columnsSvg'
 import { generateReport } from './core/generateReport'
@@ -50,6 +52,11 @@ export default function App() {
   const unidadCarga = useLoadsStore((s) => s.unidad)
   const loadCargas = useLoadsStore((s) => s.loadCargas)
   const packCargas = useLoadsStore((s) => s.packCargas)
+  const cimientos = useCimStore((s) => s.cimientos)
+  const sueloObra = useCimStore((s) => s.suelo)
+  const criteriosObra = useCimStore((s) => s.criterios)
+  const cargarCim = useCimStore((s) => s.cargar)
+  const empacarCim = useCimStore((s) => s.empacar)
   const [dxfScale, setDxfScale] = useState(1)
   const [projectName, setProjectName] = useState('')
   const [mainTab, setMainTab] = useState('detalle')
@@ -79,10 +86,11 @@ export default function App() {
     loadProject(Array.isArray(data.sections) ? data.sections : [], data.model || null)
     loadColumns(Array.isArray(data.columns) ? data.columns : [])
     loadCargas(data.cargas || {})
+    cargarCim(data.cimentacion || {})
     setProjectName(data.projectName !== undefined ? data.projectName : '')
     if (data.dxfScale !== undefined) setDxfScale(data.dxfScale)
     setRutaRam(data.rutaRam || '')
-  }, [loadProject, loadColumns, loadCargas, setRutaRam])
+  }, [loadProject, loadColumns, loadCargas, cargarCim, setRutaRam])
 
   // Recuperar la sesión anterior al arrancar
   useEffect(() => {
@@ -92,15 +100,16 @@ export default function App() {
     if (!snap) return
     applyProject(snap)
     const nLosas = snap.cargas?.losas?.length || 0
+    const nCim = snap.cimentacion?.cimientos?.length || 0
     showToast(`Sesión recuperada · ${snap.sections?.length || 0} trabe(s), ${snap.columns?.length || 0} columna(s)`
-      + `${nLosas ? `, ${nLosas} losa(s)` : ''} · ${timeAgo(snap.savedAt)}`)
+      + `${nLosas ? `, ${nLosas} losa(s)` : ''}${nCim ? `, ${nCim} cimiento(s)` : ''} · ${timeAgo(snap.savedAt)}`)
   }, [applyProject, showToast])
 
   // Autoguardado en cada cambio
   useEffect(() => {
     if (!restored.current) return
-    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam }))
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas])
+    autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() }))
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas, cimientos, sueloObra, criteriosObra, empacarCim])
 
   // Las pestañas de módulos abiertas se recuerdan entre sesiones
   useEffect(() => { guardarAbiertos(modulos) }, [modulos])
@@ -118,7 +127,7 @@ export default function App() {
   const abrirModulo = useCallback((mod) => {
     if (!mod) return
     if (mod.tipo === 'ventana') { abrirVentana(mod); return }
-    setModulos((ms) => (ms.includes(mod.id) ? ms : [...ms, mod.id]))
+    setModulos((ms) => conFijos(ms.includes(mod.id) ? ms : [...ms, mod.id]))
     setMainTab(mod.id)
   }, [])
 
@@ -128,6 +137,7 @@ export default function App() {
   }, [longFocus?.ts, abrirModulo])
 
   const cerrarModulo = useCallback((id) => {
+    if (getModulo(id)?.fijo) return
     setModulos((ms) => ms.filter((x) => x !== id))
     setMainTab((t) => (t === id ? 'detalle' : t))
   }, [])
@@ -191,13 +201,13 @@ export default function App() {
   }, [getSvgString, dxfScale, fileName, showToast])
 
   const handleSave = useCallback(async () => {
-    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam })
+    const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() })
     const r = await guardarProyecto(data, `${fileName}.json`)
     if (r.cancelado) { showToast('No se guardó: la carpeta tiene otro proyecto', 'warn'); return }
     pushRecent(data)
     setRecents(listRecents())
     if (r.donde === 'carpeta') showToast(`Proyecto ${dondeQuedo(r)} · el anterior quedó en 3 Respaldos`)
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, fileName, showToast])
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, empacarCim, fileName, showToast])
 
   // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
   // geometría pegada el análisis va por elemento completo (y las zonas de
@@ -241,11 +251,12 @@ export default function App() {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result)
-        if ((data.sections && Array.isArray(data.sections)) || data.cargas) {
+        if ((data.sections && Array.isArray(data.sections)) || data.cargas || data.cimentacion) {
           applyProject(data)
           pushRecent({ ...data, savedAt: new Date().toISOString() })
           setRecents(listRecents())
-          showToast(`Proyecto abierto · ${data.sections.length} trabe(s), ${(data.columns || []).length} columna(s)`)
+          const nCim = data.cimentacion?.cimientos?.length || 0
+          showToast(`Proyecto abierto · ${(data.sections || []).length} trabe(s), ${(data.columns || []).length} columna(s)${nCim ? `, ${nCim} cimiento(s)` : ''}`)
         } else {
           alert('El archivo no tiene secciones. Verifica que sea un proyecto de Auxiliar IV.')
         }
@@ -265,13 +276,13 @@ export default function App() {
   }, [applyProject, showToast])
 
   const handleNew = useCallback(() => {
-    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam })
+    const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() })
     if (!isEmptyProject(current) && !confirm('¿Empezar un proyecto nuevo? Lo que hay ahora queda en "Recientes" (y en tu último .json guardado).')) return
     if (!isEmptyProject(current)) { pushRecent(current); setRecents(listRecents()) }
-    applyProject({ sections: [], columns: [], cargas: {}, projectName: '', dxfScale: 1 })
+    applyProject({ sections: [], columns: [], cargas: {}, cimentacion: {}, projectName: '', dxfScale: 1 })
     clearSnapshot()
     setMainTab('detalle')
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, applyProject])
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, empacarCim, applyProject])
 
   // Una pestaña activa se dibuja como pestaña: contorno, barra de acento
   // arriba y el borde de abajo abierto hacia el contenido.
@@ -318,7 +329,8 @@ export default function App() {
     longitudinal: longStats.n || 0,
     bdglobal: dbCount || 0,
     pesos: losasCarga.length + tablerosCarga.length,
-  }), [longStats.n, dbCount, losasCarga.length, tablerosCarga.length])
+    cimentaciones: cimientos.length,
+  }), [longStats.n, dbCount, losasCarga.length, tablerosCarga.length, cimientos.length])
 
   const vistaModulo = {
     longitudinal: <LongitudinalView dxfScale={dxfScale} projectName={projectName} onAbrirCentro={() => setCentro(true)} />,
@@ -326,6 +338,7 @@ export default function App() {
     agrupacion: <AgrupacionView onToast={showToast} />,
     deflexiones: <DeflexionesView />,
     pesos: <LoadsView onToast={showToast} />,
+    cimentaciones: <CimentacionesView onToast={showToast} dxfScale={dxfScale} projectName={projectName} />,
   }
 
   return (
@@ -385,7 +398,8 @@ export default function App() {
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMainTab(id) }
                 if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); cerrarModulo(id) }
               }}
-              style={{ ...estiloTab(activo), paddingRight: 10 }}>
+              data-testid={`tab-${id}`}
+              style={{ ...estiloTab(activo), paddingRight: mod.fijo ? 14 : 10 }}>
               <ModuleIcon nombre={mod.icono} size={13} />
               {mod.nombre}
               {badges[id] > 0 && pill(badges[id].toLocaleString())}
@@ -395,14 +409,14 @@ export default function App() {
                   background: '#ef4444', border: '1.5px solid var(--color-bg)',
                 }} />
               )}
-              <span
+              {!mod.fijo && <span
                 role="button" aria-label={`Cerrar ${mod.nombre}`}
                 onClick={(e) => { e.stopPropagation(); cerrarModulo(id) }}
                 title={`Cerrar ${mod.nombre} (lo capturado se conserva)`}
                 style={{ fontSize: 14, lineHeight: 1, opacity: 0.5, marginLeft: 2 }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = 0.5}
-              >&times;</span>
+              >&times;</span>}
             </span>
           )
         })}

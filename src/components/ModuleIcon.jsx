@@ -1,5 +1,13 @@
 // Íconos de los módulos: trazo simple, heredan el color del contenedor.
 const PATHS = {
+  cimiento: (
+    <>
+      <path d="M10 3h4v8h-4z" />
+      <path d="M4 11h16v5H4z" />
+      <path d="M2 20h20" />
+      <path d="M6 18.5l-1.5 1.5M11 18.5l-1.5 1.5M16 18.5l-1.5 1.5M21 18.5l-1.5 1.5" />
+    </>
+  ),
   capas: (
     <>
       <path d="M12 3l9 5-9 5-9-5 9-5z" />

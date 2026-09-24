@@ -19,8 +19,10 @@ recorrer(join(raiz, 'src'))
 // memoria. Cuatro sitios que se quedaban atrás unos respecto de otros.
 describe('la versión sale de un solo sitio', () => {
   it('package.json va a la par', () => {
+    // la app numera 3.01, 3.02…; npm no admite ceros a la izquierda y lleva 3.1.0, 3.2.0…
     const pkg = JSON.parse(readFileSync(join(raiz, 'package.json'), 'utf-8'))
-    expect(pkg.version.startsWith(`${APP_VERSION}.`) || pkg.version === APP_VERSION).toBe(true)
+    const partes = (v) => String(v).split('.').slice(0, 2).map((n) => parseInt(n, 10) || 0)
+    expect(partes(pkg.version)).toEqual(partes(APP_VERSION))
   })
 
   it('nadie escribe un número de versión a mano', () => {
