@@ -35,6 +35,10 @@ import os
 import re
 import sys
 
+# qué instalador es: sale en el encabezado de la salida (si dice otra cosa,
+# se corrió un archivo viejo)
+VERSION = u'3.06 · rev. 2 (lee las tablas de fábrica sin «//infotable»)'
+
 # ── El catálogo (lo escribe la app desde catalogoRam.js; no hace falta tocarlo)
 CATALOGO = {
  "retirar": [
@@ -848,6 +852,7 @@ def diagnostico(db):
 
 log(u'=' * 70)
 log(u'Auxiliar IV — catálogo de la casa → grupo Personales de RAM')
+log(u'instalar_catalogo.py %s' % VERSION)
 log(u'=' * 70)
 
 if not CATALOGO['secciones']:

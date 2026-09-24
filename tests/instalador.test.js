@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { generarInstaladorCatalogo, catalogoComoPython } from '../src/core/ramScript.js'
 import { datosCatalogo, SECCIONES_RAM, MAMPOSTERIA_RAM } from '../src/core/catalogoRam.js'
+import { APP_VERSION } from '../src/core/constants.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const REPO = readFileSync(join(here, '..', 'scripts', 'ram', 'instalar_catalogo.py'), 'utf-8')
@@ -46,6 +47,13 @@ describe('instalar_catalogo.py', () => {
     const r = generarInstaladorCatalogo()
     expect(r.texto).toContain('"nombre": "COVINTEC"')
     expect(r.texto).toContain('def instalar_mamposteria(')
+  })
+
+  it('dice qué versión es (para saber si se corrió un archivo viejo)', () => {
+    const v = /^VERSION = u'([^']*)'/m.exec(REPO)
+    expect(v).not.toBeNull()
+    expect(v[1].startsWith(APP_VERSION)).toBe(true)
+    expect(REPO).toContain("log(u'instalar_catalogo.py %s' % VERSION)")
   })
 
   it('el .py no depende de barras invertidas raras ni trae tabuladores', () => {
