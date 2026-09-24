@@ -18,10 +18,11 @@
 
 import { detectUpAxis } from '../modelView'
 import { sectionDims } from '../geometry'
-import { nuevaAislada, combinaciones } from './aislada'
+import { nuevaAislada, combinaciones, centroColumna } from './aislada'
+import { nuevaLiga } from './liga'
 import { nuevaCorrida } from './corrida'
 import { nuevaContratrabe } from './contratrabe'
-import { SUELO, CRITERIOS, GC, arriba, f2 } from './comun'
+import { SUELO, CRITERIOS, GC, arriba, f2, num } from './comun'
 
 export const PAPELES = [
   { id: 'CM', t: 'muerta (CM)' },
@@ -334,13 +335,26 @@ function ladoComun(apoyos, linderos, cont) {
   return LADOS.find((l) => ls.every((x) => x.includes(l))) || null
 }
 
+/**
+ * Volado en cada extremo de un cimiento sobre un eje: medio metro, o media
+ * columna si ese extremo cae sobre un lindero marcado (que no sea el del eje):
+ * así termina al ras de la colindancia.
+ */
+function volados(ini, fin, lado, linderos, cont, vol = 0.5) {
+  const alRas = (a) => cont && condicionApoyo(a, cont, linderos).lados.some((l) => l !== lado)
+  const media = (a) => Math.max(a.col?.c1 || 30, a.col?.c2 || 30) / 200
+  return [alRas(ini) ? media(ini) : vol, alRas(fin) ? media(fin) : vol]
+}
+
 export function corridaDesde(apoyos, papeles, up, { archivo = '', linderos = {}, cont = null } = {}) {
   if (apoyos.length < 2) return null
   const E = eje(apoyos)
   const lado = ladoComun(apoyos, linderos, cont)
-  const ts = [...E.t].sort((a, b) => a - b)
-  const sep = (ts[ts.length - 1] - ts[0]) / (ts.length - 1)
-  const L = ts[ts.length - 1] - ts[0] + sep
+  const orden = apoyos.map((a, i) => ({ a, t: E.t[i] })).sort((p, q) => p.t - q.t)
+  const span = orden[orden.length - 1].t - orden[0].t
+  const sep = span / (orden.length - 1)
+  const [v0, v1] = volados(orden[0].a, orden[orden.length - 1].a, lado, linderos, cont)
+  const L = span + v0 + v1
   const c = apoyos.map((a) => cargasDeApoyo(a, papeles, up))
   const sum = (caso) => c.reduce((s, x) => s + x[caso].P, 0) / L
   const z = nuevaCorrida()
@@ -350,7 +364,7 @@ export function corridaDesde(apoyos, papeles, up, { archivo = '', linderos = {},
     cargas: { CM: { w: red(sum('CM')), M: 0 }, CV: { w: red(sum('CV')), M: 0 }, S: { w: red(Math.max(0, ...c.map((x) => Math.abs(x.S.P))) / Math.max(sep, 0.5)), M: 0 } },
     // sobre un lindero: el muro va a la orilla y la zapata crece hacia adentro
     geo: { ...z.geo, Lz: Math.round(L * 100) / 100, ...(lado ? { pos: 'lindero', liga: true } : {}) },
-    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), lindero: lado, resumen: `${lado ? 'de lindero · ' : ''}${resumenApoyos(apoyos)} · ${f2(L)} m de muro${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
+    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), lindero: lado, ini: orden[0].a.nudo, v0, v1, resumen: `${lado ? 'de lindero · ' : ''}${resumenApoyos(apoyos)} · ${f2(L)} m de muro${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
   }
 }
 
@@ -361,6 +375,7 @@ export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo =
   const lado = ladoComun(apoyos, linderos, cont)
   const t0 = Math.min(...E.t)
   const orden = apoyos.map((a, i) => ({ a, t: E.t[i] - t0 })).sort((p, q) => p.t - q.t)
+  const [v0, v1] = volados(orden[0].a, orden[orden.length - 1].a, lado, linderos, cont, voladizo)
   const z = nuevaContratrabe()
   const red = (v) => Math.round(v * 1000) / 1000
   // lo que dobla la contratrabe en su plano: el momento que corre la resultante
@@ -388,9 +403,9 @@ export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo =
     // el lado de la columna a lo largo del eje
     const ladoEje = Math.abs(E.u[0]) >= Math.abs(E.u[1]) ? col.c1 : col.c2, ladoOtro = ladoEje === col.c1 ? col.c2 : col.c1
     const r3 = (q) => ({ P: red(q.P), M: red(q.M), V: red(q.V) })
-    return { x: red(voladizo + t), c: ladoEje, cb: ladoOtro, CM: r3(cm), CV: r3(cv), S: r3(s0), nudo: a.nudo }
+    return { x: red(v0 + t), c: ladoEje, cb: ladoOtro, CM: r3(cm), CV: r3(cv), S: r3(s0), nudo: a.nudo }
   })
-  const L = red(voladizo * 2 + orden[orden.length - 1].t)
+  const L = red(v0 + v1 + orden[orden.length - 1].t)
   return {
     ...z,
     geo: { ...z.geo, L },
@@ -399,3 +414,67 @@ export function contratrabeDesde(apoyos, papeles, up, { archivo = '', voladizo =
   }
 }
 
+
+/** La carga última más grande de un apoyo (gravitacional o con sismo) */
+export function puDeApoyo(c, C = CRITERIOS) {
+  return Math.max(C.fcm * c.CM.P + C.fcv * c.CV.P, C.facc * (c.CM.P + c.CV.P + Math.abs(c.S.P)))
+}
+
+/**
+ * Contratrabe de liga sobre los apoyos de un eje: une las zapatas a la altura
+ * del dado. Cada apoyo con su Pu y, si su zapata es de lindero o de esquina
+ * con trabe de liga, el momento N·e que la liga le quita, a lo largo del eje.
+ */
+export function ligaDesde(apoyos, papeles, up, { archivo = '', cimientos = [], obra = {} } = {}) {
+  if (apoyos.length < 2) return null
+  const C = { ...CRITERIOS, ...(obra.criterios || {}) }
+  const E = eje(apoyos)
+  const t0 = Math.min(...E.t)
+  const orden = apoyos.map((a, i) => ({ a, t: E.t[i] - t0 })).sort((p, q) => p.t - q.t)
+  const red = (v) => Math.round(v * 1000) / 1000
+  const columnas = orden.map(({ a, t }) => {
+    const c = cargasDeApoyo(a, papeles, up)
+    const Pu = puDeApoyo(c, C)
+    // la zapata de este apoyo, si la hay y está excéntrica con liga
+    let Me = 0
+    const zap = cimientos.find((z) => z.tipo === 'aislada' && (z.origen?.ram?.nudos || []).map(String).includes(a.nudo))
+    if (zap && zap.geo?.liga) {
+      const T = (zap.apoyos || []).find((x) => String(x.nudo) === a.nudo)?.T || [1, 0, 0, 1]
+      const L = num(zap.geo.cuadrada ? zap.geo.B : zap.geo.L, 1)
+      const { xc, yc } = centroColumna({ ...zap.geo, L })
+      // de la columna al centro de la zapata, en planta (T ortogonal: su inversa es su transpuesta)
+      const eg = [T[0] * -xc + T[2] * -yc, T[1] * -xc + T[3] * -yc]
+      Me = Pu * Math.abs(eg[0] * E.u[0] + eg[1] * E.u[1])
+    }
+    const col = a.col || { c1: 30, c2: 30 }
+    const lado = Math.abs(E.u[0]) >= Math.abs(E.u[1]) ? col.c1 : col.c2
+    return { x: red(t), c: lado, Pu: red(Pu), Me: red(Me), nudo: a.nudo }
+  })
+  const z = nuevaLiga()
+  const conMe = columnas.filter((c) => c.Me > 0).length
+  return {
+    ...z,
+    columnas,
+    origen: { ram: { archivo, nudos: apoyos.map((a) => a.nudo), resumen: `liga · ${resumenApoyos(apoyos)} · eje de ${f2(orden[orden.length - 1].t)} m${conMe ? ` · ${conMe} zapata(s) excéntrica(s) se ligan aquí` : ''}${E.fuera > 0.3 ? ` · ojo: hay nudos a ${f2(E.fuera)} m del eje` : ''}` } },
+  }
+}
+
+/**
+ * Lo que un eje más le aporta a un diseño que ya existe (corrida,
+ * contratrabe o liga): sus cargas, sus columnas, su largo, su condición.
+ */
+export function ejeDesde(tipo, apoyos, papeles, up, op = {}) {
+  if (tipo === 'corrida') {
+    const z = corridaDesde(apoyos, papeles, up, op)
+    return z && { nudos: z.origen.ram.nudos, cargas: z.cargas, Lz: z.geo.Lz, pos: z.geo.pos, ini: z.origen.ram.ini, v0: z.origen.ram.v0, v1: z.origen.ram.v1, lindero: z.origen.ram.lindero }
+  }
+  if (tipo === 'contratrabe') {
+    const z = contratrabeDesde(apoyos, papeles, up, op)
+    return z && { nudos: z.origen.ram.nudos, columnas: z.columnas, L: z.geo.L, lindero: z.origen.ram.lindero }
+  }
+  if (tipo === 'liga') {
+    const z = ligaDesde(apoyos, papeles, up, op)
+    return z && { nudos: z.origen.ram.nudos, columnas: z.columnas }
+  }
+  return null
+}

@@ -8,11 +8,20 @@ import { nuevaContratrabe, revisarContratrabe, proponerContratrabe } from './con
 import { nuevaContencion, revisarContencion, proponerContencion } from './contencion'
 import { nuevaGravedad, revisarGravedad, proponerGravedad } from './gravedad'
 import { nuevaMamposteria, revisarMamposteria, proponerMamposteria } from './mamposteria'
+import { nuevaLiga, revisarLiga, proponerLiga } from './liga'
+import { revisarEnEjes, proponerEnEjes } from './ejes'
+
+// los que se pueden repetir en varios ejes: se revisan y se proponen en todos
+const multi = (revisar, proponer) => ({
+  revisar: (z, obra) => revisarEnEjes(revisar, z, obra),
+  proponer: (z, obra) => proponerEnEjes(proponer, revisar, z, obra),
+})
 
 export const TIPOS_CIM = [
   { id: 'aislada', nombre: 'Zapata aislada', corto: 'Aislada', prefijo: 'Z', material: 'concreto', resumen: 'Céntrica, con momentos, de lindero o de esquina, con o sin trabe de liga.', nuevo: nuevaAislada, revisar: revisarAislada, proponer: proponerAislada },
-  { id: 'corrida', nombre: 'Zapata corrida bajo muro', corto: 'Corrida', prefijo: 'ZC', material: 'concreto', resumen: 'Franja por metro bajo muro de mampostería o de concreto, central o de lindero.', nuevo: nuevaCorrida, revisar: revisarCorrida, proponer: proponerCorrida },
-  { id: 'contratrabe', nombre: 'Zapata corrida con contratrabe', corto: 'Contratrabe', prefijo: 'ZT', material: 'concreto', resumen: 'Bajo un eje de columnas: contratrabe como viga invertida y aleros, método rígido.', nuevo: nuevaContratrabe, revisar: revisarContratrabe, proponer: proponerContratrabe },
+  { id: 'corrida', nombre: 'Zapata corrida bajo muro', corto: 'Corrida', prefijo: 'ZC', material: 'concreto', resumen: 'Franja por metro bajo muro de mampostería o de concreto, central o de lindero; un diseño para varios ejes.', nuevo: nuevaCorrida, ...multi(revisarCorrida, proponerCorrida) },
+  { id: 'contratrabe', nombre: 'Zapata corrida con contratrabe', corto: 'Contratrabe', prefijo: 'ZT', material: 'concreto', resumen: 'Bajo un eje de columnas: contratrabe como viga invertida y aleros, método rígido; un diseño para varios ejes.', nuevo: nuevaContratrabe, ...multi(revisarContratrabe, proponerContratrabe) },
+  { id: 'liga', nombre: 'Contratrabe de liga', corto: 'Liga', prefijo: 'TL', material: 'concreto', resumen: 'Une las zapatas a la altura del dado, sin zapata propia: axial de liga, N·e de las de lindero y muro.', nuevo: nuevaLiga, ...multi(revisarLiga, proponerLiga) },
   { id: 'contencion', nombre: 'Muro de contención de concreto', corto: 'Contención', prefijo: 'MC', material: 'concreto', resumen: 'En voladizo: volteo, deslizamiento, presiones, pantalla con bastones, talón y punta.', nuevo: nuevaContencion, revisar: revisarContencion, proponer: proponerContencion },
   { id: 'gravedad', nombre: 'Muro de contención de mampostería', corto: 'Muro de piedra', prefijo: 'MM', material: 'mamposteria', resumen: 'Por gravedad, de piedra braza: estabilidad y juntas sin tensión.', nuevo: nuevaGravedad, revisar: revisarGravedad, proponer: proponerGravedad },
   { id: 'mamposteria', nombre: 'Cimiento de mampostería', corto: 'Mampostería', prefijo: 'CP', material: 'mamposteria', resumen: 'Cimiento corrido de piedra braza, interior o de lindero (NTC-Mampostería 8.4).', nuevo: nuevaMamposteria, revisar: revisarMamposteria, proponer: proponerMamposteria },

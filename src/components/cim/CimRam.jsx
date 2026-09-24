@@ -3,7 +3,8 @@ import useCimStore from '../../store/useCimStore'
 import { parseModeloRam } from '../../core/ramModel'
 import { modeloGuardado, hace, EVENTO_MODELO } from '../../core/ramSync'
 import { gira, GIRO_RAM } from '../../core/agrupacion'
-import { PAPELES, papelesPorDefecto, apoyosDe, cargasDeApoyo, aisladasDesde, corridaDesde, contratrabeDesde, tiposDeZapata, contorno, lineaLindero, condicionApoyo, LADOS } from '../../core/cim/reacciones'
+import { PAPELES, papelesPorDefecto, apoyosDe, cargasDeApoyo, aisladasDesde, corridaDesde, contratrabeDesde, ligaDesde, ejeDesde, tiposDeZapata, contorno, lineaLindero, condicionApoyo, LADOS } from '../../core/cim/reacciones'
+import { conEjes } from '../../core/cim/ejes'
 import { tipoCim, nombreLibre } from '../../core/cim'
 import { cimentacionEnPlanta } from '../../core/cim/planta'
 
@@ -20,13 +21,15 @@ const pct = (u) => (Number.isFinite(u) ? `${Math.round(u * 100)} %` : '—')
 
 // el color de la utilización: holgado, justo, no cumple
 const tonoDe = (u, ok) => (!ok || !(u <= 1 + 1e-9) ? { c: '#c62828', f: 'rgba(198,40,40,0.16)' } : u > 0.85 ? { c: '#b45309', f: 'rgba(232,131,10,0.16)' } : { c: '#1a7a5e', f: 'rgba(26,122,94,0.14)' })
-const CORTO = { aislada: 'aislada', corrida: 'corrida', contratrabe: 'contratrabe' }
+const CORTO = { aislada: 'aislada', corrida: 'corrida', contratrabe: 'contratrabe', liga: 'liga' }
 const CLASE = { centro: 'céntrica', lindero: 'lindero', esquina: 'esquina' }
 
 export default function CimRam({ obra, onClose, onToast }) {
   const cimientos = useCimStore((s) => s.cimientos)
   const agregarVarios = useCimStore((s) => s.agregarVarios)
   const seleccionar = useCimStore((s) => s.seleccionar)
+  const actualizar = useCimStore((s) => s.actualizar)
+  const [destino, setDestino] = useState('')
   const linderos = useCimStore((s) => s.linderos)
   const setLinderos = useCimStore((s) => s.setLinderos)
   const [fuente, setFuente] = useState(null)
@@ -38,6 +41,8 @@ export default function CimRam({ obra, onClose, onToast }) {
   const [vista, setVista] = useState(null)       // 'cim' | 'cargas'; null = según haya cimientos
   const archivoRef = useRef(null)
   const svgRef = useRef(null)
+  const lienzoRef = useRef(null)
+  const [tam, setTam] = useState({ w: 640, h: 460 })
 
   const usar = (texto, archivo, at = Date.now()) => {
     const R = parseModeloRam(texto, archivo)
@@ -50,6 +55,17 @@ export default function CimRam({ obra, onClose, onToast }) {
     window.addEventListener(EVENTO_MODELO, cargar)
     return () => window.removeEventListener(EVENTO_MODELO, cargar)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const el = lienzoRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([en]) => {
+      const r = en.contentRect
+      setTam({ w: Math.max(420, Math.floor(r.width)), h: Math.max(320, Math.floor(r.height)) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [fuente])
 
   const R = fuente?.R
   const A = useMemo(() => (R ? apoyosDe(R) : null), [R])
@@ -85,7 +101,12 @@ export default function CimRam({ obra, onClose, onToast }) {
   }, [planta])
 
   // ── planta ──
-  const W = 640, H = 460, M = 36
+  // la planta llena el espacio que le deja la ventana; letras y puntos crecen
+  // un poco con ella
+  const W = tam.w, H = tam.h
+  const esc = Math.min(1.45, Math.max(1, Math.min(W / 640, H / 460)))
+  const fs = (n) => +(n * esc).toFixed(2)
+  const M = 36 * esc
   const geo = useMemo(() => {
     if (!A?.apoyos.length) return null
     // que quepan los apoyos y los cimientos dibujados
@@ -108,7 +129,7 @@ export default function CimRam({ obra, onClose, onToast }) {
       return [P(a[A.plano[0]], a[A.plano[1]]), P(b[A.plano[0]], b[A.plano[1]])]
     }).filter(Boolean)
     return { P, k, lineas, pts: A.apoyos.map((a) => P(a.x, a.y)) }
-  }, [A, R, planta, cont])
+  }, [A, R, planta, cont, W, H, M])
   const maxP = Math.max(1e-6, ...servicio)
 
   const punto = (e) => { const r = svgRef.current.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] }
@@ -149,11 +170,28 @@ export default function CimRam({ obra, onClose, onToast }) {
     setSel(new Set()); setVista('cim')
   }
 
+  // un diseño que ya existe (corrida, contratrabe o liga) en otro eje más
+  const multis = cimientos.filter((z) => conEjes(z.tipo))
+  const aplicarEje = () => {
+    const z = cimientos.find((x) => x.uid === destino)
+    if (!z) return
+    const e = ejeDesde(z.tipo, elegidos, pap, A.up, { archivo, ...opLind, cimientos, obra })
+    if (!e) return
+    const yaEn = new Set([...(z.origen?.ram?.nudos || []), ...(z.ejes || []).flatMap((x) => x.nudos || [])].map(String))
+    if (e.nudos.every((n) => yaEn.has(String(n)))) { onToast?.(`${z.nombre} ya está en esos apoyos`, 'warn'); return }
+    const z2 = { ...z, ejes: [...(z.ejes || []), e] }
+    let p = {}
+    try { p = tipoCim(z.tipo).proponer(z2, obra) } catch { /* se queda con su diseño */ }
+    actualizar(z.uid, { ejes: z2.ejes, ...(p.geo ? { geo: p.geo } : {}), ...(p.arm ? { arm: p.arm } : {}) })
+    onToast?.(`${z.nombre} ahora en ${z2.ejes.length + 1} ejes; se volvió a proponer para que cumpla en todos`)
+    setSel(new Set()); setVista('cim')
+  }
+
   const poli = (pts) => pts.map(([x, y]) => geo.P(x, y).map((v) => v.toFixed(1)).join(',')).join(' ')
 
   return (
-    <div className="cim-modal-fondo" onClick={onClose}>
-      <div className="cim-modal cim-modal-ancho" onClick={(e) => e.stopPropagation()} data-testid="cim-ram">
+    <div className="cim-modal-fondo cim-fondo-grande" onClick={onClose}>
+      <div className="cim-modal cim-modal-ancho cim-modal-grande" onClick={(e) => e.stopPropagation()} data-testid="cim-ram">
         <header>
           <b>Cimientos desde las reacciones de RAM</b>
           <span>{fuente ? `${fuente.archivo} · ${A?.apoyos.length || 0} apoyos · ${hace(fuente.at)}` : 'Sin modelo sincronizado'}</span>
@@ -195,6 +233,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                 <button className="cim-mini" data-testid="cim-ram-todos" onClick={() => setSel(new Set(A.apoyos.map((a) => a.nudo)))}>todos</button>
                 <button className="cim-mini" onClick={() => setSel(new Set())}>ninguno</button>
               </div>
+              <div className="cim-ram-lienzo" ref={lienzoRef}>
               <svg ref={svgRef} width={W} height={H} className="cim-ram-planta" data-testid="cim-ram-planta"
                 onPointerDown={empezarCaja} onPointerMove={moverCaja} onPointerUp={soltarCaja}>
                 {geo?.lineas.map(([p, q], i) => <line key={i} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke="#cfc8bd" strokeWidth={1.4} />)}
@@ -218,12 +257,12 @@ export default function CimRam({ obra, onClose, onToast }) {
                       <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke="transparent" strokeWidth={16} />
                       {ticks.map(([x, y], k) => <line key={k} x1={x} y1={y} x2={x + nr[0] * 6 + d[0] * 4} y2={y + nr[1] * 6 + d[1] * 4} stroke="#c62828" strokeWidth={0.9} pointerEvents="none" />)}
                       <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={on ? '#c62828' : '#bdb6ab'} strokeWidth={on ? 2 : 1} strokeDasharray={on ? undefined : '6 4'} pointerEvents="none" />
-                      <text x={txt[0]} y={txt[1] + 3} textAnchor={nr[0] > 0.5 ? 'start' : nr[0] < -0.5 ? 'end' : 'middle'} fontSize={on ? 9.5 : 9} fontWeight={on ? 700 : 400} letterSpacing={on ? 1 : 0} fill={on ? '#c62828' : '#a39c92'} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{on ? 'LINDERO' : 'lindero?'}</text>
+                      <text x={txt[0]} y={txt[1] + 3} textAnchor={nr[0] > 0.5 ? 'start' : nr[0] < -0.5 ? 'end' : 'middle'} fontSize={fs(on ? 9.5 : 9)} fontWeight={on ? 700 : 400} letterSpacing={on ? 1 : 0} fill={on ? '#c62828' : '#a39c92'} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{on ? 'LINDERO' : 'lindero?'}</text>
                       <title>{on ? 'Colindancia: las zapatas de sus apoyos salen de lindero. Clic para quitarlo.' : 'Clic: este lado es colindancia (las zapatas de sus apoyos saldrán de lindero)'}</title>
                     </g>
                   )
                 })}
-                {verCim && planta.items.map((it, j) => {
+                {verCim && [...planta.items].sort((a, b) => (a.liga ? 1 : 0) - (b.liga ? 1 : 0)).map((it, j) => {
                   const t = tonoDe(it.u, it.ok)
                   const pts = it.poly.map(([x, y]) => geo.P(x, y))
                   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length
@@ -238,12 +277,20 @@ export default function CimRam({ obra, onClose, onToast }) {
                     if (dd < 4) { tx = cx; ty = cy0 - alto / 2 + 11 } else { tx = cx + (dx / dd) * ancho * 0.28; ty = cy0 + (dy / dd) * alto * 0.28 + 3 }
                   }
                   return (
-                    <g key={`${it.z.uid}-${it.n || j}`} className="cim-plan-item" data-testid={it.franja ? `cim-plan-${it.z.nombre}` : `cim-plan-${it.z.nombre}-${it.n}`}
+                    <g key={`${it.z.uid}-${it.n || `e${it.eje}`}-${j}`} className="cim-plan-item" data-testid={it.franja ? `cim-plan-${it.z.nombre}${it.eje ? `-e${it.eje + 1}` : ''}` : `cim-plan-${it.z.nombre}-${it.n}`}
                       onPointerDown={(e) => { e.stopPropagation() }} onClick={() => abrir(it.z)} style={{ cursor: 'pointer' }}>
-                      <polygon data-cim={it.z.uid} points={poli(it.poly)} fill={t.f} stroke={it.invade?.length ? '#c62828' : t.c} strokeWidth={it.invade?.length ? 2 : 1.5} strokeDasharray={it.invade?.length ? '4 2' : undefined} />
-                      {it.franja && <line x1={geo.P(...it.eje[0])[0]} y1={geo.P(...it.eje[0])[1]} x2={geo.P(...it.eje[1])[0]} y2={geo.P(...it.eje[1])[1]} stroke={t.c} strokeWidth={it.z.tipo === 'contratrabe' ? 3.2 : 1} strokeDasharray={it.z.tipo === 'contratrabe' ? undefined : '5 3'} pointerEvents="none" />}
-                      {(it.franja || ancho > 26) && <text x={tx} y={ty} textAnchor="middle" fontSize={9.5} fontWeight={700} fill={t.c} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre}{it.franja ? ` · ${pct(it.u)}` : ''}</text>}
-                      <title>{`${it.z.nombre} · ${tipoCim(it.z.tipo).nombre}${it.n ? ` en el nudo ${it.n}` : ` sobre ${it.nudos.length} apoyos`}: ${pct(it.u)}${it.ok ? '' : ` · no cumple: ${it.rige.join(', ')}`} · clic para abrirlo`}</title>
+                      <polygon data-cim={it.z.uid} points={poli(it.poly)} fill={it.liga ? 'rgba(75,70,64,0.55)' : t.f} stroke={it.invade?.length ? '#c62828' : t.c} strokeWidth={it.invade?.length ? 2 : it.liga ? 1.2 : 1.5} strokeDasharray={it.invade?.length ? '4 2' : undefined} />
+                      {it.franja && !it.liga && <line x1={geo.P(...it.linea[0])[0]} y1={geo.P(...it.linea[0])[1]} x2={geo.P(...it.linea[1])[0]} y2={geo.P(...it.linea[1])[1]} stroke={t.c} strokeWidth={it.z.tipo === 'contratrabe' ? 3.2 : 1} strokeDasharray={it.z.tipo === 'contratrabe' ? undefined : '5 3'} pointerEvents="none" />}
+                      {it.liga && (() => {
+                        // la liga: su nombre al centro, a lo largo de la franja
+                        const [a0, a1] = it.linea.map((q) => geo.P(...q))
+                        let ang = (Math.atan2(a1[1] - a0[1], a1[0] - a0[0]) * 180) / Math.PI
+                        if (ang > 90) ang -= 180; else if (ang <= -90) ang += 180
+                        const mx = (a0[0] + a1[0]) / 2, my = (a0[1] + a1[1]) / 2
+                        return <text x={mx} y={my} dy={-6 * esc} transform={`rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})`} textAnchor="middle" fontSize={fs(9.5)} fontWeight={700} fill="#3f3a34" fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre} · {pct(it.u)}</text>
+                      })()}
+                      {!it.liga && (it.franja || ancho > 26) && <text x={tx} y={ty} textAnchor="middle" fontSize={fs(9.5)} fontWeight={700} fill={t.c} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre}{it.franja ? ` · ${pct(it.u)}` : ''}</text>}
+                      <title>{`${it.z.nombre} · ${tipoCim(it.z.tipo).nombre}${it.n ? ` en el nudo ${it.n}` : ` sobre ${it.nudos.length} apoyos${it.z.ejes?.length ? ` (eje ${it.eje + 1} de ${it.z.ejes.length + 1})` : ''}`}: ${pct(it.u)}${it.ok ? '' : ` · no cumple: ${it.rige.join(', ')}`} · clic para abrirlo`}</title>
                     </g>
                   )
                 })}
@@ -257,37 +304,39 @@ export default function CimRam({ obra, onClose, onToast }) {
                     const t = suyo ? tonoDe(suyo.u, suyo.ok) : null
                     return (
                       <g key={a.nudo}>
-                        {doble && <circle cx={x} cy={y} r={9} fill="none" stroke="#c62828" strokeWidth={1.4} strokeDasharray="3 2" pointerEvents="none" />}
-                        <circle data-nudo={a.nudo} data-testid={`cim-apoyo-${a.nudo}`} cx={x} cy={y} r={on ? 6 : 4.5}
+                        {doble && <circle cx={x} cy={y} r={9 * esc} fill="none" stroke="#c62828" strokeWidth={1.4} strokeDasharray="3 2" pointerEvents="none" />}
+                        <circle data-nudo={a.nudo} data-testid={`cim-apoyo-${a.nudo}`} cx={x} cy={y} r={(on ? 6 : 4.5) * esc}
                           fill={on ? '#e8830a' : suyo ? t.c : '#fff'} stroke={on ? '#b45309' : suyo ? t.c : '#8a837a'} strokeWidth={1.3} strokeDasharray={suyo || on ? undefined : '2.5 2'}
                           style={{ cursor: 'pointer' }} onPointerDown={(e) => { e.stopPropagation(); tocar(a.nudo, e) }}>
                           <title>{`Nudo ${a.nudo}: ${suyos.length ? suyos.map((it) => `${it.z.nombre} ${pct(it.u)}`).join(' · ') : 'sin cimiento'}${doble ? ' · ¡está en dos cimientos!' : ''}`}</title>
                         </circle>
-                        <text x={x + 7} y={y - 3} fontSize={8.5} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
-                        {suyo && !suyo.franja && <text data-testid={`cim-u-${a.nudo}`} x={x + 7} y={y + 8} fontSize={9.5} fontWeight={700} fill={t.c} fontFamily="DM Mono, monospace" pointerEvents="none">{pct(suyo.u)}</text>}
-                        {!suyos.length && <text x={x + 7} y={y + 8} fontSize={8.5} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">sin cimiento</text>}
+                        <text x={x + 7 * esc} y={y - 3 * esc} fontSize={fs(8.5)} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
+                        {suyo && !suyo.franja && <text data-testid={`cim-u-${a.nudo}`} x={x + 7 * esc} y={y + 8 * esc} fontSize={fs(9.5)} fontWeight={700} fill={t.c} fontFamily="DM Mono, monospace" pointerEvents="none">{pct(suyo.u)}</text>}
+                        {!suyos.length && <text x={x + 7 * esc} y={y + 8 * esc} fontSize={fs(8.5)} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">sin cimiento</text>}
                       </g>
                     )
                   }
-                  const r = 4 + 9 * Math.sqrt(Math.max(0, servicio[i]) / maxP)
+                  const r = (4 + 9 * Math.sqrt(Math.max(0, servicio[i]) / maxP)) * esc
                   return (
                     <g key={a.nudo}>
                       <circle data-nudo={a.nudo} data-testid={`cim-apoyo-${a.nudo}`} cx={x} cy={y} r={r} fill={on ? '#e8830a' : '#5bc5ae'} fillOpacity={on ? 0.85 : 0.55} stroke={on ? '#b45309' : '#1a7a5e'} strokeWidth={1.2}
                         style={{ cursor: 'pointer' }} onPointerDown={(e) => { e.stopPropagation(); tocar(a.nudo, e) }}>
                         <title>{`Nudo ${a.nudo}: CM ${f2(cargas[i].CM.P)} t · CV ${f2(cargas[i].CV.P)} t · S ${f2(cargas[i].S.P)} t${a.col ? ` · columna ${a.col.c1}×${a.col.c2}` : ''}`}</title>
                       </circle>
-                      <text x={x + r + 2} y={y - 2} fontSize={9} fill="#6b6760" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
-                      <text x={x + r + 2} y={y + 8} fontSize={9} fill="#1a1814" fontFamily="DM Mono, monospace" pointerEvents="none">{servicio[i].toFixed(1)} t</text>
-                      {condDe(a).clase !== 'centro' && <text x={x + r + 2} y={y + 18} fontSize={8.5} fontWeight={700} fill="#c62828" fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{condDe(a).clase}</text>}
+                      <text x={x + r + 2} y={y - 2 * esc} fontSize={fs(9)} fill="#6b6760" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
+                      <text x={x + r + 2} y={y + 8 * esc} fontSize={fs(9)} fill="#1a1814" fontFamily="DM Mono, monospace" pointerEvents="none">{servicio[i].toFixed(1)} t</text>
+                      {condDe(a).clase !== 'centro' && <text x={x + r + 2} y={y + 18 * esc} fontSize={fs(8.5)} fontWeight={700} fill="#c62828" fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{condDe(a).clase}</text>}
                     </g>
                   )
                 })}
                 {caja && <rect x={Math.min(caja.a[0], caja.b[0])} y={Math.min(caja.a[1], caja.b[1])} width={Math.abs(caja.b[0] - caja.a[0])} height={Math.abs(caja.b[1] - caja.a[1])} fill="rgba(232,131,10,0.08)" stroke="#e8830a" strokeDasharray="4 3" />}
               </svg>
+              </div>
               {verCim ? (
                 <div className="cim-ram-leyenda">
                   <span><i className="cuadro" /> zapata aislada, a escala</span>
                   <span><i className="franja" /> corrida o contratrabe</span>
+                  <span><i className="liga" /> contratrabe de liga</span>
                   <span><i style={{ background: '#1a7a5e' }} /> ≤ 85 %</span>
                   <span><i style={{ background: '#b45309' }} /> ≤ 100 %</span>
                   <span><i style={{ background: '#c62828' }} /> no cumple</span>
@@ -358,6 +407,19 @@ export default function CimRam({ obra, onClose, onToast }) {
               <button className="btn btn-secondary" data-testid="cim-ram-contratrabe" disabled={sel.size < 2} onClick={() => { const z = contratrabeDesde(elegidos, pap, A.up, { archivo, ...opLind }); if (z) crear([z], 'Contratrabe') }}>
                 Corrida con contratrabe (columnas del eje)
               </button>
+              <button className="btn btn-secondary" data-testid="cim-ram-liga" disabled={sel.size < 2} title="Une las zapatas del eje a la altura del dado; no lleva zapata" onClick={() => { const z = ligaDesde(elegidos, pap, A.up, { archivo, cimientos, obra }); if (z) crear([z], 'Contratrabe de liga') }}>
+                Contratrabe de liga (une las zapatas)
+              </button>
+              {multis.length > 0 && (
+                <div className="cim-aplicar">
+                  <span>o el mismo diseño de</span>
+                  <select className="field-select" value={destino} data-testid="cim-ram-destino" onChange={(e) => setDestino(e.target.value)}>
+                    <option value="">elige…</option>
+                    {multis.map((z) => <option key={z.uid} value={z.uid}>{z.nombre} · {CORTO[z.tipo]}{z.ejes?.length ? ` (${z.ejes.length + 1} ejes)` : ''}</option>)}
+                  </select>
+                  <button className="btn btn-secondary" data-testid="cim-ram-aplicar" disabled={sel.size < 2 || !destino} onClick={aplicarEje} title="Agrega estos apoyos como otro eje del mismo diseño y lo vuelve a proponer para que cumpla en todos">＋ en este eje</button>
+                </div>
+              )}
               <p className="cim-nota">Cada cimiento guarda de qué nudos salió y se revisa con la reacción de cada uno. Con un modelo nuevo, la planta dice cuáles ya no alcanzan.</p>
             </div>
           </div>

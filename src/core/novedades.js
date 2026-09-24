@@ -16,6 +16,7 @@ import imgCimRam from '../assets/novedades/cim-ram.webp'
 import imgMemPrellenado from '../assets/novedades/mem-prellenado.webp'
 import imgCimPlanta from '../assets/novedades/cim-planta.webp'
 import imgCimLinderos from '../assets/novedades/cim-linderos.webp'
+import imgCimLigaEjes from '../assets/novedades/cim-liga-ejes.webp'
 
 export const TIPOS = {
   nuevo: { etiqueta: 'NUEVO', fondo: '#dcf3ec', color: '#1a7a5e' },
@@ -29,6 +30,27 @@ export const TIPOS = {
  * lo que hay que hacer para aprovecharla.
  */
 export const NOVEDADES = [
+  {
+    version: '3.04',
+    fecha: '2026-09-24',
+    lema: 'Contratrabes de liga, un mismo diseño en varios ejes y la planta de cimentación en grande.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'Contratrabe de liga y un diseño para varios ejes',
+        texto: 'Elige un eje y crea una contratrabe de liga: une las zapatas a la altura del dado, no lleva zapata y se diseña con la liga de la oficina (10 % de la Pu en tensión y compresión), el N·e de las zapatas de lindero y el muro que cargue. Y una corrida, contratrabe o liga se puede aplicar a otros ejes: se revisa con lo de cada uno y ⚡ Proponer la hace cumplir en todos.',
+        donde: 'Cimentaciones → ⚡ Desde RAM → Sobre un eje',
+        img: imgCimLigaEjes,
+        alt: 'Planta con una corrida en dos ejes, zapatas aisladas y una contratrabe de liga que las une',
+      },
+    ],
+    cambios: [
+      { tipo: 'nuevo', texto: 'Tipo nuevo: Contratrabe de liga (TL), con su alzado sobre los dados, su corte, su memoria y su DXF.' },
+      { tipo: 'nuevo', texto: '«o el mismo diseño de…  ＋ en este eje»: agrega los apoyos elegidos como otro eje de una corrida, contratrabe o liga; su formulario lista los ejes y cada revisión dice cuál rige.' },
+      { tipo: 'mejora', texto: 'La ventana de Desde RAM ocupa casi toda la pantalla y la planta crece con ella.' },
+      { tipo: 'arreglo', texto: 'Las corridas y contratrabes desde RAM terminan a 0.5 m de la última columna (antes, media crujía), o al ras si el extremo cae en un lindero.' },
+    ],
+  },
   {
     version: '3.03',
     fecha: '2026-09-24',

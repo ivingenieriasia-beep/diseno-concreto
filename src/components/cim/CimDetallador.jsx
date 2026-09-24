@@ -23,6 +23,7 @@ const EDITA = {
   aislada: { x: 's', y: 's' },
   corrida: { t: 's', l: 's' },
   contratrabe: { inf: 'n', sup: 'n', est: 'est', alero: 's', long: 's' },
+  liga: { inf: 'n', sup: 'n', est: 'est' },
   contencion: { pv: 's', bast: 'bast', pe: 's', ph: 's', ts: 's', pi: 's', pl: 's' },
 }
 

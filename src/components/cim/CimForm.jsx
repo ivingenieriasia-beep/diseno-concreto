@@ -2,6 +2,7 @@ import { Num, Sel, Check, Bloque, Varilla } from './campos'
 import { SUELO } from '../../core/cim/comun'
 import { centrarResultante } from '../../core/cim/contratrabe'
 import { MAMPOSTERIA } from '../../core/cim/gravedad'
+import { conEjes, etiquetaEje } from '../../core/cim/ejes'
 
 // Formulario del cimiento seleccionado. Cada cambio va directo al store (y
 // de ahí a la revisión y al dibujo), igual que las secciones de trabes.
@@ -87,6 +88,66 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
           Desde RAM: {z.origen.ram.resumen}
         </div>
       )}
+
+      {conEjes(z.tipo) && z.ejes?.length > 0 && (
+        <Bloque titulo={`Ejes (${z.ejes.length + 1})`} testid="cim-ejes">
+          <div className="cim-nota">El mismo diseño en {z.ejes.length + 1} ejes: se revisa con lo de cada uno y cada revisión informa el peor.</div>
+          <div className="cim-ejes-lista">
+            <div><b>1</b><span>el del diseño{z.origen?.ram?.nudos ? ` · nudos ${z.origen.ram.nudos.join(', ')}` : ''}</span></div>
+            {z.ejes.map((e, i) => (
+              <div key={i} data-testid={`cim-eje-${i + 2}`}>
+                <b>{i + 2}</b><span>{etiquetaEje(e, i)}{e.L ? ` · L = ${Number(e.L).toFixed(2)} m` : e.Lz ? ` · ${Number(e.Lz).toFixed(2)} m` : ''}{e.pos === 'lindero' ? ' · de lindero' : ''}</span>
+                <button className="cim-mini" title="Quitar este eje" onClick={() => set({ ejes: z.ejes.filter((_, j) => j !== i) })}>✕</button>
+              </div>
+            ))}
+          </div>
+        </Bloque>
+      )}
+
+      {z.tipo === 'liga' && <>
+        <Bloque titulo="Sección" testid="cim-geo">
+          <div className="cim-grid">
+            <Num label="Ancho b" value={g.b} onChange={(v) => G({ b: v })} unit="cm" step={5} min={15} testid="cim-b" />
+            <Num label="Peralte h" value={g.h} onChange={(v) => G({ h: v })} unit="cm" step={5} min={20} testid="cim-h" />
+            <Num label="Dado bajo la liga" value={g.dado} onChange={(v) => G({ dado: v })} unit="cm" step={5} min={0} titulo="Sólo para el dibujo: la liga va sobre el tope del dado" />
+          </div>
+        </Bloque>
+        <Bloque titulo={`Apoyos (${(z.columnas || []).length})`} extra={
+          <button className="cim-mini" onClick={() => {
+            const cs = z.columnas || []
+            const x = cs.length ? Math.max(...cs.map((c) => +c.x)) + 5 : 0
+            set({ columnas: [...cs, { x, c: 30, Pu: 40, Me: 0 }] })
+          }}>＋ apoyo</button>}>
+          <div className="cim-nota">Pu: la carga última de la columna (la liga toma una fracción en tensión y compresión). N·e: el momento de una zapata de lindero o de esquina que se liga aquí (0 si es céntrica).</div>
+          {(z.columnas || []).map((c, i) => {
+            const C = (patch) => set({ columnas: z.columnas.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+            return (
+              <div key={i} className="cim-col" data-testid={`cim-col-${i}`}>
+                <div className="cim-col-cab">
+                  <b>C{i + 1}</b>
+                  <Num value={c.x} onChange={(v) => C({ x: v })} unit="m" step={0.05} min={0} ancho={96} titulo="Posición a lo largo del eje" />
+                  <Num value={c.c} onChange={(v) => C({ c: v })} unit="cm" step={5} min={15} ancho={80} titulo="Ancho de la columna (o del dado) a lo largo" />
+                  <button className="cim-mini" onClick={() => set({ columnas: z.columnas.filter((_, j) => j !== i) })} title="Quitar">✕</button>
+                </div>
+                <div className="cim-col-cargas">
+                  <div>
+                    <span className="cim-caso">Pu</span>
+                    <Num value={c.Pu ?? 0} onChange={(v) => C({ Pu: v })} unit="t" step={1} ancho={88} testid={`cim-liga-Pu-${i}`} />
+                    <span className="cim-caso">N·e</span>
+                    <Num value={c.Me ?? 0} onChange={(v) => C({ Me: v })} unit="t·m" step={0.5} ancho={92} testid={`cim-liga-Me-${i}`} />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </Bloque>
+        <Bloque titulo="Muro sobre la liga (servicio)">
+          <div className="cim-grid">
+            <Num label="CM" value={z.cargas?.CM?.w ?? 0} onChange={(v) => set({ cargas: { ...z.cargas, CM: { w: v } } })} unit="t/m" step={0.1} />
+            <Num label="CV" value={z.cargas?.CV?.w ?? 0} onChange={(v) => set({ cargas: { ...z.cargas, CV: { w: v } } })} unit="t/m" step={0.1} />
+          </div>
+        </Bloque>
+      </>}
 
       {z.tipo === 'aislada' && <>
         <Bloque titulo="Geometría" testid="cim-geo">
@@ -255,7 +316,8 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
         </Bloque>
       </>}
 
-      <Bloque titulo="Suelo" abierto={false} testid="cim-suelo">
+{z.tipo !== 'liga' && (
+            <Bloque titulo="Suelo" abierto={false} testid="cim-suelo">
         <div className="cim-grid">
           {(SUELO_DE[z.tipo] || []).map((k) => {
             const C = CAMPO_SUELO[k]
@@ -270,6 +332,7 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
         </div>
         <p className="cim-nota">Lo que no cambies aquí sale de «Suelo y criterios» de la obra.</p>
       </Bloque>
+      )}
 
       <Bloque titulo="Materiales" abierto={false}>
         {esMamp ? (
@@ -296,6 +359,11 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
           {z.tipo === 'corrida' && <>
             <Varilla label="Transversal (por metro)" arm={z.arm.t} onChange={(v) => A('t', v)} testid="cim-arm-t" />
             <Varilla label="Longitudinal" arm={z.arm.l} onChange={(v) => A('l', v)} testid="cim-arm-l" />
+          </>}
+          {z.tipo === 'liga' && <>
+            <Varilla label="Arriba (en los apoyos)" arm={z.arm.sup} onChange={(v) => A('sup', v)} conN testid="cim-arm-sup" />
+            <Varilla label="Abajo (al centro)" arm={z.arm.inf} onChange={(v) => A('inf', v)} conN testid="cim-arm-inf" />
+            <Varilla label="Estribos cerrados" arm={z.arm.est} onChange={(v) => A('est', v)} conRamas />
           </>}
           {z.tipo === 'contratrabe' && <>
             <Varilla label="Contratrabe: abajo" arm={z.arm.inf} onChange={(v) => A('inf', v)} conN testid="cim-arm-inf" />

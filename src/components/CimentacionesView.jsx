@@ -20,6 +20,7 @@ const ICONO = {
   contencion: <><path d="M4 20h16v-3H11V4H8v13H4z" /><path d="M13 7l7 0" strokeDasharray="2 2" /></>,
   gravedad: <path d="M5 20h12L11 4H7z" />,
   mamposteria: <><path d="M5 20h14l-4-7H9z" /><rect x="10" y="4" width="4" height="9" /></>,
+  liga: <><rect x="2.5" y="15" width="6" height="5" rx="1" strokeDasharray="2 1.5" /><rect x="15.5" y="15" width="6" height="5" rx="1" strokeDasharray="2 1.5" /><rect x="4" y="9.5" width="16" height="4.5" rx="0.8" /><path d="M5.5 9.5V5M18.5 9.5V5" /></>,
 }
 export const IconoCim = ({ tipo, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{ICONO[tipo]}</svg>

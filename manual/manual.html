@@ -14,7 +14,7 @@
      con «Gráficos de fondo» y sin «Encabezados y pies de página» (el pie lo pone esta hoja). */
   @page {
     size: Letter; margin: 0.72in 0.78in 0.8in 0.78in;
-    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.03"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
+    @bottom-left { content: "Auxiliar IV con RAM Elements · Manual del equipo · v3.04"; font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt 'Instrument Sans', sans-serif; color: #87918b; }
   }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -126,7 +126,7 @@
     <path d="M10 43l30 23M40 43l30 23M70 43l25 23" stroke-width="0.6"/>
   </svg>
   <div class="pie">
-    <div><b>Versión 3.03</b>Septiembre de 2026</div>
+    <div><b>Versión 3.04</b>Septiembre de 2026</div>
     <div style="text-align:right">burgos2177-create.github.io/auxiliar-iv<br>Chrome o Edge</div>
   </div>
 </div>
@@ -755,6 +755,7 @@
     <tr><td><b>Zapata corrida</b></td><td>Por metro, bajo muro de concreto (sección crítica en la cara) o de mampostería (a t/4 dentro del muro), al centro o de lindero. Suelo, cortante, flexión transversal, anclaje y el acero longitudinal de temperatura.</td></tr>
     <tr><td><b>Corrida con contratrabe</b></td><td>Varias columnas sobre un eje, por el método rígido (presión lineal). Diagramas de cortante y momento de la contratrabe, armado abajo y arriba con los motores de la app, estribos, y los aleros como voladizos. <b>Centrar resultante</b> ajusta los voladizos para que la presión salga pareja.</td></tr>
     <tr><td><b>Muro de contención</b></td><td>De concreto armado, en voladizo: volteo, deslizamiento (con dentellón y pasivo si lo pides), resultante en el tercio medio y presión máxima; pantalla, talón y punta a flexión y cortante; anclaje de la pantalla en la base; temperatura.</td></tr>
+    <tr><td><b>Contratrabe de liga</b></td><td>Une las zapatas de un eje a la altura del dado; no lleva zapata ni apoya en el suelo. Toma una fuerza de liga en tensión y compresión (10 % de la Pu de la columna más cargada del tramo), el momento N·e de las zapatas de lindero o de esquina que se ligan en ella (como viga de equilibrio) y el peso de un muro, si lo lleva. Flexión arriba y abajo, la tensión con el acero que sobra, compresión, cortante con estribos cerrados (s ≤ d/2 ≤ 30 cm) y lado ≥ claro/20 (sin pasar de 45 cm).</td></tr>
     <tr><td><b>Muro de piedra</b></td><td>De gravedad, de piedra braza: la misma estabilidad, juntas sin tensión a cada altura, y compresión y cortante en la mampostería. ⚡ Proponer prueba también inclinar el frente.</td></tr>
     <tr><td><b>Cimiento de mampostería</b></td><td>Trapecio o medio trapecio (lindero), como la hoja de la oficina: el ancho por suelo, el escarpio por cortante y a 1.5 del vuelo y, en lindero, la separación máxima de muros perpendiculares (tabla 8.4 de la NTC-Mampostería).</td></tr>
   </table>
@@ -773,6 +774,17 @@
   </ol>
   <p>Cada cimiento guarda de qué nudos salió y lo dice arriba de su formulario. Una zapata tipo se revisa además con la reacción de <b>cada uno</b> de sus apoyos:
   la envolvente junta la P más pesada con el M más grande, pero con el sismo descargando puede mandar la columna ligera de la esquina. La columna de cada apoyo sale del modelo con su sección real.</p>
+
+  <h3>Sobre un eje: corridas, contratrabes y ligas</h3>
+  <figure>
+    <img src="img/cim-liga-ejes.png" alt="">
+    <figcaption><b>Sobre un eje.</b> ZC-1 es una sola corrida en dos ejes (X = 0 y X = 15), las interiores son aisladas y la contratrabe de liga TL-1 une las zapatas del eje de los nudos 5, 17, 29 y 41 a la altura del dado.</figcaption>
+  </figure>
+  <ul>
+    <li><b>Zapata corrida</b> y <b>corrida con contratrabe</b>: con los apoyos de una fila. Terminan a 0.5 m de la última columna, o al ras si ese extremo cae en un lindero marcado.</li>
+    <li><b>Contratrabe de liga</b>: une las zapatas del eje por arriba, sobre los dados; no lleva zapata y no cuenta como cimiento de sus apoyos. Si alguna zapata del eje es de lindero o de esquina con trabe de liga, su N·e (a lo largo del eje) entra solo; si el eje corre paralelo al lindero, no.</li>
+    <li><b>El mismo diseño en otro eje</b>: elige los apoyos del otro eje y, en <b>o el mismo diseño de…</b>, la corrida, contratrabe o liga que ya tienes; <b>＋ en este eje</b> la agrega y la vuelve a proponer para que cumpla en todos. El formulario lista sus ejes (con ✕ para quitar uno), la memoria empieza con cómo queda cada eje y cada revisión dice cuál rige. Las cantidades suman todos los ejes.</li>
+  </ul>
 
   <h3>La planta de cimentación</h3>
   <figure>
@@ -841,6 +853,7 @@
     <tr><td><b>Armado de trabes</b></td><td>El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas.</td></tr>
     <tr><td><b>Armado de columnas</b></td><td>Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app.</td></tr>
     <tr><td><b>Estribos de columna</b></td><td>Centro y extremos según el capítulo 9, con H del modelo.</td></tr>
+    <tr><td><b>Contratrabe de liga</b></td><td>Práctica de la oficina, sin análisis de RAM: T = 10 % de la Pu mayor del tramo (ACI 18.13.3), N·e de las zapatas excéntricas con reparto lineal (viga de equilibrio), wu Ln²/10 con su peso y el muro; lado ≥ Ln/20 ≤ 45 cm; estribos cerrados a d/2 ≤ 30 cm (capítulo 11).</td></tr>
     <tr><td><b>Cimentaciones</b></td><td>Las hojas de la oficina, corregidas. Suelo con cargas de servicio contra qe = qadm − γs (Df − h) − γc h, en t/m² (la hoja restaba t/m³ a kg/m²), con el área efectiva de Meyerhof B′ = B − 2e y e = (M + V h)/(N + W); con sismo, 1.33 qadm y el sismo cargando y descargando.
       Concreto con 1.3 CM + 1.5 CV y 1.1 (CM + CV + S): FR 0.9 en flexión y 0.75 en cortante; VcR = 0.5 FR b d √f'c (reducido si h &gt; 70 cm); penetración FR (0.5 + γ) √f'c ≤ FR √f'c con la sección crítica de 4, 3 o 2 lados; aplastamiento FR 0.65, √(A2/A1) ≤ 2, y el excedente con arranques.
       Acero: el calculado, 4/3 de él o el mínimo, nunca menos que 0.0018 b h. Anclaje con L<sub>d</sub> × As,req/As,prov (≥ 30 cm) o gancho a 90°.

@@ -12,8 +12,10 @@ import { revisarMamposteria, nuevaMamposteria, tabla84 } from '../src/core/cim/m
 import { TIPOS_CIM, crearCim, revisarCim, nombreLibre, estadoCim, tipoCim } from '../src/core/cim'
 import { dibujarCim } from '../src/core/cim/dibujo'
 import { parseModeloRam } from '../src/core/ramModel'
-import { apoyosDe, papelesPorDefecto, cargasDeApoyo, sismosDeApoyo, aZapata, ladoRequerido, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente, contorno, lineaLindero, condicionApoyo, cargasEnEjes } from '../src/core/cim/reacciones'
+import { apoyosDe, papelesPorDefecto, cargasDeApoyo, sismosDeApoyo, aZapata, ladoRequerido, agruparPorLado, aisladasDesde, contratrabeDesde, corridaDesde, envolvente, contorno, lineaLindero, condicionApoyo, cargasEnEjes, ligaDesde, ejeDesde } from '../src/core/cim/reacciones'
 import { cimentacionEnPlanta } from '../src/core/cim/planta'
+import { nuevaLiga, revisarLiga, proponerLiga, tramosLiga } from '../src/core/cim/liga'
+import { APLICAR } from '../src/core/cim/ejes'
 
 const valor = (R, titulo) => R.secciones.flatMap((s) => s.pasos).find((p) => p.t === titulo)?.v
 const chk = (R, id) => R.checks.find((c) => c.id === id)
@@ -521,5 +523,97 @@ describe('zapatas de lindero desde la planta', () => {
     expect(Math.min(...P.items[0].poly.map((q) => q[0]))).toBeCloseTo(-num(p.geo.t) / 200, 6)
     // la contratrabe sobre el lindero avisa que se diseña centrada
     expect(contratrabeDesde(fila, pap, 'y', { linderos: { 'x-min': true }, cont }).origen.ram.resumen).toMatch(/lindero/)
+  })
+})
+
+describe('contratrabe de liga', () => {
+  it('toma el 10 % de la Pu y el N·e de la zapata de lindero, como viga de equilibrio', () => {
+    const z = { ...nuevaLiga(), columnas: [{ x: 0, c: 30, Pu: 50, Me: 8 }, { x: 5, c: 30, Pu: 80, Me: 0 }] }
+    const { tramos, peso, wu } = tramosLiga(z)
+    expect(tramos).toHaveLength(1)
+    expect(tramos[0].T).toBeCloseTo(8, 9)                            // 10 % de 80
+    expect(tramos[0].Ln).toBeCloseTo(4.7, 9)
+    expect(wu).toBeCloseTo(1.3 * peso, 9)                             // sin muro, sólo su peso
+    expect(tramos[0].Mneg).toBeCloseTo(8 + wu * 4.7 * 4.7 / 10, 9)
+    expect(tramos[0].Vu).toBeCloseTo(1.15 * wu * 4.7 / 2 + 8 / 5, 9)
+  })
+
+  it('⚡ Proponer deja una liga que cumple todo, con lado ≥ claro/20', () => {
+    const z = { ...nuevaLiga(), columnas: [{ x: 0, c: 30, Pu: 60, Me: 12 }, { x: 6.5, c: 30, Pu: 90, Me: 0 }, { x: 13, c: 30, Pu: 70, Me: 0 }], cargas: { CM: { w: 1.2 }, CV: { w: 0 } } }
+    const p = proponerLiga(z, {})
+    const R = revisarLiga({ ...z, ...p }, {})
+    expect(R.ok).toBe(true)
+    expect(Math.min(p.geo.b, p.geo.h)).toBeGreaterThanOrEqual(Math.ceil((6.5 - 0.3) * 100 / 20))
+    expect(R.checks.map((c) => c.id)).toEqual(expect.arrayContaining(['flexionSup', 'flexionInf', 'tension', 'compresion', 'cortante', 'seccion']))
+    expect(dibujarCim({ ...z, ...p, uid: 'l' }, R, { ancho: 900 }).svg).toMatch(/ALZADO DE LA LIGA/)
+  })
+
+  it('desde RAM: liga un eje y trae el N·e de la zapata de lindero con liga', () => {
+    const R = parseModeloRam(readFileSync(resolve(__dirname, 'fixtures/modelo_edificio_prueba.json'), 'utf8'), 'modelo.json')
+    const A = apoyosDe(R), pap = papelesPorDefecto(R.casos), cont = contorno(A.apoyos)
+    const nudo = (n) => A.apoyos.find((a) => a.nudo === n)
+    // zapata de lindero en el nudo 5 (lado X = 0), con liga
+    const [zl] = aisladasDesde([nudo('5')], pap, 'y', { tipos: 1, linderos: { 'x-min': true }, cont })
+    const zap = { ...zl, ...tipoCim('aislada').proponer(zl, {}), uid: 'a', nombre: 'Z-1' }
+    expect(zap.geo.px).toBe('min')
+    // la liga del eje perpendicular al lindero (Z = 5.5: nudos 5, 17, 29, 41)
+    const fila = ['5', '17', '29', '41'].map(nudo)
+    const l = ligaDesde(fila, pap, 'y', { cimientos: [zap] })
+    const c5 = l.columnas.find((c) => c.nudo === '5')
+    const xc = centroColumna({ ...zap.geo, L: zap.geo.B }).xc
+    expect(c5.Me).toBeCloseTo(c5.Pu * Math.abs(xc), 2)
+    expect(l.columnas.filter((c) => c.nudo !== '5').every((c) => c.Me === 0)).toBe(true)
+    const p = { ...l, ...tipoCim('liga').proponer(l, {}) }
+    expect(revisarCim(p, {}).ok).toBe(true)
+    // la liga paralela al lindero (X = 0: nudos 1, 5, 9) no toma ese momento
+    const l2 = ligaDesde(['1', '5', '9'].map(nudo), pap, 'y', { cimientos: [zap] })
+    expect(l2.columnas.find((c) => c.nudo === '5').Me).toBeCloseTo(0, 6)
+  })
+})
+
+describe('un mismo diseño en varios ejes', () => {
+  const R = parseModeloRam(readFileSync(resolve(__dirname, 'fixtures/modelo_edificio_prueba.json'), 'utf8'), 'modelo.json')
+  const A = apoyosDe(R), pap = papelesPorDefecto(R.casos)
+  const nudo = (n) => A.apoyos.find((a) => a.nudo === n)
+  const cargasPlanta = A.apoyos.map((a) => cargasDeApoyo(a, pap, 'y'))
+
+  it('una corrida en dos ejes: la revisión informa el peor y las cantidades se suman', () => {
+    const z = corridaDesde(['1', '13', '25', '37'].map(nudo), pap, 'y')
+    const e = ejeDesde('corrida', ['9', '21', '33', '45'].map(nudo), pap, 'y')
+    const p1 = { ...z, ...tipoCim('corrida').proponer(z, {}) }
+    const R1 = revisarCim(p1, {})
+    const z2 = { ...p1, ejes: [e] }
+    const p2 = { ...z2, ...tipoCim('corrida').proponer(z2, {}) }
+    const R2 = revisarCim(p2, {})
+    expect(R2.ok).toBe(true)
+    expect(R2.secciones[0].titulo).toBe('En sus 2 ejes')
+    expect(R2.cant.concreto).toBeGreaterThan(1.5 * R1.cant.concreto)
+    // y cumple revisado sólo con el otro eje
+    expect(revisarCim(APLICAR.corrida(p2, e), {}).ok).toBe(true)
+  })
+
+  it('una contratrabe en dos ejes: se propone para el más exigido', () => {
+    const z = contratrabeDesde(['1', '5', '9'].map(nudo), pap, 'y')
+    const e2 = ejeDesde('contratrabe', ['13', '17', '21'].map(nudo), pap, 'y')
+    const zz = { ...z, ejes: [e2] }
+    const p = { ...zz, ...tipoCim('contratrabe').proponer(zz, {}) }
+    const Rm = revisarCim(p, {})
+    expect(Rm.ok).toBe(true)
+    expect(revisarCim(APLICAR.contratrabe(p, e2), {}).ok).toBe(true)
+    expect(Rm.checks.some((c) => /eje de 13, 17, 21/.test(c.nota))).toBe(true)
+  })
+
+  it('la planta dibuja el diseño en cada eje y la liga no cuenta como cimiento', () => {
+    const cor = { ...corridaDesde(['1', '13', '25', '37'].map(nudo), pap, 'y'), uid: 'c', nombre: 'ZC-1' }
+    const pc = { ...cor, ejes: [ejeDesde('corrida', ['9', '21', '33', '45'].map(nudo), pap, 'y')] }
+    const p = { ...pc, ...tipoCim('corrida').proponer(pc, {}) }
+    const lg = { ...ligaDesde(['1', '5', '9'].map(nudo), pap, 'y'), uid: 'l', nombre: 'TL-1' }
+    const pl = { ...lg, ...tipoCim('liga').proponer(lg, {}) }
+    const cont = contorno(A.apoyos)
+    const P = cimentacionEnPlanta(A, [p, pl], cargasPlanta, {}, cont, {})
+    expect(P.items.filter((it) => it.z.uid === 'c').map((it) => it.eje)).toEqual([0, 1])
+    expect(P.items.filter((it) => it.liga)).toHaveLength(1)
+    expect(P.porNudo.size).toBe(8)                                     // los de las dos corridas; la liga no cubre a nadie
+    expect(P.porNudo.has('5')).toBe(false)
   })
 })

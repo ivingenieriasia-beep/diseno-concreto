@@ -461,7 +461,80 @@ function mamposteria(z, R, { ancho = 900, k: kFijo } = {}) {
   return L.resultado(W, H)
 }
 
-const DIBUJOS = { aislada, corrida, contratrabe, contencion, gravedad, mamposteria }
+// ── Contratrabe de liga ──────────────────────────────────────
+function liga(z, R, { ancho = 900, exportar = false, escalas = null } = {}) {
+  const D = R.datos
+  const { b, h, dado, cs, arm } = D
+  const vs = varilla(arm.sup.num), vi = varilla(arm.inf.num), ve = varilla(arm.est.num)
+  const x00 = cm(cs[0].x) - cs[0].c / 2 - 40
+  const X = (c) => cm(c.x) - x00
+  const largo = cm(cs[cs.length - 1].x) + cs[cs.length - 1].c / 2 + 40 - x00
+  const top = 64, M = 70
+  const kx = escalas?.kx ?? escalaPara(largo, Math.max(420, ancho - 300), { min: 0.2, max: 2.6 })
+  const ks = escalas?.ks ?? escalaPara(b + 70, 200, { max: 4 })
+  // en pantalla se exageran las alturas para leer el armado; el DXF va a escala
+  const kz = exportar ? kx : escalas?.kz ?? Math.max(kx, Math.min(3, 190 / (dado + h + 70)))
+
+  // ── alzado ──
+  const E = lienzo(kx, kz)
+  const baseY = top + (h + 40) * kz + 26
+  E.titulo(M - 40, 22, 'ALZADO DE LA LIGA', `${f0(b)} × ${f0(h)} cm · a la altura del dado · T = ${f2(D.T)} t (tensión y compresión)${kz > kx * 1.05 ? ` · alturas × ${f2(kz / kx)}` : ''}`)
+  E.vista(M, baseY)
+  cs.forEach((c, i) => {
+    const x = X(c)
+    // el dado bajo la liga y, punteada, la zapata que liga
+    E.rect(x - c.c / 2, -dado, c.c, dado, { c: COL.concreto, w: 1.2, fill: FONDO })
+    E.rect(x - 55, -dado - 28, 110, 28, { c: COL.tenue, w: 0.8, dash: '5 3' })
+    E.text(x, -dado - 28, 'zapata', { dy: 12, size: 8.5, c: COL.tenue })
+    E.rect(x - c.c / 2, h, c.c, 26 / kz, { c: COL.concreto, w: 1.2, fill: '#e0cbd4' })
+    E.text(x, h + 26 / kz, `C${i + 1}`, { dy: -5, size: 10, weight: 700, c: COL.concreto })
+    if (c.Me > 1e-6) E.text(x, h + 26 / kz, `N·e = ${f2(c.Me)} t·m`, { dy: -18, size: 9, c: COL.mal })
+  })
+  const x0 = X(cs[0]) - cs[0].c / 2, x1 = X(cs[cs.length - 1]) + cs[cs.length - 1].c / 2
+  E.rect(x0, 0, x1 - x0, h, { c: COL.concreto, w: 1.6, fill: '#f3ece6' })
+  const yS = h - D.rS, yI = D.rI
+  const g = 14 / kz
+  E.poly([[x0 + 4, yS - g], [x0 + 4, yS], [x1 - 4, yS], [x1 - 4, yS - g]], { c: COL.arriba, w: 1.8 }, false)
+  E.poly([[x0 + 4, yI + g], [x0 + 4, yI], [x1 - 4, yI], [x1 - 4, yI + g]], { c: COL.abajo, w: 1.8 }, false)
+  for (let i = 0; i < cs.length - 1; i++) {
+    const a = X(cs[i]) + cs[i].c / 2 + 5, bb = X(cs[i + 1]) - cs[i + 1].c / 2 - 5
+    for (let x = a; x <= bb + 1e-6; x += arm.est.s) E.line(x, 4, x, h - 4, { c: COL.estribo, w: 0.7 })
+    E.dimH(X(cs[i]), X(cs[i + 1]), -dado - 28, 22, f2(cs[i + 1].x - cs[i].x))
+  }
+  const mid = (X(cs[0]) + X(cs[1])) / 2
+  E.etiqueta('sup', mid, h, `${arm.sup.n}#${arm.sup.num}`, { c: COL.arriba, dy: -40, titulo: 'Lecho de arriba' })
+  E.etiqueta('inf', mid - 55 / kx, 0, `${arm.inf.n}#${arm.inf.num}`, { c: COL.abajo, dy: 24, titulo: 'Lecho de abajo' })
+  E.etiqueta('est', mid + 55 / kx, 0, `E#${arm.est.num} @ ${arm.est.s}`, { c: COL.estribo, dy: 24, titulo: 'Estribos' })
+  E.dimV(0, h, x1, 22, `h = ${f0(h)}`)
+  E.dimV(-dado, 0, x0, -18, `dado ${f0(dado)}`)
+
+  // ── corte ──
+  const S = lienzo(ks)
+  const cxX = M + largo * kx + 60 + (b / 2) * ks, cxY = top + 34 + h * ks
+  S.vista(cxX, cxY)
+  S.titulo(cxX - (b / 2) * ks - 10, 22, 'CORTE', `${f0(b)} × ${f0(h)} cm`)
+  S.rect(-b / 2, 0, b, h, { c: COL.concreto, w: 1.6, fill: FONDO })
+  const r = num(z.mat?.r, 5)
+  S.rect(-b / 2 + r, r, b - 2 * r, h - 2 * r, { c: COL.estribo, w: 1 })
+  for (const x of reparto(-b / 2 + r + ve.diam + vs.diam / 2, b / 2 - r - ve.diam - vs.diam / 2, arm.sup.n)) S.dot(x, yS, Math.max(2, (vs.diam / 2) * ks), COL.arriba)
+  for (const x of reparto(-b / 2 + r + ve.diam + vi.diam / 2, b / 2 - r - ve.diam - vi.diam / 2, arm.inf.n)) S.dot(x, yI, Math.max(2, (vi.diam / 2) * ks), COL.abajo)
+  S.dimH(-b / 2, b / 2, 0, 22, `b = ${f0(b)}`)
+  S.dimV(0, h, b / 2, 20, `h = ${f0(h)}`)
+  S.manija('h', 0, h, { eje: 'y', campo: 'geo.h', factor: 1, pasoCm: 5, min: 20, max: 150, titulo: 'h' })
+  S.manija('b', b / 2, h * 0.55, { eje: 'x', campo: 'geo.b', factor: 2, pasoCm: 5, min: 15, max: 80, titulo: 'b' })
+
+  const W = Math.max(M + largo * kx + 30, cxX + (b / 2) * ks + 70)
+  const Htot = Math.max(baseY + (dado + 28) * kz + 56, cxY + 60)
+  const partes = [E.resultado(W, Htot), S.resultado(W, Htot)]
+  const inner = partes.map((x) => x.inner).join('')
+  return {
+    inner, W, H: Htot, k: kx, escalas: { kx, ks, kz },
+    handles: partes.flatMap((x) => x.handles), hits: partes.flatMap((x) => x.hits),
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Htot}" width="${W}" height="${Htot}" font-family="DM Mono, monospace">${inner}</svg>`,
+  }
+}
+
+const DIBUJOS = { aislada, corrida, contratrabe, contencion, gravedad, mamposteria, liga }
 
 /**
  * @param z   cimiento

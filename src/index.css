@@ -557,3 +557,24 @@ input[type="number"] { -moz-appearance: textfield; }
 .cim-lado.on { border: 1.5px solid #c62828; color: #c62828; background: rgba(198,40,40,0.06); font-weight: 700; }
 .cim-lindero:hover line:nth-last-of-type(1) { stroke-width: 2.4; }
 .cim-mini-tabla small.gris { color: var(--color-tx3); font-size: 10px; }
+
+/* ── «Desde RAM» casi a pantalla completa: la planta llena lo que queda ── */
+.cim-fondo-grande { padding: 20px 16px; align-items: stretch; }
+.cim-modal-grande { width: min(1800px, 100%); height: calc(100vh - 40px); display: flex; flex-direction: column; }
+.cim-modal-grande > .cim-ram-cuerpo { flex: 1; min-height: 0; grid-template-columns: 250px minmax(0, 1fr) 300px; align-items: stretch; }
+.cim-modal-grande .cim-ram-izq, .cim-modal-grande .cim-ram-der { overflow-y: auto; min-height: 0; padding-right: 2px; }
+.cim-modal-grande .cim-ram-centro { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.cim-ram-lienzo { flex: 1; min-height: 320px; position: relative; overflow: hidden; }
+.cim-ram-lienzo > svg { position: absolute; inset: 0; }
+@media (max-width: 1100px) {
+  .cim-modal-grande { height: auto; }
+  .cim-modal-grande > .cim-ram-cuerpo { grid-template-columns: 1fr; }
+  .cim-ram-lienzo { height: 60vh; flex: none; }
+}
+.cim-ejes-lista { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.cim-ejes-lista > div { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 6px; font-size: 11.5px; color: var(--color-tx2); padding: 3px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-panel); }
+.cim-ejes-lista b { font-family: var(--font-mono); color: var(--color-accent2); }
+.cim-aplicar { display: grid; grid-template-columns: 1fr auto; gap: 5px; align-items: center; font-size: 11.5px; color: var(--color-tx2); margin-top: 2px; }
+.cim-aplicar > span { grid-column: 1 / -1; }
+.cim-aplicar .btn { font-size: 12px; padding: 5px 10px; }
+.cim-ram-leyenda i.liga { width: 18px; height: 5px; background: rgba(75,70,64,0.55); border-radius: 1px; }
