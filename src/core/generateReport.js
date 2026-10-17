@@ -2,10 +2,10 @@ import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
 import { MARCA, enPdf, rgbDe } from './marca'
-import { calcFlexion, calcCortante } from './sectionCalculator'
+import { calcFlexion } from './sectionCalculator'
 import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
-import { resistenciasConPuntual } from './sectionResults'
+import { computeSectionCapacities, resistenciasConPuntual } from './sectionResults'
 import { columnDemand, demandCase } from './columnDemand'
 import { analyzeGroup, unidadesTexto } from './longitudinal'
 
@@ -308,28 +308,6 @@ function drawEjemplares(doc, ev, x, y, maxW, pageH, marginT, onNewPage) {
   return y + 1
 }
 
-// ── Resistencias de una trabe (para evaluar su envolvente) ──────
-function computeSectionResultsLite(t) {
-  const calc = t.calc || {}
-  const fc = +t.fc || 250
-  const fy = +calc.fy || 4200
-  const b = +t.ancho, h = +t.peralte, r = +t.recub || 3
-  const ck = computeChecks(t)
-  let resC = null
-  const VuTon = +(calc.VuTon || t.vu || 0)
-  if (VuTon > 0) {
-    const AsUsada = +(calc.asManual != null ? calc.asManual
-      : Math.max(ck.flexP?.AsTotal || 0, ck.flexN?.AsTotal || 0) || 4.52)
-    resC = calcCortante({
-      fc, fy, b, h, r, L: +(calc.L || 0), VuTon, AsUsada,
-      varEstNum: +(calc.varEstNum || CAL_TO_NUM[t.calEst] || 2),
-      nramas: +(calc.nramas || 2),
-      conCompresion: calc.conCompresion, MuCorte: +(calc.MuCorte || 0),
-    })
-  }
-  return { resP: ck.flexP, resN: ck.flexN, resC }
-}
-
 // ── Dibujo de la sección de una columna (retícula real de barras) ──
 function drawColumnSection(doc, col, ox, oy, drawScale) {
   const b = +col.b || 30, h = +col.h || 30, r = +col.r || 3
@@ -581,13 +559,34 @@ export function generateReport(sections, projectName = '', columns = []) {
     doc.text('Mu/Mr', tblX + 58, ty - 6, { align: 'right' })
     doc.text('Estado', tblX + 68, ty - 6, { align: 'right' })
 
+    // Una trabe del modelo trae la demanda en su envolvente, no capturada a
+    // mano: lo que falte se lee de ahí (marcado con *), contra el armado del
+    // corte con sus bastones puntuales y el Vr de los estribos del detalle —
+    // las mismas resistencias con las que se cuentan los ejemplares abajo.
+    const bEnv = t.envelope?.points?.length ? t.envelope : null
+    let ev = null, envP = null, envN = null, envV = null
+    if (bEnv) {
+      const cap = computeSectionCapacities(t)
+      const punt = resistenciasConPuntual(t)
+      ev = evaluateBeamEnvelope(bEnv.points, cap, !!bEnv.invertir, punt)
+      envP = { mr: Math.max(cap.resP?.MRT || 0, punt?.MRP || 0), mu: ev.globalMuP }
+      envN = { mr: Math.max(cap.resN?.MRT || 0, punt?.MRN || 0), mu: ev.globalMuN }
+      envV = { mr: cap.resC?.Vr || 0, mu: ev.globalVu }
+    }
+    const vacio = (v) => v === '' || v === undefined || v === null || isNaN(v)
+    const fila = (mr, mu, env) => (env && vacio(mu) ? { ...env, env: true } : { mr, mu, env: false })
+    const fP = fila(t.mrPos, t.muPos, envP)
+    const fN = fila(t.mrNeg, t.muNeg, envN)
+    const fV = fila(t.vr, t.vu, envV)
+    const conEnv = fP.env || fN.env || fV.env
+
     // Flexion (+)
-    const okFlexPos = drawVerifRow(doc, 'Mu(+) / Mr(+)', t.mrPos, t.muPos, ty, tblX, tblW)
+    const okFlexPos = drawVerifRow(doc, `Mu(+) / Mr(+)${fP.env ? '*' : ''}`, fP.mr, fP.mu, ty, tblX, tblW)
     if (!okFlexPos) hasWarnings = true
     ty += 5.5
 
     // Flexion (-)
-    const okFlexNeg = drawVerifRow(doc, 'Mu(-) / Mr(-)', t.mrNeg, t.muNeg, ty, tblX, tblW)
+    const okFlexNeg = drawVerifRow(doc, `Mu(-) / Mr(-)${fN.env ? '*' : ''}`, fN.mr, fN.mu, ty, tblX, tblW)
     if (!okFlexNeg) hasWarnings = true
     ty += 5.5
 
@@ -597,7 +596,7 @@ export function generateReport(sections, projectName = '', columns = []) {
     doc.line(tblX, ty - 2, tblX + 72, ty - 2)
 
     // Cortante
-    const okCort = drawVerifRow(doc, 'Vu / Vr', t.vr, t.vu, ty, tblX, tblW)
+    const okCort = drawVerifRow(doc, `Vu / Vr${fV.env ? '*' : ''}`, fV.mr, fV.mu, ty, tblX, tblW)
     if (!okCort) hasWarnings = true
     ty += 6
 
@@ -621,15 +620,16 @@ export function generateReport(sections, projectName = '', columns = []) {
     ty += 6
 
     // Overall status for this section
-    const allFields = [t.mrPos, t.muPos, t.mrNeg, t.muNeg, t.vr, t.vu]
-    const filledFields = allFields.filter(v => v !== '' && v !== undefined && v !== null && !isNaN(v))
+    const allFields = [fP.mr, fP.mu, fN.mr, fN.mu, fV.mr, fV.mu]
+    const filledFields = allFields.filter(v => !vacio(v))
     const isComplete = filledFields.length === 6
     const hasAnyData = filledFields.length > 0
 
     if (isComplete) {
       const checksOk = (!checks.flexP || (checks.flexP.okMin && checks.flexP.okMax && checks.flexP.okBmin)) &&
         (!checks.flexN || (checks.flexN.okMin && checks.flexN.okMax && checks.flexN.okBmin))
-      const sectionOk = okFlexPos && okFlexNeg && okCort && checksOk
+      // la envolvente manda aunque la demanda capturada a mano pase
+      const sectionOk = okFlexPos && okFlexNeg && okCort && checksOk && (!ev || ev.allOk)
       setFill(doc, sectionOk ? [230, 245, 240] : [252, 235, 230])
       setDraw(doc, sectionOk ? COL.ok : COL.warn)
       doc.setLineWidth(0.15)
@@ -658,16 +658,13 @@ export function generateReport(sections, projectName = '', columns = []) {
     }
 
     // ── Envolvente del modelo, si esta trabe la tiene cargada ──
-    const bEnv = t.envelope
-    if (bEnv?.points?.length) {
-      const R = computeSectionResultsLite(t)
-      const ev = evaluateBeamEnvelope(bEnv.points, R, !!bEnv.invertir, resistenciasConPuntual(t))
+    if (ev) {
       doc.setFontSize(7)
       setColor(doc, ev.allOk ? COL.ok : COL.warn)
       const crit = ev.critical
       doc.setFontSize(6.5)
       doc.text(
-        `Envolvente: ${ev.passing}/${ev.total} ejemplares pasan${ev.conPuntual ? ` (${ev.conPuntual} con baston puntual)` : ''}` +
+        `${conEnv ? '*' : ''}Envolvente: ${ev.passing}/${ev.total} ejemplares pasan${ev.conPuntual ? ` (${ev.conPuntual} con baston puntual)` : ''}` +
         (crit ? ` | critico M-${crit.member} (${isFinite(crit.util) ? crit.util.toFixed(3) : 'inf'})` : '') +
         ` | Mu+ ${ev.globalMuP.toFixed(2)} / Mu- ${ev.globalMuN.toFixed(2)} / Vu ${ev.globalVu.toFixed(2)}`,
         tblX, cardY + cardH - 5,

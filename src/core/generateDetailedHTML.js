@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
-import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
+import { computeSectionResults, computeSectionCapacities, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
 import { MARCA } from './marca'
 import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
@@ -446,7 +446,10 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     // ── Envolvente del modelo (reporte RAM), si la trabe la tiene ──
     const bEnv = t.envelope
     if (bEnv?.points?.length) {
-      const ev = evaluateBeamEnvelope(bEnv.points, { resP, resN, resC }, !!bEnv.invertir, resistenciasConPuntual(t))
+      // Resistencias con el Vr de los estribos del detalle: una trabe del modelo
+      // no trae Vu capturado (la demanda es la envolvente), y sin esto Vr = 0
+      const cap = computeSectionCapacities(t)
+      const ev = evaluateBeamEnvelope(bEnv.points, cap, !!bEnv.invertir, resistenciasConPuntual(t))
       const filas = [...ev.results].sort((a, b) => b.util - a.util).map((rr) => `
         <tr${rr.member === ev.critical?.member ? ' style="background:#fff8e1"' : ''}>
           <td>${rr.member}</td>
@@ -465,7 +468,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
           ${[['Combinación', bEnv.combo || '—', ''], ['Mu+ máx', fmt(ev.globalMuP, 2), 'ton·m'],
              ['Mu− máx', fmt(ev.globalMuN, 2), 'ton·m'], ['Vu máx', fmt(ev.globalVu, 2), 'ton'],
              ['MR+', fmt(resP?.MRT, 2), 'ton·m'], ['MR−', fmt(resN?.MRT, 2), 'ton·m'],
-             ['Vr', fmt(resC?.Vr, 2), 'ton'],
+             ['Vr', fmt(cap.resC?.Vr, 2), 'ton'],
              ['Crítico', ev.critical ? `M-${ev.critical.member} (${fmt(ev.critical.util, 3)})` : '—', '']]
             .map(([l, v, u]) => `<div><span class="l">${l}:</span> <span class="v">${v}</span>${u ? ` <span class="u">${u}</span>` : ''}</div>`).join('')}
         </div>
