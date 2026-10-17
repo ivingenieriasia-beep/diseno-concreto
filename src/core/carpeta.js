@@ -18,6 +18,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { permisoDe } from './ramSync'
+import { MARCA } from './marca'
 
 export const SUB = {
   raiz: [],
@@ -46,7 +47,7 @@ const dos = (n) => String(n).padStart(2, '0')
 export const sello = (d = new Date()) => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}${dos(d.getMinutes())}`
 
 /** Ruta legible dentro de la carpeta: «Auxiliar IV\2 Salidas\Planos\x.dxf» */
-export const rutaLegible = (handle, partes, nombre) => [handle?.name || 'Auxiliar IV', ...partes, nombre].filter(Boolean).join('\\')
+export const rutaLegible = (handle, partes, nombre) => [handle?.name || MARCA.carpeta, ...partes, nombre].filter(Boolean).join('\\')
 
 async function dirDe(handle, partes, crear = true) {
   let h = handle

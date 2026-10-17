@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { APP_VERSION } from '../core/constants'
+import { MARCA } from '../core/marca'
 import { TIPOS, logVigente, fechaCorta, leerVista, marcarVista } from '../core/novedades'
 
 // La versión en la barra. Al pasar el cursor abre el log de la versión mayor
@@ -60,7 +61,7 @@ export default function Novedades() {
 
       {abierto && (
         <div className="nov-puente">
-          <div className="nov-pop" role="dialog" aria-label={`Novedades de Auxiliar IV v${log.mayor}`} data-testid="novedades">
+          <div className="nov-pop" role="dialog" aria-label={`Novedades de ${MARCA.app} v${log.mayor}`} data-testid="novedades">
             <Encabezado log={log} />
             <div className="nov-cuerpo">
               {log.entregas.map((e) => (
@@ -93,7 +94,7 @@ function Encabezado({ log }) {
       <div className="nov-marca" aria-hidden="true">{log.mayor}</div>
       <div className="nov-kicker">✦ ¡Nueva actualización!</div>
       <div className="nov-titulo">
-        Auxiliar IV <span>v{log.mayor}</span>
+        {MARCA.app} <span>v{log.mayor}</span>
       </div>
       {ultima?.lema && <p className="nov-lema">{ultima.lema}</p>}
       {ultima && (

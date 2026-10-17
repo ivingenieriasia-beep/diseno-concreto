@@ -13,6 +13,8 @@
 // elegir la carpeta con <input webkitdirectory>, que no se puede recordar.
 // ══════════════════════════════════════════════════════════════
 
+import { MARCA } from './marca'
+
 const DB = 'iv_fs'
 const STORE = 'handles'
 const DATOS = 'datos'
@@ -120,11 +122,11 @@ export async function permisoDe(handle, pedir = false, mode = 'read') {
 }
 
 /** El nombre de la carpeta de la app dentro de PROCESO */
-export const CARPETA_APP = 'Auxiliar IV'
+export const CARPETA_APP = MARCA.carpeta
 
 /**
  * Pide la carpeta al usuario (con permiso de escritura) y la recuerda para
- * este proyecto. Si eligió PROCESO, se usa (o se crea) «Auxiliar IV» adentro.
+ * este proyecto. Si eligió PROCESO, se usa (o se crea) «Auxiliar IV» (o la de su marca) adentro.
  * @returns { handle, creada:boolean, deProceso:boolean }
  */
 export async function elegirCarpeta(ruta = '') {

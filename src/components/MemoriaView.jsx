@@ -4,23 +4,14 @@
 // ══════════════════════════════════════════════════════════════
 
 import { APP_VERSION } from '../core/constants'
+import { MARCA } from '../core/marca'
 
 function fmt(v, dec = 4) {
   if (v === null || v === undefined || isNaN(v)) return '—'
   return Number(v).toFixed(dec)
 }
 
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170">
-  <rect x="18" y="10" width="22" height="90" fill="#1a1a2e"/>
-  <rect x="8"  y="10" width="42" height="14" fill="#1a1a2e"/>
-  <rect x="8"  y="86" width="42" height="14" fill="#1a1a2e"/>
-  <polygon points="52,10 74,10 110,100 88,100" fill="#1a1a2e"/>
-  <polygon points="148,10 170,10 128,100 106,100" fill="#1a1a2e"/>
-  <rect x="111" y="28" width="10" height="52" rx="4" transform="rotate(-18,116,54)" fill="#4ecac4"/>
-  <rect x="127" y="24" width="10" height="52" rx="4" transform="rotate(-18,132,50)" fill="#8a9ab0"/>
-  <text x="100" y="148" text-anchor="middle" font-family="Arial,sans-serif"
-    font-size="15" font-weight="800" letter-spacing="5" fill="#1a1a2e">INGENIERÍAS</text>
-</svg>`
+const LOGO_SVG = MARCA.logo
 
 const PRINT_STYLE = `
   body { font-family:'IBM Plex Sans',Arial,sans-serif; margin:18mm 15mm; color:#111; }
@@ -35,18 +26,18 @@ function printDoc(elId, title) {
 
   const brandHeader = `
     <div style="display:flex;align-items:center;justify-content:space-between;
-      border-bottom:2px solid #4ecac4;padding-bottom:10px;margin-bottom:6px;">
+      border-bottom:2px solid ${MARCA.acento};padding-bottom:10px;margin-bottom:6px;">
       <div>
         <div style="font-size:8pt;color:#6b7280;letter-spacing:0.08em;
           text-transform:uppercase;margin-bottom:2px;">
           Método de Diseño por Resistencia · NTC-2023
         </div>
-        <div style="font-size:11pt;font-weight:800;color:#1b2349;letter-spacing:-0.01em;">
-          IV Ingenierías
+        <div style="font-size:11pt;font-weight:800;color:${MARCA.tinta};letter-spacing:-0.01em;">
+          ${MARCA.empresa}
         </div>
       </div>
       <img src="data:image/svg+xml;base64,${logob64}"
-        style="width:48px;opacity:0.85;" alt="IV Ingenierías"/>
+        style="width:48px;opacity:0.85;" alt="${MARCA.empresa}"/>
     </div>`
 
   const w = window.open('', '_blank')
@@ -284,7 +275,7 @@ export default function MemoriaView({ nombre, fc, fy, b, h, r, MuP, MuN, resP, r
         border: '1px solid #e5e7eb', maxWidth: 860, margin: '0 auto',
       }}>
         {/* Header */}
-        <div style={{ borderBottom: '2px solid #4ecac4', paddingBottom: 14, marginBottom: 24 }}>
+        <div style={{ borderBottom: `2px solid ${MARCA.acento}`, paddingBottom: 14, marginBottom: 24 }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
             MEMORIA DE CÁLCULO — {nombre || 'SECCIÓN'}
           </div>
@@ -486,9 +477,9 @@ export default function MemoriaView({ nombre, fc, fy, b, h, r, MuP, MuN, resP, r
         )}
 
         {/* Footer */}
-        <div style={{ borderTop: '2px solid #4ecac4', paddingTop: 10, marginTop: 24,
+        <div style={{ borderTop: `2px solid ${MARCA.acento}`, paddingTop: 10, marginTop: 24,
           fontSize: 10, color: '#9ca3af', textAlign: 'right' }}>
-          IV Ingenierías · Auxiliar IV v{APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)
+          {MARCA.empresa} · {MARCA.app} v{APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)
         </div>
       </div>
     </div>

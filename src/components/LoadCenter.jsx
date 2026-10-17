@@ -12,6 +12,7 @@ import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta, guardarCarpeta, modeloGuardado,
   guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
 } from '../core/ramSync'
+import { MARCA } from '../core/marca'
 import { setCarpetaActiva, asegurarArbol, escribir, respaldarModelo, rutaLegible } from '../core/carpeta'
 
 // Centro de carga: un solo lugar para meter todo lo que sale de RAM, con el
@@ -540,7 +541,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
                 : <span style={{ fontWeight: 400, color: '#92400e', marginLeft: 8, fontSize: 10.5 }}>sin configurar</span>}
             </summary>
             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-tx2)', lineHeight: 1.6 }}>
-              Pega aquí la ruta de la carpeta <b>Auxiliar IV</b> de la obra (<code>PROCESO\Auxiliar IV</code>) y dale a
+              Pega aquí la ruta de la carpeta <b>{MARCA.carpeta}</b> de la obra (<code>PROCESO\{MARCA.carpeta}</code>) y dale a
               Generar: eliges esa misma carpeta una vez, la app le hace su árbol (1 Agrupación, 2 Salidas, 3 Respaldos) y deja
               ahí el <b>sincronizar.py</b> con la ruta ya dentro. Se guarda con el proyecto, así que al cambiar de obra cambia sola.
               <div style={{ fontSize: 10, color: 'var(--color-tx3)', marginTop: 4, lineHeight: 1.65 }}>
@@ -553,7 +554,7 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
                 <input data-testid="ruta-ram" value={ruta} onChange={(e) => { setRuta(e.target.value); setAvisoRuta('') }}
-                  placeholder="C:\\Users\\...\\PROCESO\\Auxiliar IV"
+                  placeholder={`C:\\Users\\...\\PROCESO\\${MARCA.carpeta}`}
                   style={{
                     flex: '1 1 340px', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '5px 8px',
                     borderRadius: 5, border: `1px solid ${avisoRuta ? '#ef9a9a' : 'var(--color-border)'}`,

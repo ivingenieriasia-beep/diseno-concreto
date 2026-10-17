@@ -6,6 +6,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { APP_VERSION } from './constants'
+import { deMarca } from './marca'
 import imgSincronizar from '../assets/novedades/sincronizar.webp'
 import imgAgrTrabes from '../assets/novedades/agr-trabes.webp'
 import imgAgrColumnas from '../assets/novedades/agr-columnas.webp'
@@ -258,6 +259,11 @@ export function compararVersion(a, b) {
   return 0
 }
 
+// Los textos hablan de «Auxiliar IV»; en otra marca se leen con su nombre
+const conMarca = (x) => (typeof x === 'string' ? deMarca(x)
+  : Array.isArray(x) ? x.map(conMarca)
+    : x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, conMarca(v)])) : x)
+
 /**
  * El log que se muestra: las entregas de la versión mayor vigente, de la más
  * nueva a la más vieja, sin las que todavía no salen.
@@ -267,6 +273,7 @@ export function logVigente(version = APP_VERSION, lista = NOVEDADES) {
   const entregas = lista
     .filter((e) => mayorDe(e.version) === mayor && compararVersion(e.version, version) <= 0)
     .sort((a, b) => compararVersion(b.version, a.version))
+    .map(conMarca)
   const cuenta = (k) => entregas.reduce((s, e) => s + (e[k]?.length || 0), 0)
   return { mayor, entregas, destacados: cuenta('destacados'), cambios: cuenta('cambios') }
 }

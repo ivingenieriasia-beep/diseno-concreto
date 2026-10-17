@@ -18,6 +18,7 @@ import { svgToDxf } from '../svgToDxf'
 import { svgToPng } from '../generateMemoria'
 import { guardarSalida, dondeQuedo } from '../carpeta'
 import { APP_VERSION } from '../constants'
+import { MARCA, rgbDe } from '../marca'
 import fuenteNormal from '../../assets/fuentes/DejaVuSans.ttf?inline'
 import fuenteNegrita from '../../assets/fuentes/DejaVuSans-Bold.ttf?inline'
 import fuenteMono from '../../assets/fuentes/DejaVuSansMono.ttf?inline'
@@ -104,9 +105,9 @@ function nuevaPagina(doc, ctx) {
 
 function encabezado(doc, ctx) {
   doc.setFont('DejaVu', 'normal'); doc.setFontSize(7.5); doc.setTextColor(135, 145, 139)
-  doc.text(`IV Ingenierías · Auxiliar IV v${APP_VERSION} · Cimentaciones${ctx.proyecto ? ` · ${ctx.proyecto}` : ''}`, ctx.m, ctx.m - 3)
+  doc.text(`${MARCA.empresa} · ${MARCA.app} v${APP_VERSION} · Cimentaciones${ctx.proyecto ? ` · ${ctx.proyecto}` : ''}`, ctx.m, ctx.m - 3)
   doc.text(`${ctx.fecha}`, ctx.ancho - ctx.m, ctx.m - 3, { align: 'right' })
-  doc.setDrawColor(78, 202, 196); doc.setLineWidth(0.5)
+  doc.setDrawColor(...rgbDe(MARCA.acento)); doc.setLineWidth(0.5)
   doc.line(ctx.m, ctx.m - 1.5, ctx.ancho - ctx.m, ctx.m - 1.5)
   doc.setLineWidth(0.2); doc.setTextColor(26, 24, 20)
 }

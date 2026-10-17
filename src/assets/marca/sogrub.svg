@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170">
+  <rect x="72" y="8" width="56" height="16" fill="#2e2a27"/>
+  <rect x="72" y="8" width="16" height="46" fill="#2e2a27"/>
+  <rect x="72" y="46" width="56" height="16" fill="#b0643f"/>
+  <rect x="112" y="54" width="16" height="46" fill="#2e2a27"/>
+  <rect x="72" y="92" width="56" height="16" fill="#2e2a27"/>
+  <text x="100" y="140" text-anchor="middle" font-family="Arial,sans-serif" font-size="27" font-weight="800" letter-spacing="4" fill="#2e2a27">SOGRUB</text>
+  <text x="100" y="159" text-anchor="middle" font-family="Arial,sans-serif" font-size="10.5" font-weight="700" letter-spacing="3.2" fill="#8a7f78">GRUPO CONSTRUCTOR</text>
+</svg>

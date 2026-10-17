@@ -6,6 +6,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { revisarCim, tipoCim } from './cim'
+import { MARCA } from './marca'
 import { dibujoParaDocumento } from './cim/planos'
 import {
   CSS as DETAIL_CSS, LOGO_SVG,
@@ -45,7 +46,7 @@ const MEM_CSS = `
   @page { size: A4; margin: 16mm 14mm 18mm; }
   h1.mem { font-size:22pt; font-weight:800; letter-spacing:-0.01em; color:#0f172a; margin:0; }
   h2.mem { font-size:15pt; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.03em;
-           border-bottom:2px solid #4ecac4; padding-bottom:6px; margin:0 0 14px; }
+           border-bottom:2px solid ${MARCA.acento}; padding-bottom:6px; margin:0 0 14px; }
   h3.mem { font-size:12.5pt; font-weight:700; color:#1f2937; margin:18px 0 8px; }
   .mem-sec { page-break-before:always; padding-top:4px; }
   .mem-p { font-size:11pt; line-height:1.6; color:#1f2937; margin:0 0 10px; text-align:justify; }
@@ -81,9 +82,9 @@ const MEM_CSS = `
 
 // Table-based footer (Word-safe — avoids flexbox)
 function brandFooter(meta) {
-  return `<table style="width:100%;border-collapse:collapse;border:none;border-top:2px solid #4ecac4;margin-top:24px;font-size:8.5pt;color:#9ca3af">
+  return `<table style="width:100%;border-collapse:collapse;border:none;border-top:2px solid ${MARCA.acento};margin-top:24px;font-size:8.5pt;color:#9ca3af">
     <tr>
-      <td style="border:none;padding:6px 0 0;text-align:left">IV Ingenierías · ${esc(meta.norma)}</td>
+      <td style="border:none;padding:6px 0 0;text-align:left">${esc(MARCA.empresa)} · ${esc(meta.norma)}</td>
       <td style="border:none;padding:6px 0 0;text-align:right">${esc(meta.proyecto || 'Memoria de cálculo')}</td>
     </tr>
   </table>`
@@ -391,8 +392,8 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
   return `
     <!-- ░░ PORTADA ░░ -->
     <div class="mem-cover" style="text-align:center;padding:55mm 0 40mm">
-      <img width="120" src="${logoSrc}" style="width:120px;margin:0 auto 18px" alt="IV"/>
-      <div style="font-size:11pt;letter-spacing:0.28em;color:#6b7280;text-transform:uppercase">IV Ingenierías</div>
+      <img width="120" src="${logoSrc}" style="width:120px;margin:0 auto 18px" alt="${esc(MARCA.empresa)}"/>
+      <div style="font-size:11pt;letter-spacing:0.28em;color:#6b7280;text-transform:uppercase">${esc(MARCA.empresa)}</div>
       <h1 class="mem" style="font-size:30pt;margin:14px 0 6px">MEMORIA DE CÁLCULO</h1>
       <div style="font-size:13pt;color:#334155;margin-bottom:6px">Diseño estructural · Concreto reforzado</div>
       <div style="font-size:15pt;font-weight:700;color:#0f172a;margin:18px 0 26px">${esc(M.proyecto || 'Proyecto sin nombre')}</div>

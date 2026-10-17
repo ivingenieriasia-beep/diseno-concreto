@@ -5,6 +5,7 @@
 import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
+import { MARCA } from './marca'
 import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
@@ -20,17 +21,7 @@ function fmt(v, dec = 4) {
   return Number(v).toFixed(dec)
 }
 
-export const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170">
-  <rect x="18" y="10" width="22" height="90" fill="#1a1a2e"/>
-  <rect x="8"  y="10" width="42" height="14" fill="#1a1a2e"/>
-  <rect x="8"  y="86" width="42" height="14" fill="#1a1a2e"/>
-  <polygon points="52,10 74,10 110,100 88,100" fill="#1a1a2e"/>
-  <polygon points="148,10 170,10 128,100 106,100" fill="#1a1a2e"/>
-  <rect x="111" y="28" width="10" height="52" rx="4" transform="rotate(-18,116,54)" fill="#4ecac4"/>
-  <rect x="127" y="24" width="10" height="52" rx="4" transform="rotate(-18,132,50)" fill="#8a9ab0"/>
-  <text x="100" y="148" text-anchor="middle" font-family="Arial,sans-serif"
-    font-size="15" font-weight="800" letter-spacing="5" fill="#1a1a2e">INGENIERÍAS</text>
-</svg>`
+export const LOGO_SVG = MARCA.logo
 
 export const CSS = `
   body { font-family:'IBM Plex Sans',Arial,sans-serif; margin:18mm 15mm; color:#111; font-size:11pt; }
@@ -311,7 +302,7 @@ function renderColumnas(columnsArr, envStats = null) {
       <td>${fmt(pt.P, 3)}</td><td>${fmt(pt.M, 4)}</td></tr>`).join('')
 
     return `<div class="${i > 0 ? 'section-page' : ''}">
-      <div style="border-bottom:2px solid #4ecac4;padding-bottom:14px;margin-bottom:24px">
+      <div style="border-bottom:2px solid ${MARCA.acento};padding-bottom:14px;margin-bottom:24px">
         <div style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.02em">VERIFICACIÓN POR FLEXOCOMPRESIÓN — ${esc(col.nombre)}</div>
         <div style="font-size:12px;color:#6b7280;margin-top:4px">Diagrama de interacción · NTC-2023 · Concreto Reforzado</div>
       </div>
@@ -387,8 +378,8 @@ function renderColumnas(columnsArr, envStats = null) {
             ? `✗ DISEÑO NO VÁLIDO — ${D.env.total - D.env.passing} de ${D.env.total} ejemplares quedan fuera del diagrama; revisar sección o armado`
             : '✗ DISEÑO NO VÁLIDO — el punto queda fuera del diagrama; revisar sección o armado')}</div>
 
-      <div style="border-top:2px solid #4ecac4;padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">
-        IV Ingenierías · Auxiliar IV — Columnas por flexocompresión
+      <div style="border-top:2px solid ${MARCA.acento};padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">
+        ${MARCA.empresa} · ${MARCA.app} — Columnas por flexocompresión
       </div>
     </div>`
   }).join('')
@@ -420,7 +411,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
 
     // Build section HTML
     sectionsHTML += `<div class="${idx > 0 ? 'section-page' : ''}">`
-    sectionsHTML += `<div style="border-bottom:2px solid #4ecac4;padding-bottom:14px;margin-bottom:24px">
+    sectionsHTML += `<div style="border-bottom:2px solid ${MARCA.acento};padding-bottom:14px;margin-bottom:24px">
       <div style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.02em">MEMORIA DE CÁLCULO — ${t.nombre || 'SECCIÓN'}</div>
       <div style="font-size:12px;color:#6b7280;margin-top:4px">Norma: NTC-2023 · Concreto Reforzado · Método de Diseño por Resistencia</div>
     </div>`
@@ -540,7 +531,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     }
 
     // Footer per section
-    sectionsHTML += `<div style="border-top:2px solid #4ecac4;padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">IV Ingenierías · Auxiliar IV v${APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
+    sectionsHTML += `<div style="border-top:2px solid ${MARCA.acento};padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">${MARCA.empresa} · ${MARCA.app} v${APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
     sectionsHTML += '</div>'
   })
 
@@ -614,19 +605,19 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     ${colSummaryHTML}
     ${leyendaHTML}
     <div style="margin-top:14px;font-size:10px;color:#9ca3af">
-      Generado con Auxiliar IV v${APP_VERSION} — ${dateStr}<br>
+      Generado con ${MARCA.app} v${APP_VERSION} — ${dateStr}<br>
       Trabes: ${sections.length} · Columnas: ${columns.length}${envStats.total ? ` · Ejemplares del modelo revisados: ${envStats.total}` : ''}
     </div>
   </div>`
 
   // Brand header
-  const brandHeader = `<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #4ecac4;padding-bottom:10px;margin-bottom:6px">
+  const brandHeader = `<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid ${MARCA.acento};padding-bottom:10px;margin-bottom:6px">
     <div>
       <div style="font-size:8pt;color:#6b7280;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px">Método de Diseño por Resistencia · NTC-2023</div>
-      <div style="font-size:11pt;font-weight:800;color:#1b2349;letter-spacing:-0.01em">IV Ingenierías</div>
+      <div style="font-size:11pt;font-weight:800;color:${MARCA.tinta};letter-spacing:-0.01em">${MARCA.empresa}</div>
       <div style="font-size:8pt;color:#9ca3af;margin-top:2px">${projectName ? `Proyecto: ${projectName} — ` : ''}${dateStr}</div>
     </div>
-    <img src="data:image/svg+xml;base64,${logob64}" style="width:48px;opacity:0.85" alt="IV"/>
+    <img src="data:image/svg+xml;base64,${logob64}" style="width:48px;opacity:0.85" alt="${MARCA.empresa}"/>
   </div>`
 
   // Open print window

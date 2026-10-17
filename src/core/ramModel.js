@@ -19,6 +19,7 @@
 import { claveNombre } from './bulkEnvelopes'
 import { sectionDims } from './geometry'
 import { detectUpAxis } from './modelView'
+import { MARCA } from './marca'
 
 /** Orden de los números de cada estación, tal como los escribe el script */
 const CAMPOS = ['x', 'm33min', 'm33max', 'v2min', 'v2max', 'axmin', 'axmax']
@@ -49,7 +50,7 @@ export function parseModeloRam(entrada, archivo = 'modelo.json') {
   if (typeof entrada === 'string') {
     try { d = JSON.parse(entrada) } catch (e) { return vacio(`No se pudo leer el .json: ${e.message}`) }
   }
-  if (!looksLikeModeloRam(d)) return vacio('Ese .json no lo escribió el script de RAM de Auxiliar IV.')
+  if (!looksLikeModeloRam(d)) return vacio(`Ese .json no lo escribió el script de RAM de ${MARCA.app}.`)
   if (!Array.isArray(d.miembros) || !d.miembros.length) return vacio('El archivo no trae miembros.')
 
   // El script podría cambiar el orden de los números de una estación; si lo

@@ -29,6 +29,7 @@ import { packProject, saveSnapshot, loadSnapshot, clearSnapshot, pushRecent, lis
 import { buildDcheck } from './core/dcheckExport'
 import { analyzeGroup, perfilCompleto } from './core/longitudinal'
 import { carpetaGuardada } from './core/ramSync'
+import { MARCA } from './core/marca'
 import { setCarpetaActiva, guardarSalida, guardarProyecto, dondeQuedo } from './core/carpeta'
 
 // Guardar en localStorage con un pequeño retraso para no escribir en cada tecla
@@ -259,7 +260,7 @@ export default function App() {
           const nCim = data.cimentacion?.cimientos?.length || 0
           showToast(`Proyecto abierto · ${(data.sections || []).length} trabe(s), ${(data.columns || []).length} columna(s)${nCim ? `, ${nCim} cimiento(s)` : ''}`)
         } else {
-          alert('El archivo no tiene secciones. Verifica que sea un proyecto de Auxiliar IV.')
+          alert(`El archivo no tiene secciones. Verifica que sea un proyecto de ${MARCA.app}.`)
         }
       } catch {
         alert('No se pudo leer el archivo. Verifica que sea un JSON válido.')

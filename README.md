@@ -97,6 +97,23 @@ npm test        # suite de pruebas
 npm run build   # build de un solo archivo a dist/
 ```
 
+### Marca SOGRUB y paquete del agente
+
+La misma app sale con la marca de SOGRUB Grupo Constructor (nombre, logo,
+pantalla de entrada, informes, memoria y carpeta `PROCESO\Auxiliar SOGRUB`).
+La marca vive en `src/core/marca.js` y el logo en `src/assets/marca/`
+(`sogrub.svg` y sus `.png` para Double Check). Los formatos de archivo son los
+mismos en las dos marcas.
+
+```bash
+npm run build:sogrub                              # dist-sogrub/ con su pantalla de entrada
+python3 scripts/paquete_agente.py --marca sogrub  # paquete-agente-auxiliar-sogrub.zip
+```
+
+El paquete junta `agente/` (el prompt de sistema, la referencia de cada
+pantalla y los ejemplos) con la app compilada, para enseñarle la app a un
+agente de IA. Cuando cambie la interfaz, actualiza `agente/referencia/`.
+
 ### Versión y novedades
 
 La versión vive en `src/core/constants.js` (`APP_VERSION`); `package.json` y el

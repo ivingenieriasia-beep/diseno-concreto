@@ -10,6 +10,7 @@ import {
   ImageRun, VerticalAlign,
 } from 'docx'
 import { LOGO_SVG } from './generateDetailedHTML'
+import { MARCA } from './marca'
 import { computeSectionResults } from './sectionResults'
 import { sectionSvgString } from './sectionSvg'
 import { svgToPng, normalizeMeta } from './generateMemoria'
@@ -412,7 +413,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
   const cover = []
   for (let k = 0; k < 5; k++) cover.push(new Paragraph({ children: [run('')] }))
   if (logoImg) cover.push(center([new ImageRun(logoImg)], { after: 120 }))
-  cover.push(center([run('IV INGENIERÍAS', { size: 20, color: GREY, characterSpacing: 60 })], { after: 40 }))
+  cover.push(center([run(MARCA.empresaMayus, { size: 20, color: GREY, characterSpacing: 60 })], { after: 40 }))
   cover.push(center([run('MEMORIA DE CÁLCULO', { size: 56, bold: true, color: INK })], { after: 60 }))
   cover.push(center([run('Diseño estructural · Concreto reforzado', { size: 24, color: SUB })], { after: 200 }))
   cover.push(center([run(M.proyecto || 'Proyecto sin nombre', { size: 30, bold: true, color: INK })], { after: 240 }))
@@ -488,7 +489,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
   ]
 
   const doc = new Document({
-    creator: 'IV Ingenierías · Auxiliar IV',
+    creator: `${MARCA.empresa} · ${MARCA.app}`,
     title: `Memoria de Cálculo${M.proyecto ? ` — ${M.proyecto}` : ''}`,
     styles: {
       default: { document: { run: { font: 'Calibri', size: 22, color: '111111' } } },

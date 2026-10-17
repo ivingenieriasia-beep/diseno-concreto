@@ -23,6 +23,7 @@ import PLANTILLA from '../../scripts/ram/sincronizar.py?raw'
 import INSTALADOR from '../../scripts/ram/instalar_catalogo.py?raw'
 import APLICAR from '../../scripts/ram/aplicar_agrupacion.py?raw'
 import { datosCatalogo } from './catalogoRam'
+import { deMarca } from './marca'
 
 /** Quita comillas, espacios y barras sobrantes de una ruta pegada a mano */
 export function normalizarRuta(s) {
@@ -88,7 +89,7 @@ export function generarScriptRam(ruta, { proyecto = '' } = {}) {
   texto = texto.replace(/^(# -\*- coding: [^\n]*\n)/, `$1${cabecera}`)
 
   return {
-    ok: true, texto, ruta: limpia,
+    ok: true, texto: deMarca(texto), ruta: limpia,
     nombre: 'sincronizar.py',
     aviso: '',
   }
@@ -107,7 +108,7 @@ export function generarInstaladorCatalogo() {
   if (!BLOQUE_CATALOGO.test(INSTALADOR)) {
     return { ok: false, aviso: 'La plantilla del instalador ya no trae el bloque CATALOGO.' }
   }
-  return { ok: true, nombre: 'instalar_catalogo.py', texto: INSTALADOR.replace(BLOQUE_CATALOGO, catalogoComoPython()) }
+  return { ok: true, nombre: 'instalar_catalogo.py', texto: deMarca(INSTALADOR.replace(BLOQUE_CATALOGO, catalogoComoPython())) }
 }
 
 // ── Aplicar una agrupación en RAM ─────────────────────────────
@@ -139,5 +140,5 @@ export function generarAplicarAgrupacion(propuesta, { carpetaDeshacer = '' } = {
   if (destino && esRutaWindows(destino.replace(/\//g, '\\')) && !destino.includes("'")) {
     texto = texto.replace(/^CARPETA_DESHACER = None$/m, `CARPETA_DESHACER = u'${destino}'`)
   }
-  return { ok: true, nombre: 'aplicar_agrupacion.py', texto }
+  return { ok: true, nombre: 'aplicar_agrupacion.py', texto: deMarca(texto) }
 }

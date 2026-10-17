@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
+import { MARCA, enPdf, rgbDe } from './marca'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
@@ -122,6 +123,8 @@ function drawWatermark(doc, pageW, pageH) {
   const cy = pageH / 2 - 10
   const s = 1.8 // scale
 
+  if (MARCA.id === 'sogrub') { marcaSogrub(doc, cx, cy, s); doc.restoreGraphicsState(); return }
+
   // "I" vertical bar
   setFill(doc, [30, 30, 30])
   doc.rect(cx - 28 * s, cy - 25 * s, 8 * s, 50 * s, 'F')
@@ -175,6 +178,20 @@ function drawWatermark(doc, pageW, pageH) {
   doc.text('INGENIERIAS', cx, cy + 32 * s, { align: 'center' })
 
   doc.restoreGraphicsState()
+}
+
+// La «S» de bloques de SOGRUB (la misma geometría que su logo, en unidades
+// del viewBox 200×170 centradas en el bloque) y su nombre abajo
+function marcaSogrub(doc, cx, cy, s) {
+  const u = s * 0.5
+  const bloque = (x, y, w, h) => doc.rect(cx + (x - 100) * u, cy + (y - 58) * u, w * u, h * u, 'F')
+  setFill(doc, [30, 30, 30])
+  bloque(72, 8, 56, 16); bloque(72, 8, 16, 46); bloque(112, 54, 16, 46); bloque(72, 92, 56, 16)
+  setFill(doc, rgbDe(MARCA.acento))
+  bloque(72, 46, 56, 16)
+  doc.setFontSize(18)
+  setColor(doc, [30, 30, 30])
+  doc.text('SOGRUB', cx, cy + 32 * s, { align: 'center' })
 }
 
 // ── Verification row helper ─────────────────────────────────
@@ -468,7 +485,7 @@ export function generateReport(sections, projectName = '', columns = []) {
   y += 5
   doc.setFontSize(9)
   setColor(doc, COL.tx3)
-  doc.text('Auxiliar IV - Detallador de elementos de concreto', marginL, y)
+  doc.text(`${enPdf(MARCA.app)} - Detallador de elementos de concreto`, marginL, y)
 
   if (projectName.trim()) {
     y += 4.5
@@ -797,7 +814,7 @@ export function generateReport(sections, projectName = '', columns = []) {
   y += 6
   doc.setFontSize(7)
   setColor(doc, COL.tx3)
-  doc.text(`Generado con Auxiliar IV v${APP_VERSION} - Detallador de elementos de concreto`, marginL, y)
+  doc.text(`Generado con ${enPdf(MARCA.app)} v${APP_VERSION} - Detallador de elementos de concreto`, marginL, y)
   doc.text(`Trabes: ${sections.length}  |  Columnas: ${columns.length}  |  P\u00E1ginas: ${pageNum}`, marginL, y + 3.5)
 
   // ── Watermark + Footer on each page ──

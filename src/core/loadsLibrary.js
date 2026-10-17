@@ -9,6 +9,7 @@
 import {
   MATERIALES, COMPONENTES_DIRECTOS, PLANTILLAS_LOSA, PLANTILLAS_MURO,
 } from './loadsCatalog'
+import { MARCA } from './marca'
 
 const LS_KEY = 'iv_loads_lib_v1'
 export const LIB_VERSION = 1
@@ -265,7 +266,7 @@ export function importLibrary(texto, { modo = 'merge' } = {}) {
   try { data = typeof texto === 'string' ? JSON.parse(texto) : texto } catch { return { ok: false, error: 'El archivo no es un JSON válido.' } }
   if (!data || typeof data !== 'object') return { ok: false, error: 'El archivo no tiene el formato esperado.' }
   if (data.tipo && data.tipo !== 'auxiliar-iv-biblioteca-cargas') {
-    return { ok: false, error: 'Ese .json no es una biblioteca de cargas de Auxiliar IV.' }
+    return { ok: false, error: `Ese .json no es una biblioteca de cargas de ${MARCA.app}.` }
   }
   const entra = { ...vacio(), ...data }
   const unirPorNombre = (a, b) => {

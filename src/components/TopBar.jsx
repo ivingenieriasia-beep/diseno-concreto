@@ -3,6 +3,7 @@ import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { timeAgo } from '../core/autosave'
 import Novedades from './Novedades'
+import { MARCA } from '../core/marca'
 import useCimStore from '../store/useCimStore'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 
@@ -91,7 +92,7 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
           &#9645;
         </span>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-tx1)' }}>
-          Auxiliar IV
+          {MARCA.app}
         </span>
         <Novedades />
       </div>
