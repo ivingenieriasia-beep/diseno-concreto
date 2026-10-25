@@ -5,6 +5,7 @@
 
 import { APP_VERSION } from '../core/constants'
 import { MARCA } from '../core/marca'
+import { FUENTES_DOC } from '#marca-extra'
 
 function fmt(v, dec = 4) {
   if (v === null || v === undefined || isNaN(v)) return '—'
@@ -16,6 +17,7 @@ const LOGO_SVG = MARCA.logo
 const PRINT_STYLE = `
   body { font-family:'IBM Plex Sans',Arial,sans-serif; margin:18mm 15mm; color:#111; }
   @media print { body { margin:10mm 12mm; } }
+  ${FUENTES_DOC}
 `
 
 function printDoc(elId, title) {
@@ -37,7 +39,7 @@ function printDoc(elId, title) {
         </div>
       </div>
       <img src="data:image/svg+xml;base64,${logob64}"
-        style="width:48px;opacity:0.85;" alt="${MARCA.empresa}"/>
+        style="width:${MARCA.logoAncho}px;opacity:${MARCA.logoOpacidad};" alt="${MARCA.empresa}"/>
     </div>`
 
   const w = window.open('', '_blank')
@@ -479,7 +481,7 @@ export default function MemoriaView({ nombre, fc, fy, b, h, r, MuP, MuN, resP, r
         {/* Footer */}
         <div style={{ borderTop: `2px solid ${MARCA.acento}`, paddingTop: 10, marginTop: 24,
           fontSize: 10, color: '#9ca3af', textAlign: 'right' }}>
-          {MARCA.empresa} · {MARCA.app} v{APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)
+          {MARCA.pie} · {MARCA.app} v{APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)
         </div>
       </div>
     </div>

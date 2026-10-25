@@ -6,6 +6,7 @@ import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
 import { MARCA } from './marca'
+import { FUENTES_DOC } from '#marca-extra'
 import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
@@ -51,6 +52,7 @@ export const CSS = `
   table.summary { width:100%; border-collapse:collapse; font-size:12px; }
   table.summary th,table.summary td { padding:6px 10px; border:1px solid #d1d5db; text-align:left; }
   table.summary th { background:#f3f4f6; font-weight:700; }
+  ${FUENTES_DOC}
 `
 
 function linea(sym, formula, sust, resultado, unidad, ok, nota) {
@@ -352,7 +354,7 @@ function renderColumnas(columnsArr, envStats = null) {
             <td style="color:${bi.ok ? '#15803d' : '#dc2626'};font-weight:700">${bi.ok ? '✓ CUMPLE' : '✗ NO CUMPLE'}</td></tr>
       </table>
 
-      <div style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid #1a7a5e;padding-bottom:8px;margin:24px 0 14px;text-transform:uppercase">
+      <div style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid ${MARCA.acentoTexto};padding-bottom:8px;margin:24px 0 14px;text-transform:uppercase">
         Acero transversal
       </div>
       <table class="summary">
@@ -379,7 +381,7 @@ function renderColumnas(columnsArr, envStats = null) {
             : '✗ DISEÑO NO VÁLIDO — el punto queda fuera del diagrama; revisar sección o armado')}</div>
 
       <div style="border-top:2px solid ${MARCA.acento};padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">
-        ${MARCA.empresa} · ${MARCA.app} — Columnas por flexocompresión
+        ${MARCA.pie} · ${MARCA.app} — Columnas por flexocompresión
       </div>
     </div>`
   }).join('')
@@ -531,7 +533,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
     }
 
     // Footer per section
-    sectionsHTML += `<div style="border-top:2px solid ${MARCA.acento};padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">${MARCA.empresa} · ${MARCA.app} v${APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
+    sectionsHTML += `<div style="border-top:2px solid ${MARCA.acento};padding-top:10px;margin-top:24px;font-size:10px;color:#9ca3af;text-align:right">${MARCA.pie} · ${MARCA.app} v${APP_VERSION} NTC-2023 · (q conforme NTC-2017, ver nota)</div>`
     sectionsHTML += '</div>'
   })
 
@@ -617,7 +619,7 @@ export function generateDetailedReport(sections, projectName = '', columns = [])
       <div style="font-size:11pt;font-weight:800;color:${MARCA.tinta};letter-spacing:-0.01em">${MARCA.empresa}</div>
       <div style="font-size:8pt;color:#9ca3af;margin-top:2px">${projectName ? `Proyecto: ${projectName} — ` : ''}${dateStr}</div>
     </div>
-    <img src="data:image/svg+xml;base64,${logob64}" style="width:48px;opacity:0.85" alt="${MARCA.empresa}"/>
+    <img src="data:image/svg+xml;base64,${logob64}" style="width:${MARCA.logoAncho}px;opacity:${MARCA.logoOpacidad}" alt="${MARCA.empresa}"/>
   </div>`
 
   // Open print window

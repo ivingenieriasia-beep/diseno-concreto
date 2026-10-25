@@ -7,12 +7,14 @@ import useCimStore from '../store/useCimStore'
 import { prellenado } from '../core/memoriaDatos'
 import { modeloGuardado } from '../core/ramSync'
 import { parseModeloRam } from '../core/ramModel'
+import { MARCA } from '../core/marca'
 
 const LS_KEY = 'iv_memoria_meta'
 
 const blankMeta = () => ({
   proyecto: '', ubicacion: '', area: '', niveles: '', hEntrepiso: '',
-  responsable: '', cedula: '', fecha: new Date().toLocaleDateString('es-MX'),
+  // SOGRUB: firma el Ing. Fernando Burgos; se puede cambiar en el diálogo
+  responsable: (MARCA.responsable || '').replace(/^Ing\.\s*/, ''), cedula: '', fecha: new Date().toLocaleDateString('es-MX'),
   descripcion: '',
   cmEntrepiso: '236.5', cmMuro: '249.4', cvEntrepiso: '190', cvAzotea: '100',
   detalleTodos: true,

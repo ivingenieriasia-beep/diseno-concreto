@@ -20,14 +20,14 @@ RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 MARCAS = {
     'iv': {'app': 'Auxiliar IV', 'carpeta_zip': 'paquete-agente-auxiliar-iv', 'dist': 'dist', 'cambios': []},
     'sogrub': {
-        'app': 'Auxiliar SOGRUB', 'carpeta_zip': 'paquete-agente-auxiliar-sogrub', 'dist': 'dist-sogrub',
+        'app': 'SOGRUB Concreto', 'carpeta_zip': 'paquete-agente-auxiliar-sogrub', 'dist': 'dist-sogrub',
         # en orden: lo más largo primero
         'cambios': [
-            ('IV Ingenierías · Estructuras', 'SOGRUB Grupo Constructor · Estructuras'),
-            ('IV Ingenierías', 'SOGRUB Grupo Constructor'),
+            ('IV Ingenierías · Estructuras', 'Grupo Constructor SOGRUB · Estructuras'),
+            ('IV Ingenierías', 'Grupo Constructor SOGRUB'),
             ('IV INGENIERÍAS', 'SOGRUB'),
             ('IV INGENIERIAS', 'SOGRUB'),
-            ('Auxiliar IV', 'Auxiliar SOGRUB'),
+            ('Auxiliar IV', 'SOGRUB Concreto'),
             ('crear-proyectoiv.bat', 'crear-proyectosogrub.bat'),
             ('burgos2177-create.github.io/auxiliar-iv', 'app/index.html (en el paquete)'),
             ('por criterio IV', 'por criterio de la oficina'),
@@ -37,7 +37,7 @@ MARCAS = {
 
 DESCRIPCION = {
     'iv': 'Opera Auxiliar IV, la app de IV Ingenierías',
-    'sogrub': 'Opera Auxiliar SOGRUB, la app de SOGRUB Grupo Constructor',
+    'sogrub': 'Opera SOGRUB Concreto, la app de Grupo Constructor SOGRUB',
 }
 
 

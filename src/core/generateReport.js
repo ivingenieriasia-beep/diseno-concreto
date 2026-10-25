@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
 import { MARCA, enPdf, rgbDe } from './marca'
+import MARCA_AGUA_SOGRUB from '../assets/marca/sogrub-marca-agua.png?inline'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
@@ -18,7 +19,7 @@ const COL = {
   tx: [26, 24, 20],
   tx2: [74, 70, 64],
   tx3: [138, 133, 128],
-  accent: [91, 197, 174],
+  accent: MARCA.id === 'iv' ? [91, 197, 174] : rgbDe(MARCA.acento),
   accent2: [26, 122, 94],
   steelTop: [201, 79, 42],
   steelBot: [37, 99, 168],
@@ -113,7 +114,7 @@ function drawSection(doc, section, ox, oy, drawScale = 2.2) {
   return { w: bMm, h: hMm }
 }
 
-// ── Watermark: IV INGENIERIAS logo (vector) ─────────────────
+// ── Watermark: logo de la marca (IV vectorial, SOGRUB el del kit) ─────────────────
 function drawWatermark(doc, pageW, pageH) {
   doc.saveGraphicsState()
   // Very subtle — low opacity
@@ -180,18 +181,10 @@ function drawWatermark(doc, pageW, pageH) {
   doc.restoreGraphicsState()
 }
 
-// La «S» de bloques de SOGRUB (la misma geometría que su logo, en unidades
-// del viewBox 200×170 centradas en el bloque) y su nombre abajo
+// El logotipo horizontal de SOGRUB (PNG del kit de marca), centrado y grande
 function marcaSogrub(doc, cx, cy, s) {
-  const u = s * 0.5
-  const bloque = (x, y, w, h) => doc.rect(cx + (x - 100) * u, cy + (y - 58) * u, w * u, h * u, 'F')
-  setFill(doc, [30, 30, 30])
-  bloque(72, 8, 56, 16); bloque(72, 8, 16, 46); bloque(112, 54, 16, 46); bloque(72, 92, 56, 16)
-  setFill(doc, rgbDe(MARCA.acento))
-  bloque(72, 46, 56, 16)
-  doc.setFontSize(18)
-  setColor(doc, [30, 30, 30])
-  doc.text('SOGRUB', cx, cy + 32 * s, { align: 'center' })
+  const w = 62 * s, h = w * (254 / 600)
+  doc.addImage(MARCA_AGUA_SOGRUB, 'PNG', cx - w / 2, cy - h / 2, w, h)
 }
 
 // ── Verification row helper ─────────────────────────────────
@@ -830,6 +823,8 @@ export function generateReport(sections, projectName = '', columns = []) {
     if (projectName.trim()) {
       doc.text(projectName, marginL, pageH - 8)
     }
+    // SOGRUB: pie con razón social y teléfono en todas las hojas
+    if (MARCA.pieEnHojas) doc.text(enPdf(MARCA.pie), pageW / 2, pageH - 8, { align: 'center' })
   }
 
   return doc

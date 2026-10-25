@@ -4,11 +4,12 @@
 // Se elige al compilar con VITE_MARCA (npm run build:sogrub usa
 // .env.sogrub). Sin ella es IV, así que la app publicada no cambia.
 // Sólo cambia lo que se ve: nombre, empresa, logo, el color de las
-// líneas de los informes y la carpeta de la obra. Los formatos de archivo
+// líneas de los informes, el pie, la firma y la carpeta de la obra. Los formatos de archivo
 // (proyecto.json, modelo.json «auxiliar-iv/ram») son los mismos en las dos.
 // ══════════════════════════════════════════════════════════════
 
 import LOGO_SOGRUB from '../assets/marca/sogrub.svg?raw'
+import LOGO_SOGRUB_CORTO from '../assets/marca/sogrub-sin-isotipo.svg?raw'
 
 const LOGO_IV = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170">
   <rect x="18" y="10" width="22" height="90" fill="#1a1a2e"/>
@@ -30,19 +31,39 @@ export const MARCAS = {
     empresaMayus: 'IV INGENIERÍAS',
     carpeta: 'Auxiliar IV',
     acento: '#4ecac4',
+    acentoTexto: '#1a7a5e',
     tinta: '#1b2349',
     logo: LOGO_IV,
+    logoAncho: 48,      // px del logo en el encabezado de las memorias
+    logoOpacidad: 0.85,
+    fuenteWord: 'Calibri',
+    pie: 'IV Ingenierías',
   },
+  // SOGRUB Concreto: la marca aprobada el 25-oct-2026 (kit del CMO,
+  // direcciones/cmo/trabajo/marca-auxiliares). Uso interno, sin lema.
   sogrub: {
     id: 'sogrub',
-    app: 'Auxiliar SOGRUB',
-    empresa: 'SOGRUB Grupo Constructor',
+    app: 'SOGRUB Concreto',
+    nombreCorto: 'Concreto',
+    descripcion: 'Diseño y detallado de elementos de concreto reforzado',
+    empresa: 'Grupo Constructor SOGRUB',
     empresaMayus: 'SOGRUB · GRUPO CONSTRUCTOR',
     razonSocial: 'Grupo Constructor SOGRUB, S.A.S. de C.V.',
-    carpeta: 'Auxiliar SOGRUB',
-    acento: '#b0643f',
-    tinta: '#2e2a27',
-    logo: LOGO_SOGRUB.trim(),
+    telefono: '442 385 5912',
+    responsable: 'Ing. Fernando Burgos',
+    carpeta: 'SOGRUB Concreto',
+    acento: '#1A9DD9',       // líneas y filetes
+    acentoTexto: '#0F6E9C',  // el azul claro sobre blanco no pasa para texto chico (3.06:1)
+    tinta: '#29235C',        // marino del logotipo
+    logo: LOGO_SOGRUB.trim(),            // horizontal a color
+    logoCorto: LOGO_SOGRUB_CORTO.trim(), // sin isotipo: barras y sitios chicos
+    logoAncho: 113,   // ≈ 30 mm, el mínimo del Manual en las memorias
+    logoOpacidad: 1,  // el Manual no admite el logo atenuado
+    fuenteWord: 'Aptos',   // el cuerpo del Word (Roboto no viaja dentro del .docx)
+    pieEnHojas: true,       // pie con razón social y teléfono en cada hoja de Word y de PDF
+    nombreEnLogo: true,    // el logotipo ya dice «Grupo Constructor»: no se repite debajo
+    firmaRegistro: true,   // la firma lleva renglones para cédula y registro de Corresponsable/DRO, a mano
+    pie: 'Grupo Constructor SOGRUB, S.A.S. de C.V. · Tel. 442 385 5912',
   },
 }
 
@@ -52,7 +73,7 @@ export const MARCA = MARCAS[elegida] || MARCAS.iv
 /** El logo listo para un <img src> */
 export const logoDataUri = (m = MARCA) => `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(m.logo)))}`
 
-/** '#b0643f' → [176, 100, 63] */
+/** '#1A9DD9' → [26, 157, 217] */
 export const rgbDe = (hex) => [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16))
 
 /** Sin acentos ni «·», para jsPDF con la fuente de fábrica */
@@ -70,3 +91,16 @@ export function deMarca(texto, m = MARCA) {
     .replace(/Auxiliar IV/g, m.app)
     .replace(/crear-proyectoiv\.bat/g, `crear-proyecto${m.id}.bat`)
 }
+
+/**
+ * Quién firma. El nombre que se captura en la memoria va con «Ing.»; si no
+ * se capturó, el de la marca (SOGRUB: Ing. Fernando Burgos) o un renglón en blanco.
+ */
+export function firmante(responsable, m = MARCA) {
+  const r = String(responsable ?? '').trim()
+  if (r) return `Ing. ${r}`
+  return m.responsable || 'Ing. ________________________'
+}
+
+/** El logo corto (sin isotipo) listo para un <img src>, o null si la marca no lo tiene */
+export const logoCortoDataUri = (m = MARCA) => (m.logoCorto ? logoDataUri({ logo: m.logoCorto }) : null)
