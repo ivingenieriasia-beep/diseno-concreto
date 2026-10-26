@@ -1,0 +1,3 @@
+# Los scripts de RAM se leen como plantillas (?raw) y las pruebas comparan texto:
+# siempre con fin de línea LF, aunque core.autocrlf=true
+*.py text eol=lf
