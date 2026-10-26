@@ -79,7 +79,8 @@ def cabeza(carpeta, m):
         json.dump(manifest, f, ensure_ascii=False, indent=2)
         f.write('\n')
     d, t = esc(m['descripcion']), esc(titulo)
-    # og:image relativa: cuando se defina el dominio hay que poner la URL absoluta
+    # og:image absoluta: los previews (WhatsApp) no resuelven rutas relativas
+    url = 'https://concreto.sogrub.com/'
     meta = '\n'.join([
         '<meta name="description" content="' + d + '">',
         '<meta name="theme-color" content="' + m['color'] + '">',
@@ -92,7 +93,8 @@ def cabeza(carpeta, m):
         '<meta property="og:locale" content="es_MX">',
         '<meta property="og:title" content="' + t + '">',
         '<meta property="og:description" content="' + d + '">',
-        '<meta property="og:image" content="og-1200x630.png">',
+        '<meta property="og:url" content="' + url + '">',
+        '<meta property="og:image" content="' + url + 'og-1200x630.png">',
         '<meta property="og:image:width" content="1200">',
         '<meta property="og:image:height" content="630">',
         '<meta property="og:image:alt" content="' + esc(m['nombre']) + ' — ' + d + '">',
