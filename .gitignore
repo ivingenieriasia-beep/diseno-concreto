@@ -1,6 +1,5 @@
 node_modules/
 dist/
-dist-sogrub/
 .claude/
 *.local
 paquete-agente-*.zip

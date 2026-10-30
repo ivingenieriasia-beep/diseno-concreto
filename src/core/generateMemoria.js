@@ -393,7 +393,7 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
     <!-- ░░ PORTADA ░░ -->
     <div class="mem-cover" style="text-align:center;padding:55mm 0 40mm">
       <img width="120" src="${logoSrc}" style="width:120px;margin:0 auto 18px" alt="${esc(MARCA.empresa)}"/>
-      ${MARCA.nombreEnLogo ? '' : `<div style="font-size:11pt;letter-spacing:0.28em;color:#6b7280;text-transform:uppercase">${esc(MARCA.empresa)}</div>`}
+      <div style="font-size:11pt;letter-spacing:0.28em;color:#6b7280;text-transform:uppercase">${esc(MARCA.empresa)}</div>
       <h1 class="mem" style="font-size:30pt;margin:14px 0 6px">MEMORIA DE CÁLCULO</h1>
       <div style="font-size:13pt;color:#334155;margin-bottom:6px">Diseño estructural · Concreto reforzado</div>
       <div style="font-size:15pt;font-weight:700;color:#0f172a;margin:18px 0 26px">${esc(M.proyecto || 'Proyecto sin nombre')}</div>
@@ -402,7 +402,7 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
         ${M.area ? `<tr><td class="k">Área de construcción</td><td>${esc(M.area)} m²</td></tr>` : ''}
         ${M.niveles ? `<tr><td class="k">Niveles</td><td>${esc(M.niveles)}</td></tr>` : ''}
         <tr><td class="k">Normatividad</td><td>${esc(M.norma)} · ACI 318-19</td></tr>
-        ${M.responsable || MARCA.responsable ? `<tr><td class="k">Responsable</td><td>${esc(firmante(M.responsable))}${M.cedula ? ` · Céd. ${esc(M.cedula)}` : ''}</td></tr>` : ''}
+        ${M.responsable ? `<tr><td class="k">Responsable</td><td>${esc(firmante(M.responsable))}${M.cedula ? ` · Céd. ${esc(M.cedula)}` : ''}</td></tr>` : ''}
         <tr><td class="k">Fecha</td><td>${esc(M.fecha)}</td></tr>
       </table>
     </div>
@@ -522,11 +522,7 @@ function buildMemoriaBody({ sections, M, dcheck, columnsArr = [], renderFig, log
         <p class="mem-p" style="text-align:center;margin-bottom:50px">ATENTAMENTE</p>
         <div class="line"></div>
         <div style="font-weight:700;font-size:11.5pt">${esc(firmante(M.responsable))}</div>
-        ${MARCA.firmaRegistro
-          ? `<div style="font-size:10pt;color:#6b7280">Responsable del cálculo</div>
-        <div style="font-size:10pt;color:#334155;margin-top:8px">Cédula profesional: ${M.cedula ? esc(M.cedula) : '______________________'}</div>
-        <div style="font-size:10pt;color:#334155;margin-top:6px">Registro de Corresponsable en Seguridad Estructural o DRO: ${M.registro ? esc(M.registro) : '______________'}</div>`
-          : (M.cedula ? `<div style="font-size:10pt;color:#6b7280">Cédula: ${esc(M.cedula)}</div>` : '')}
+        ${M.cedula ? `<div style="font-size:10pt;color:#6b7280">Cédula: ${esc(M.cedula)}</div>` : ''}
       </div>
       ${brandFooter(M)}
     </div>`

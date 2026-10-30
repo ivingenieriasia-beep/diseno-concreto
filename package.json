@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:sogrub": "vite build --mode sogrub --outDir dist-sogrub && python3 auth-inject.py dist-sogrub/index.html --marca sogrub && python3 scripts/marca_html.py dist-sogrub sogrub",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

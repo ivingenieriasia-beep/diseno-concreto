@@ -3,7 +3,7 @@ import useBeamStore from '../store/useBeamStore'
 import useColumnStore from '../store/useColumnStore'
 import { timeAgo } from '../core/autosave'
 import Novedades from './Novedades'
-import { MARCA, logoCortoDataUri } from '../core/marca'
+import { MARCA } from '../core/marca'
 import useCimStore from '../store/useCimStore'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 
@@ -88,25 +88,12 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
       style={{ borderColor: 'var(--color-border)', background: 'var(--color-panel)', minHeight: 48 }}>
       {/* Logo / title */}
       <div className="flex items-center gap-2 mr-4" style={{ flexShrink: 0 }}>
-        {MARCA.logoCorto ? (
-          <>
-            {/* SOGRUB: el logotipo sin isotipo (Manual § 1.4.2), 30 px de alto */}
-            <img src={logoCortoDataUri()} alt={MARCA.empresa} style={{ height: 30, display: 'block', marginLeft: 12 }} />
-            <span className="titulo-marca" style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-tx1)',
-              borderLeft: '1px solid var(--color-border2)', paddingLeft: 10, marginLeft: 2 }} title={MARCA.app}>
-              {MARCA.nombreCorto}
-            </span>
-          </>
-        ) : (
-          <>
-            <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
-              &#9645;
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-tx1)' }}>
-              {MARCA.app}
-            </span>
-          </>
-        )}
+        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
+          &#9645;
+        </span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-tx1)' }}>
+          {MARCA.app}
+        </span>
         <Novedades />
       </div>
 

@@ -1,8 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { computeGeometry, placeBastones } from './beamGeometry'
 import { DIAM, CAL_TO_NUM, APP_VERSION } from './constants'
-import { MARCA, enPdf, rgbDe } from './marca'
-import MARCA_AGUA_SOGRUB from '../assets/marca/sogrub-marca-agua.png?inline'
+import { MARCA, enPdf } from './marca'
 import { calcFlexion, calcCortante } from './sectionCalculator'
 import { analyzeColumn, estribosDe, barGrid, bdLookup } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
@@ -19,7 +18,7 @@ const COL = {
   tx: [26, 24, 20],
   tx2: [74, 70, 64],
   tx3: [138, 133, 128],
-  accent: MARCA.id === 'iv' ? [91, 197, 174] : rgbDe(MARCA.acento),
+  accent: [91, 197, 174],
   accent2: [26, 122, 94],
   steelTop: [201, 79, 42],
   steelBot: [37, 99, 168],
@@ -114,7 +113,7 @@ function drawSection(doc, section, ox, oy, drawScale = 2.2) {
   return { w: bMm, h: hMm }
 }
 
-// ── Watermark: logo de la marca (IV vectorial, SOGRUB el del kit) ─────────────────
+// ── Watermark: logo de IV, vectorial ─────────────────
 function drawWatermark(doc, pageW, pageH) {
   doc.saveGraphicsState()
   // Very subtle — low opacity
@@ -123,8 +122,6 @@ function drawWatermark(doc, pageW, pageH) {
   const cx = pageW / 2
   const cy = pageH / 2 - 10
   const s = 1.8 // scale
-
-  if (MARCA.id === 'sogrub') { marcaSogrub(doc, cx, cy, s); doc.restoreGraphicsState(); return }
 
   // "I" vertical bar
   setFill(doc, [30, 30, 30])
@@ -179,12 +176,6 @@ function drawWatermark(doc, pageW, pageH) {
   doc.text('INGENIERIAS', cx, cy + 32 * s, { align: 'center' })
 
   doc.restoreGraphicsState()
-}
-
-// El logotipo horizontal de SOGRUB (PNG del kit de marca), centrado y grande
-function marcaSogrub(doc, cx, cy, s) {
-  const w = 62 * s, h = w * (254 / 600)
-  doc.addImage(MARCA_AGUA_SOGRUB, 'PNG', cx - w / 2, cy - h / 2, w, h)
 }
 
 // ── Verification row helper ─────────────────────────────────
@@ -823,8 +814,6 @@ export function generateReport(sections, projectName = '', columns = []) {
     if (projectName.trim()) {
       doc.text(projectName, marginL, pageH - 8)
     }
-    // SOGRUB: pie con razón social y teléfono en todas las hojas
-    if (MARCA.pieEnHojas) doc.text(enPdf(MARCA.pie), pageW / 2, pageH - 8, { align: 'center' })
   }
 
   return doc

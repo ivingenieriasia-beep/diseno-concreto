@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Arma el paquete para enseñarle la app a un agente de IA.
 
-    npm run build:sogrub                                   (primero, la app con su marca)
-    python3 scripts/paquete_agente.py --marca sogrub       → paquete-agente-auxiliar-sogrub.zip
+    npm run build                                (primero, la app compilada)
+    python3 scripts/paquete_agente.py            → paquete-agente-auxiliar-iv.zip
 
 Junta el prompt y la referencia de agente/ con los textos pasados a la marca,
 las imágenes del manual, la app compilada (dist-<marca>, o dist con IV), los
@@ -19,25 +19,10 @@ RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 
 MARCAS = {
     'iv': {'app': 'Auxiliar IV', 'carpeta_zip': 'paquete-agente-auxiliar-iv', 'dist': 'dist', 'cambios': []},
-    'sogrub': {
-        'app': 'SOGRUB Concreto', 'carpeta_zip': 'paquete-agente-auxiliar-sogrub', 'dist': 'dist-sogrub',
-        # en orden: lo más largo primero
-        'cambios': [
-            ('IV Ingenierías · Estructuras', 'Grupo Constructor SOGRUB · Estructuras'),
-            ('IV Ingenierías', 'Grupo Constructor SOGRUB'),
-            ('IV INGENIERÍAS', 'SOGRUB'),
-            ('IV INGENIERIAS', 'SOGRUB'),
-            ('Auxiliar IV', 'SOGRUB Concreto'),
-            ('crear-proyectoiv.bat', 'crear-proyectosogrub.bat'),
-            ('burgos2177-create.github.io/auxiliar-iv', 'app/index.html (en el paquete)'),
-            ('por criterio IV', 'por criterio de la oficina'),
-        ],
-    },
 }
 
 DESCRIPCION = {
     'iv': 'Opera Auxiliar IV, la app de IV Ingenierías',
-    'sogrub': 'Opera SOGRUB Concreto, la app de Grupo Constructor SOGRUB',
 }
 
 

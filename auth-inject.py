@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Inject the auth gate into built index.html - uses rfind to find the REAL <body> tag
 
-    python3 auth-inject.py dist/index.html docs/index.html                 (IV Ingenierías)
-    python3 auth-inject.py dist-sogrub/index.html out.html --marca sogrub  (SOGRUB)
+    python3 auth-inject.py dist/index.html docs/index.html
 """
 import os
 import re
@@ -29,29 +28,11 @@ LOGO_IV = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" width
 </svg>'''
 
 
-def logo_sogrub():
-    """El logo horizontal de src/assets/marca/sogrub.svg, a 200 px (el mínimo del Manual en pantalla es 120)"""
-    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'assets', 'marca', 'sogrub.svg')
-    with open(ruta, 'r', encoding='utf-8') as f:
-        svg = f.read().strip()
-    # el kit trae width/height en la etiqueta raíz: se cambian por el ancho de la pantalla de entrada
-    raiz = re.match(r'<svg[^>]*>', svg).group(0)
-    nueva = re.sub(r'\s(width|height)="[^"]*"', '', raiz)
-    nueva = nueva.replace('<svg ', '<svg width="200" style="margin:0 auto 24px;display:block" ', 1)
-    return svg.replace(raiz, nueva, 1)
-
-
 # Lo que cambia de una marca a otra en la pantalla de entrada
 MARCAS = {
     'iv': {'fondo': '#1a1a2e 0%,#16213e 50%,#0f3460 100%', 'tinta': '#1a1a2e', 'boton': '#1a7a5e',
            'app': 'Auxiliar IV', 'empresa': 'IV Ingenier&#237;as', 'logo': lambda: LOGO_IV,
            'fuente': 'Arial,sans-serif', 'fuente_titulo': '', 'desc': ''},
-    # SOGRUB Concreto (marca aprobada 25-oct-2026): marino del logotipo, Roboto en el título
-    'sogrub': {'fondo': '#29235C 0%,#1B1740 100%', 'tinta': '#29235C', 'boton': '#29235C',
-               'app': 'SOGRUB Concreto', 'empresa': 'Grupo Constructor SOGRUB', 'logo': logo_sogrub,
-               'fuente': "'Aptos','Segoe UI','Roboto',system-ui,sans-serif",
-               'fuente_titulo': ";font-family:'Roboto','Segoe UI',system-ui,sans-serif",
-               'desc': 'Dise&#241;o y detallado de elementos de concreto reforzado'},
 }
 
 LOGIN_BLOCK = '''<!-- IV Auth Gate -->

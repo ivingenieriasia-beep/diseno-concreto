@@ -5,7 +5,6 @@
 
 import { APP_VERSION } from '../core/constants'
 import { MARCA } from '../core/marca'
-import { FUENTES_DOC } from '#marca-extra'
 
 function fmt(v, dec = 4) {
   if (v === null || v === undefined || isNaN(v)) return '—'
@@ -17,7 +16,6 @@ const LOGO_SVG = MARCA.logo
 const PRINT_STYLE = `
   body { font-family:'IBM Plex Sans',Arial,sans-serif; margin:18mm 15mm; color:#111; }
   @media print { body { margin:10mm 12mm; } }
-  ${FUENTES_DOC}
 `
 
 function printDoc(elId, title) {

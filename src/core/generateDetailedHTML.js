@@ -6,7 +6,6 @@ import { calcFlexion, calcCortante, VARILLAS } from './sectionCalculator'
 import { computeSectionResults, resistenciasConPuntual } from './sectionResults'
 import { CAL_TO_NUM, APP_VERSION } from './constants'
 import { MARCA } from './marca'
-import { FUENTES_DOC } from '#marca-extra'
 import { analyzeColumn, calcEstribos, estribosDe, excentricidad } from './columnCalculator'
 import { evaluateBeamEnvelope, peorPorMiembro } from './ramParser'
 import { columnDemand, demandCase } from './columnDemand'
@@ -52,7 +51,6 @@ export const CSS = `
   table.summary { width:100%; border-collapse:collapse; font-size:12px; }
   table.summary th,table.summary td { padding:6px 10px; border:1px solid #d1d5db; text-align:left; }
   table.summary th { background:#f3f4f6; font-weight:700; }
-  ${FUENTES_DOC}
 `
 
 function linea(sym, formula, sust, resultado, unidad, ok, nota) {

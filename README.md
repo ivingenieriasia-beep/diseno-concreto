@@ -97,21 +97,14 @@ npm test        # suite de pruebas
 npm run build   # build de un solo archivo a dist/
 ```
 
-### Marca SOGRUB y paquete del agente
+### Marca y paquete del agente
 
-La misma app sale como **SOGRUB Concreto** (Grupo Constructor SOGRUB; nombre,
-logo, pantalla de entrada, informes, memoria con pie y firma, tipografías y
-carpeta `PROCESO\SOGRUB Concreto`). La marca vive en `src/core/marca.js`, el kit
-(logos, íconos, Roboto) en `src/assets/marca/` y viene de
-`direcciones/cmo/trabajo/marca-auxiliares` de la oficina. `build:sogrub` además
-deja junto al `index.html` los favicons, íconos, `manifest.webmanifest` y la
-`og-1200x630.png` (los publica todos juntos). Las fuentes de la marca entran sólo
-a ese build (`#marca-extra` en `vite.config.js`). Los formatos de archivo son los
-mismos en las dos marcas; la marca IV de siempre no cambia.
+La app es exclusiva de IV Ingenierías. Su marca (nombre, logo, colores y pie de
+los informes) vive en `src/core/marca.js`.
 
 ```bash
-npm run build:sogrub                              # dist-sogrub/ con su pantalla de entrada
-python3 scripts/paquete_agente.py --marca sogrub  # paquete-agente-auxiliar-sogrub.zip
+npm run build                        # dist/
+python3 scripts/paquete_agente.py    # paquete-agente-auxiliar-iv.zip
 ```
 
 El paquete junta `agente/` (el prompt de sistema, la referencia de cada

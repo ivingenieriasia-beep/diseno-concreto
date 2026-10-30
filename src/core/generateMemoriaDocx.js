@@ -7,7 +7,7 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
-  ImageRun, VerticalAlign, Footer, PageNumber,
+  ImageRun, VerticalAlign,
 } from 'docx'
 import { LOGO_SVG } from './generateDetailedHTML'
 import { MARCA, firmante } from './marca'
@@ -187,7 +187,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
 
   // ── Rasterize all images up front ──
   let logoImg = null
-  try { logoImg = await prep(await svgToPng(LOGO_SVG, 200, 170), MARCA.nombreEnLogo ? 170 : 110) } catch { /* ignore */ }
+  try { logoImg = await prep(await svgToPng(LOGO_SVG, 200, 170), 110) } catch { /* ignore */ }
   const figImgs = await Promise.all(computed.map(async ({ t }) => {
     try { return await prep(await svgToPng(sectionSvgString(t)), 360) } catch { return null }
   }))
@@ -413,7 +413,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
   const cover = []
   for (let k = 0; k < 5; k++) cover.push(new Paragraph({ children: [run('')] }))
   if (logoImg) cover.push(center([new ImageRun(logoImg)], { after: 120 }))
-  if (!MARCA.nombreEnLogo) cover.push(center([run(MARCA.empresaMayus, { size: 20, color: GREY, characterSpacing: 60 })], { after: 40 }))
+  cover.push(center([run(MARCA.empresaMayus, { size: 20, color: GREY, characterSpacing: 60 })], { after: 40 }))
   cover.push(center([run('MEMORIA DE CÁLCULO', { size: 56, bold: true, color: INK })], { after: 60 }))
   cover.push(center([run('Diseño estructural · Concreto reforzado', { size: 24, color: SUB })], { after: 200 }))
   cover.push(center([run(M.proyecto || 'Proyecto sin nombre', { size: 30, bold: true, color: INK })], { after: 240 }))
@@ -422,7 +422,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
   if (M.area) cover.push(info('Área de construcción', `${M.area} m²`))
   if (M.niveles) cover.push(info('Niveles', M.niveles))
   cover.push(info('Normatividad', `${M.norma} · ACI 318-19`))
-  if (M.responsable || MARCA.responsable) cover.push(info('Responsable', `${firmante(M.responsable)}${M.cedula ? ` · Céd. ${M.cedula}` : ''}`))
+  if (M.responsable) cover.push(info('Responsable', `${firmante(M.responsable)}${M.cedula ? ` · Céd. ${M.cedula}` : ''}`))
   cover.push(info('Fecha', M.fecha))
 
   // ── Assemble document children ──
@@ -484,12 +484,8 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
 
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 800, after: 40 }, children: [run('ATENTAMENTE', { bold: true })] }),
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 500, after: 0 }, children: [run('_________________________________', {})] }),
-    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [run(MARCA.firmaRegistro ? firmante(M.responsable) : `Ing. ${M.responsable || ''}`, { bold: true })] }),
-    ...(MARCA.firmaRegistro ? [
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [run('Responsable del cálculo', { size: 18, color: GREY })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [run(`Cédula profesional: ${M.cedula || '______________________'}`, { size: 20, color: SUB })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [run(`Registro de Corresponsable en Seguridad Estructural o DRO: ${M.registro || '______________'}`, { size: 20, color: SUB })] }),
-    ] : M.cedula ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [run(`Cédula: ${M.cedula}`, { size: 18, color: GREY })] })] : []),
+    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [run(`Ing. ${M.responsable || ''}`, { bold: true })] }),
+    ...(M.cedula ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [run(`Cédula: ${M.cedula}`, { size: 18, color: GREY })] })] : []),
   ]
 
   const doc = new Document({
@@ -504,16 +500,6 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
     },
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } },
-      ...(MARCA.pieEnHojas ? { footers: { default: new Footer({ children: [new Paragraph({
-        alignment: AlignmentType.CENTER,
-        border: { top: { color: TEAL, size: 8, style: BorderStyle.SINGLE, space: 4 } },
-        children: [
-          run(`${MARCA.pie}  ·  ${M.proyecto || 'Memoria de cálculo'}  ·  Hoja `, { size: 16, color: GREY }),
-          new TextRun({ children: [PageNumber.CURRENT], size: 16, color: GREY }),
-          run(' de ', { size: 16, color: GREY }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: GREY }),
-        ],
-      })] }) } } : {}),
       children,
     }],
   })
