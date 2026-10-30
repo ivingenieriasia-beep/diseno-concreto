@@ -73,8 +73,8 @@ def main():
     skill = ('---\n'
              'name: %s\n'
              'description: "%s para diseñar y detallar concreto reforzado (NTC-2023) con RAM Elements: secciones, '
-             'columnas, agrupación, deflexiones, cimentaciones, pesos unitarios, memoria y planos. Úsala para operar la app, '
-             'explicar para qué sirve cada herramienta o guiar un proyecto del modelo de RAM a la entrega."\n'
+             'columnas, agrupación, deflexiones, cimentaciones, pesos unitarios, memoria y planos. Úsala para diseñar una obra '
+             'a partir del modelo de RAM ya validado, operar la app o explicar para qué sirve cada herramienta."\n'
              '---\n\n# %s\n\n%s') % (m['carpeta_zip'].replace('paquete-agente-', ''), DESCRIPCION[marca], m['app'], cuerpo)
     escribir(os.path.join(base, 'SKILL.md'), skill)
 

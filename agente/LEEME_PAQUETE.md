@@ -1,12 +1,12 @@
 # Paquete del agente de Auxiliar IV
 
-Todo lo que necesita un agente de IA para aprender a usar **Auxiliar IV**: el prompt, la referencia de cada pantalla, la app y archivos de práctica.
+Todo lo que necesita un agente de IA para diseñar elementos de concreto con **Auxiliar IV**: el prompt, la referencia de cada pantalla, la app y archivos de práctica.
 
 ## Qué trae
 
 | Carpeta / archivo | Para qué |
 |---|---|
-| `PROMPT_SISTEMA.md` | **El prompt.** Quién es el agente, el mapa de la app, para qué sirve cada herramienta, el flujo de una obra, los conceptos, las reglas, las recetas y el diagnóstico. |
+| `PROMPT_SISTEMA.md` | **El prompt.** Quién es el agente (el diseñador) y su frontera con el modelo de RAM, el mapa de la app, para qué sirve cada herramienta, el flujo de una obra, los conceptos, las reglas, las recetas y el diagnóstico. |
 | `SKILL.md` | El mismo prompt como *skill* de Claude (con su encabezado `name` / `description`). |
 | `referencia/` | La base de conocimiento: el manual del equipo y una guía por pantalla, con las etiquetas exactas de botones y campos (y los `data-testid` para operar con navegador). `09-practica.md` trae ejercicios con resultados esperados. |
 | `app/` | La app lista para usarse: abre `app/index.html` en Chrome o Edge. `double_check_estructural.html` y `MallaVigas.html` van junto a ella porque la app los abre como ventanas. |
@@ -37,6 +37,8 @@ La app pide usuario y contraseña al abrirse; son las mismas de siempre. No van 
 3. Termina con las preguntas de autoevaluación del final.
 4. Cuando falle, corrige el prompt o la referencia: la siguiente vez lo hará bien.
 
-## Lo que el agente no hace todavía
+## Qué hace el agente y qué no
 
-Opera la app, explica cada herramienta y revisa que todo esté completo, pero **no sustituye el criterio del ingeniero**: no acepta diseños, no cambia criterios de la oficina y avisa de lo que la app no revisa (esbeltez y cortante de columnas, asentamientos, etc.).
+**Es el diseñador.** Recibe el modelo de RAM ya validado por el modelador y por el de cargas (su frontera), y a partir de ahí diseña y detalla trabes, columnas y cimentación, revisa flechas y arma la memoria, los planos y el Double Check.
+
+**No toca lo que está antes de la frontera:** cargas, combinaciones, geometría, apoyos ni secciones de RAM. Si la solución pide cambiar algo de eso, lo regresa al eslabón que corresponde y la cadena se reinicia. Tampoco cambia los criterios de la oficina sin autorización, avisa de lo que la app no revisa (esbeltez y cortante de columnas, asentamientos, etc.) y no firma: la memoria la firma el ingeniero responsable.
