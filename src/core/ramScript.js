@@ -115,30 +115,64 @@ export function generarInstaladorCatalogo() {
 const BLOQUE_AGRUPACION = /^AGRUPACION = \{[\s\S]*?\n\}\n/m
 
 /**
- * El aplicar_agrupacion.py con la propuesta elegida dentro.
- * @param propuesta  { nombre, grupos:[{ nombre, sec:{nombre}, miembros:[ids] }] }
+ * El nombre con que esa sección está dada de alta en el RAM de la obra.
+ *
+ * RAM busca la sección por nombre, y cada obra puede tener los suyos (en IV,
+ * los del grupo IV: «IVTrabe 15x20cm», «IVCad 15x15cm», «IVCol 15x15cm»). Si el
+ * modelo sincronizado trae su tabla de secciones (modelo.json → secciones), se
+ * usa la de RAM con las mismas b, h y tipo. Si hay varias, la que ya usa la
+ * mayoría de los miembros del grupo (una cadena sigue siendo cadena). Sin
+ * ninguna, se queda el nombre del catálogo de la app y se avisa: el script se
+ * detiene antes de tocar nada si la sección no existe en RAM.
+ *
+ * @param sec            { b, h, tipo, nombre } del catálogo de la app
+ * @param seccionesRam   modelo.json → secciones: { nombre: { b, h, tipo } }
+ * @param actuales       secciones que tienen hoy los miembros del grupo
  */
+export function seccionEnRam(sec, seccionesRam = {}, actuales = []) {
+  const iguales = Object.entries(seccionesRam || {})
+    .filter(([, v]) => +v.b === +sec.b && +v.h === +sec.h && (!v.tipo || !sec.tipo || v.tipo === sec.tipo))
+    .map(([k]) => k)
+  if (!iguales.length) return { nombre: sec.nombre, enRam: !Object.keys(seccionesRam || {}).length }
+  if (iguales.length === 1) return { nombre: iguales[0], enRam: true }
+  const usos = (k) => actuales.filter((a) => a === k).length
+  const nombre = [...iguales].sort((a, b) => usos(b) - usos(a) || a.localeCompare(b))[0]
+  return { nombre, enRam: true }
+}
+
 /**
- * @param propuesta          una propuesta (o el acomodo manual)
+ * El aplicar_agrupacion.py con la propuesta elegida dentro.
+ * @param propuesta             { nombre, grupos:[{ nombre, sec:{b, h, tipo, nombre}, miembros:[ids] }] }
  * @param opts.carpetaDeshacer  ruta de Windows donde el script deja su «Deshacer» (1 Agrupación del proyecto)
+ * @param opts.seccionesRam     modelo.json → secciones, para escribir los nombres de la obra
+ * @param opts.seccionDe        { idDelMiembro → sección que tiene hoy en RAM }
  */
-export function generarAplicarAgrupacion(propuesta, { carpetaDeshacer = '' } = {}) {
+export function generarAplicarAgrupacion(propuesta, { carpetaDeshacer = '', seccionesRam = null, seccionDe = {} } = {}) {
   if (!BLOQUE_AGRUPACION.test(APLICAR)) {
     return { ok: false, aviso: 'La plantilla de aplicar_agrupacion.py ya no trae el bloque AGRUPACION.' }
   }
+  const faltan = []
   const datos = {
     propuesta: propuesta.nombre || '',
-    grupos: propuesta.grupos.map((g) => ({
-      descripcion: g.nombre,
-      seccion: g.sec.nombre,
-      // los ids de RAM son enteros; en la app viajan como texto
-      miembros: g.miembros.map((id) => Number(id)).filter((n) => Number.isFinite(n)),
-    })),
+    grupos: propuesta.grupos.map((g) => {
+      const actuales = g.miembros.map((id) => seccionDe[String(id)]).filter(Boolean)
+      const r = seccionesRam ? seccionEnRam(g.sec, seccionesRam, actuales) : { nombre: g.sec.nombre, enRam: true }
+      if (!r.enRam) faltan.push(`${g.nombre} (${g.sec.b}×${g.sec.h})`)
+      return {
+        descripcion: g.nombre,
+        seccion: r.nombre,
+        // los ids de RAM son enteros; en la app viajan como texto
+        miembros: g.miembros.map((id) => Number(id)).filter((n) => Number.isFinite(n)),
+      }
+    }),
   }
   let texto = APLICAR.replace(BLOQUE_AGRUPACION, `AGRUPACION = ${JSON.stringify(datos, null, 1)}\n`)
   const destino = normalizarRuta(carpetaDeshacer || '').replace(/\\/g, '/')
   if (destino && esRutaWindows(destino.replace(/\//g, '\\')) && !destino.includes("'")) {
     texto = texto.replace(/^CARPETA_DESHACER = None$/m, `CARPETA_DESHACER = u'${destino}'`)
   }
-  return { ok: true, nombre: 'aplicar_agrupacion.py', texto: deMarca(texto) }
+  const aviso = faltan.length
+    ? `En el RAM de la obra no hay una sección con las medidas de ${faltan.join(', ')}: el script se detendrá sin tocar nada. Dala de alta en RAM, sincroniza y vuelve a bajarlo.`
+    : ''
+  return { ok: true, nombre: 'aplicar_agrupacion.py', texto: deMarca(texto), faltan, aviso }
 }
