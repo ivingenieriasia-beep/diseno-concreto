@@ -15,6 +15,9 @@ import ModuleLauncher from './components/ModuleLauncher'
 import LoadCenter from './components/LoadCenter'
 import ModuleIcon from './components/ModuleIcon'
 import MemoriaDialog from './components/MemoriaDialog'
+import Consola from './components/Consola'
+import useConsola from './core/consola/registro'
+import { registrarUI } from './core/consola/puente'
 import useBeamStore from './store/useBeamStore'
 import useColumnStore from './store/useColumnStore'
 import useLoadsStore from './store/useLoadsStore'
@@ -120,6 +123,8 @@ export default function App() {
   useEffect(() => {
     const h = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setLauncher((v) => !v) }
+      // Ctrl+` abre y cierra la consola
+      if ((e.metaKey || e.ctrlKey) && (e.key === '`' || e.code === 'Backquote')) { e.preventDefault(); useConsola.getState().alternar() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -192,6 +197,7 @@ export default function App() {
     if (!str) return
     const r = await guardarSalida(`${fileName}.svg`, str, { sub: 'planos', mime: 'image/svg+xml' })
     if (r.donde === 'carpeta') showToast(`SVG ${dondeQuedo(r)}`)
+    return r
   }, [getSvgString, fileName, showToast])
 
   const handleExportDxf = useCallback(async () => {
@@ -200,15 +206,17 @@ export default function App() {
     const dxf = svgToDxf(str, { scaleFactor: dxfScale })
     const r = await guardarSalida(`${fileName}.dxf`, dxf, { sub: 'planos', mime: 'application/dxf' })
     if (r.donde === 'carpeta') showToast(`DXF ${dondeQuedo(r)}`)
+    return r
   }, [getSvgString, dxfScale, fileName, showToast])
 
   const handleSave = useCallback(async () => {
     const data = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() })
     const r = await guardarProyecto(data, `${fileName}.json`)
-    if (r.cancelado) { showToast('No se guardó: la carpeta tiene otro proyecto', 'warn'); return }
+    if (r.cancelado) { showToast('No se guardó: la carpeta tiene otro proyecto', 'warn'); return r }
     pushRecent(data)
     setRecents(listRecents())
     if (r.donde === 'carpeta') showToast(`Proyecto ${dondeQuedo(r)} · el anterior quedó en 3 Respaldos`)
+    return r
   }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, empacarCim, fileName, showToast])
 
   // Los informes tienen que ver lo mismo que el módulo Longitudinal: con la
@@ -223,13 +231,14 @@ export default function App() {
   const handleVerifyResumido = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
     const doc = generateReport(seccionesConGeometria, projectName, columns)
-    guardarSalida(`${fileName}-verificacion.pdf`, doc.output('blob'), { sub: 'memoria', mime: 'application/pdf' })
-      .then((r) => { if (r.donde === 'carpeta') showToast(`Verificación ${dondeQuedo(r)}`) })
+    return guardarSalida(`${fileName}-verificacion.pdf`, doc.output('blob'), { sub: 'memoria', mime: 'application/pdf' })
+      .then((r) => { if (r.donde === 'carpeta') showToast(`Verificación ${dondeQuedo(r)}`); return r })
   }, [seccionesConGeometria, sections.length, columns, projectName, fileName, showToast])
 
   const handleVerifyDetallado = useCallback(() => {
     if (sections.length === 0 && columns.length === 0) return
     generateDetailedReport(seccionesConGeometria, projectName, columns)
+    return { donde: 'ventana', ruta: 'ventana nueva' }
   }, [seccionesConGeometria, sections.length, columns, projectName])
 
   // Double Check prellenado (nombres, resistencias y demandas); sólo faltan las capturas
@@ -237,8 +246,9 @@ export default function App() {
     if (sections.length === 0 && columns.length === 0) return
     const data = buildDcheck({ projectName, sections, columns })
     const stamp = (projectName.trim() || 'proyecto').replace(/\s+/g, '_')
-    guardarSalida(`DoubleCheck_${stamp}.dcheck`, JSON.stringify(data), { sub: 'dcheck', mime: 'application/json' }).then((r) => {
+    return guardarSalida(`DoubleCheck_${stamp}.dcheck`, JSON.stringify(data), { sub: 'dcheck', mime: 'application/json' }).then((r) => {
       showToast(`Double Check ${r.donde === 'carpeta' ? dondeQuedo(r) : 'exportado'} · ${data.sections.length} elemento(s) prellenados; falta añadir las capturas`)
+      return { ...r, elementos: data.sections.length }
     })
   }, [sections, columns, projectName, showToast])
 
@@ -333,6 +343,22 @@ export default function App() {
     pesos: losasCarga.length + tablerosCarga.length,
     cimentaciones: cimientos.length,
   }), [longStats.n, dbCount, losasCarga.length, tablerosCarga.length, cimientos.length])
+
+  // La consola hace lo mismo que los botones: aquí se le prestan
+  registrarUI({
+    irA: setMainTab,
+    abrirModulo: (id) => abrirModulo(getModulo(id)),
+    abrirCentro: () => setCentro(true),
+    toast: showToast,
+    exportarDxf: handleExportDxf,
+    exportarSvg: handleExportSvg,
+    verificarResumido: handleVerifyResumido,
+    verificarDetallado: handleVerifyDetallado,
+    exportarDcheck: handleExportDcheck,
+    guardar: handleSave,
+    pestana: () => (getModulo(mainTab)?.nombre || { detalle: 'Secciones', calculo: 'Calculo', columnas: 'Columnas' }[mainTab] || mainTab),
+    proyecto: () => projectName,
+  })
 
   const vistaModulo = {
     longitudinal: <LongitudinalView dxfScale={dxfScale} projectName={projectName} onAbrirCentro={() => setCentro(true)} />,
@@ -458,6 +484,8 @@ export default function App() {
           {vistaModulo[id]}
         </div>
       ))}
+
+      <Consola />
 
       <ModuleLauncher
         open={launcher}

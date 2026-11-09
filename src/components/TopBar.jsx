@@ -6,6 +6,8 @@ import Novedades from './Novedades'
 import { MARCA, logoCortoDataUri } from '../core/marca'
 import useCimStore from '../store/useCimStore'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
+import useConsola from '../core/consola/registro'
+import { IconoConsola } from './Consola'
 
 const SCALE_PRESETS = [
   { label: '50:1', value: 0.02 },
@@ -38,6 +40,9 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
   const columnsCount = columns.length
   const nCimientos = useCimStore((s) => s.cimientos.length)
   const hasContent = sections.length > 0 || columnsCount > 0 || nCimientos > 0
+  const consolaAbierta = useConsola((s) => s.abierta)
+  const consolaNoLeidas = useConsola((s) => s.noLeidas)
+  const alternarConsola = useConsola((s) => s.alternar)
 
   const [arrastre, setArrastre] = useState(null) // { from, over, lado }
   const envRef = useRef(null)
@@ -512,6 +517,31 @@ export default function TopBar({ onExportDxf, onExportSvg, onSave, onOpen, onNew
           style={{ fontSize: 12 }}
         >
           Exportar DXF
+        </button>
+
+        {/* La consola: discreta, al final de la barra */}
+        <button
+          onClick={alternarConsola}
+          data-testid="consola-btn"
+          aria-label="Consola"
+          aria-pressed={consolaAbierta}
+          title={`Consola de comandos (Ctrl+\`)${consolaNoLeidas ? ` · ${consolaNoLeidas} comando(s) nuevo(s) del agente` : ''}`}
+          style={{
+            position: 'relative', display: 'inline-flex', alignItems: 'center', padding: 3, marginLeft: 2,
+            border: 'none', borderRadius: 5, cursor: 'pointer',
+            background: consolaAbierta ? 'var(--color-border)' : 'transparent',
+            opacity: consolaAbierta ? 1 : 0.75,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1 }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = consolaAbierta ? 1 : 0.75 }}
+        >
+          <IconoConsola size={20} />
+          {consolaNoLeidas > 0 && (
+            <span style={{
+              position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: '50%',
+              background: '#e3b341', border: '1.5px solid var(--color-bg)',
+            }} />
+          )}
         </button>
       </div>
     </header>

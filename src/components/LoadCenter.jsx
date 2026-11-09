@@ -4,15 +4,15 @@ import useColumnStore from '../store/useColumnStore'
 import { REPORTES, clasificarLote } from '../core/ramReports'
 import { repartirEnvolventes, resumenReparto } from '../core/bulkEnvelopes'
 import { parseGeometryReport, parseNodeXlsx, attachGeometry } from '../core/geometry'
-import { parseModeloRam, looksLikeModeloRam, resumenModeloRam, repartirModelo, seccionSugerida, SIN_NOMBRE } from '../core/ramModel'
+import { looksLikeModeloRam, seccionSugerida } from '../core/ramModel'
 import { generarScriptRam, esRutaWindows, normalizarRuta, nombreCarpeta, generarInstaladorCatalogo } from '../core/ramScript'
 import { SECCIONES_RAM, MATERIALES_RAM, MAMPOSTERIA_RAM } from '../core/catalogoRam'
-import { proponerTrabe, proponerColumna } from '../core/propuesta'
 import {
   puedeRecordar, elegirCarpeta, carpetaGuardada, permisoDe, recorrerCarpeta, guardarCarpeta, modeloGuardado,
-  guardarModelo, guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
+  guardarSync, ultimaSync, cambios, resumenSync, hace, olvidarCarpeta,
 } from '../core/ramSync'
 import { MARCA } from '../core/marca'
+import { aplicarModeloRam, crearSeccionesDesdeModelo } from '../core/ramAplicar'
 import { setCarpetaActiva, asegurarArbol, escribir, respaldarModelo, rutaLegible } from '../core/carpeta'
 
 // Centro de carga: un solo lugar para meter todo lo que sale de RAM, con el
@@ -65,14 +65,11 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   const setPerfilAt = useBeamStore((s) => s.setPerfilAt)
   const model = useBeamStore((s) => s.model)
   const setModel = useBeamStore((s) => s.setModel)
-  const setReacciones = useBeamStore((s) => s.setReacciones)
   const rutaRam = useBeamStore((s) => s.rutaRam)
   const setRutaRam = useBeamStore((s) => s.setRutaRam)
-  const addSection = useBeamStore((s) => s.addSection)
   const patchSectionAt = useBeamStore((s) => s.patchSectionAt)
   const columns = useColumnStore((s) => s.columns)
   const setColEnvelopeAt = useColumnStore((s) => s.setEnvelopeAt)
-  const addColumn = useColumnStore((s) => s.addColumn)
   const patchColumnAt = useColumnStore((s) => s.patchColumnAt)
   const inputRef = useRef(null)
   const dirRef = useRef(null)
@@ -225,43 +222,11 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
   // cada miembro ya afinado. Los grupos vienen etiquetados por el propio
   // modelo (T5, C1…), así que caen solos en su chip.
   function aplicarModelo(texto, nombre) {
-    const R = parseModeloRam(texto, nombre)
-    if (!R.ok) return { nota: R.warnings[0], R }
-    setModel(R.model)
-    setReacciones(R.reacciones)
-    const { asignados, sinChip } = repartirModelo(R, { trabes: sections, columnas: columns })
-    // Si el chip tiene otras medidas que la sección analizada en RAM, las
-    // demandas que entran son de otra sección. Callarlo sería lo peor.
-    const discrepan = []
-    for (const a of asignados) {
-      const su = seccionSugerida(a.grupo)
-      if (!su.ancho) continue
-      const chip = a.tipo === 'trabe' ? sections[a.idx] : columns[a.idx]
-      const b = +(a.tipo === 'trabe' ? chip.ancho : chip.b) || 0
-      const h = +(a.tipo === 'trabe' ? chip.peralte : chip.h) || 0
-      if (b !== su.ancho || h !== su.peralte) {
-        discrepan.push({ tipo: a.tipo, idx: a.idx, nombre: chip.nombre, b, h, ancho: su.ancho, peralte: su.peralte, seccion: su.seccion, contradice: su.contradice })
-      }
-    }
-    for (const a of asignados) {
-      if (a.tipo === 'trabe') {
-        setPerfilAt(a.idx, a.grupo.perfil)
-        setEnvelopeAt(a.idx, { archivo: nombre, combo: a.grupo.perfil.combo, unidades: R.modelo.unidades, invertir: false, points: a.grupo.points })
-      } else {
-        setColEnvelopeAt(a.idx, { archivo: nombre, combo: a.grupo.perfil.combo, unidades: R.modelo.unidades, mapping: 'M33X', points: a.grupo.points })
-      }
-    }
-    // Los miembros sin descripción no son una sección: son lo que falta agrupar
-    setFaltan(sinChip.filter((g) => g.nombre !== SIN_NOMBRE))
-    setSinDescripcion(sinChip.filter((g) => g.nombre === SIN_NOMBRE).reduce((n, g) => n + g.n, 0))
-    guardarModelo(texto, nombre)          // en IndexedDB: no cabe en el autoguardado
-    const enChip = asignados.map((a) => a.grupo.nombre).join(', ')
-    return {
-      R,
-      discrepan,
-      nota: `${resumenModeloRam(R)} · aplicado a ${asignados.length} chip(s)${enChip ? `: ${enChip}` : ''}`
-        + (sinChip.length ? ` · ${sinChip.length} grupo(s) sin sección en el proyecto` : ''),
-    }
+    const r = aplicarModeloRam(texto, nombre)
+    if (!r.R.ok) return r
+    setFaltan(r.faltan)
+    setSinDescripcion(r.sinDescripcion)
+    return r
   }
 
   // ── El script de RAM, con la carpeta de ESTE proyecto dentro ──
@@ -334,38 +299,9 @@ export default function LoadCenter({ onClose, onToast, projectName = '' }) {
    * verificado con los mismos motores que luego la revisan.
    */
   async function crearFaltantes() {
-    const hechos = []
-    const props = []
     const lista = faltan
     setFaltan([])
-    for (const g of lista) {
-      const s = seccionSugerida(g)
-      setOcupado(`Proponiendo el armado de ${s.nombre}…`)
-      await new Promise((r) => setTimeout(r, 0))     // que se pinte el avance entre grupos
-      let p = null
-      if (s.esColumna) {
-        const idx = addColumn({ nombre: s.nombre, ...(s.ancho ? { b: s.ancho, h: s.peralte } : {}) })
-        setColEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, mapping: 'M33X', points: g.points })
-        // la altura (para la zona de estribos de los extremos): el tramo más largo del grupo
-        const H = Math.max(0, ...g.perfil.members.map((m) => +m.Lreport || 0)) || null
-        try { p = proponerColumna(useColumnStore.getState().columns[idx], { H }) } catch (e) { console.error(e) }
-        if (p && Object.keys(p.patch).length) patchColumnAt(idx, p.patch)
-      } else {
-        const idx = addSection({ nombre: s.nombre, ...(s.ancho ? { ancho: s.ancho, peralte: s.peralte } : {}) })
-        setPerfilAt(idx, g.perfil)
-        setEnvelopeAt(idx, { archivo: g.perfil.archivo, combo: g.perfil.combo, invertir: false, points: g.points })
-        const B = useBeamStore.getState()
-        try { p = proponerTrabe(B.sections[idx], B.model) } catch (e) { console.error(e) }
-        if (p && Object.keys(p.patch).length) patchSectionAt(idx, p.patch)
-      }
-      const bh = s.ancho ? `${s.ancho}×${s.peralte}` : ''
-      hechos.push(`${s.nombre}${bh ? ` (${bh})` : ''}`)
-      props.push({
-        nombre: s.nombre, tipo: s.esColumna ? 'columna' : 'trabe', bh, n: g.n,
-        estado: p?.estado || 'sin', texto: p?.texto || 'sin envolvente: no hay con qué proponer',
-        motivos: p?.motivos || [], avisos: p?.avisos || [], kg: p?.kg || 0,
-      })
-    }
+    const { hechos, props } = await crearSeccionesDesdeModelo(lista, { onAvance: setOcupado })
     setOcupado('')
     setPropuestas(props)
     const nOk = props.filter((x) => x.estado === 'ok').length
