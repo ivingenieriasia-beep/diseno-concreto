@@ -350,8 +350,15 @@ function Agrupador({ pieza, fuente, inv, memo, giro, girar, onToast, setAvisoGen
     setAviso('')
     setAvisoGeneral('')
     // el «Deshacer» que deja el script va a la carpeta 1 Agrupación de la obra
-    const r = generarAplicarAgrupacion(P, { carpetaDeshacer: rutaRam ? `${rutaRam}\\1 Agrupación` : '' })
+    // los nombres de sección que tiene el RAM de la obra (p. ej. los del grupo IV)
+    const seccionDe = {}
+    for (const g of fuente.R.grupos || []) for (const mb of g.perfil?.members || []) seccionDe[mb.id] = mb.seccion
+    const r = generarAplicarAgrupacion(P, {
+      carpetaDeshacer: rutaRam ? `${rutaRam}\\1 Agrupación` : '',
+      seccionesRam: fuente.R.secciones, seccionDe,
+    })
     if (!r.ok) { setAviso(r.aviso); return }
+    if (r.aviso) setAviso(r.aviso)
     const nombre = `aplicar_agrupacion${esCol ? ' columnas' : ''} ${sello()}.py`
     const g = await guardarSalida(nombre, new Blob([r.texto], { type: 'text/x-python;charset=utf-8' }), { sub: 'agrupacion' })
     onToast?.(`${nombre} ${dondeQuedo(g)}: en RAM, Abrir Script… → Ctrl+R`, 'ok')

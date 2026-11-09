@@ -56,7 +56,7 @@ describe('dimensionar', () => {
   })
 
   it('con tope de peralte, ninguna propuesta pasa de él', () => {
-    expect(PERALTES).toEqual([20, 25, 30, 35, 40, 45, 50])
+    expect(PERALTES).toEqual([15, 20, 25, 30, 35, 40, 45, 50])
     expect(candidatas([15, 20, 25], [20, 25, 30]).every((s) => s.h <= 30)).toBe(true)
     const A = proponerAgrupacion(R, ['T5', 'T6', 'T4', 'T7'], { peraltes: [20, 25, 30, 35] })
     for (const P of A.propuestas) for (const g of P.grupos) expect(g.sec.h).toBeLessThanOrEqual(35)

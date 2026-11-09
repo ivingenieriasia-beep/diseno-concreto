@@ -67,6 +67,13 @@ CATALOGO = {
   },
   {
    "tabla": "Vigas de Concreto",
+   "nombre": "15 X 15",
+   "b": 15,
+   "h": 15,
+   "s": 3
+  },
+  {
+   "tabla": "Vigas de Concreto",
    "nombre": "15 X 20",
    "b": 15,
    "h": 20,
