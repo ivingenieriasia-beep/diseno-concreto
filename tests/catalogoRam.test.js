@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { SECCIONES_RAM, MATERIALES_RAM, materialRam, enCatalogo, nombreSeccionRam, RECUB_RAM } from '../src/core/catalogoRam.js'
 
 describe('catálogo de secciones para RAM', () => {
-  it('21 vigas (con la nervadura) y 9 columnas, con s = 3 cm', () => {
+  it('22 vigas (con la nervadura y la dala de 15 x 15) y 9 columnas, con s = 3 cm', () => {
     const vigas = SECCIONES_RAM.filter((s) => s.tipo === 'viga')
     const cols = SECCIONES_RAM.filter((s) => s.tipo === 'columna')
-    expect(vigas).toHaveLength(21)
+    expect(vigas).toHaveLength(22)
+    expect(enCatalogo(15, 15, 'viga')).toBe(true)
+    expect(nombreSeccionRam(15, 15)).toBe('15 X 15')
     expect(cols.map((s) => s.nombre)).toEqual([
       'COL 15 X 15', 'COL 15 X 20', 'COL 15 X 25', 'COL 20 X 20', 'COL 20 X 25',
       'COL 25 X 10', 'COL 25 X 25', 'COL 30 X 30', 'COL 36 X 36',
@@ -18,7 +20,7 @@ describe('catálogo de secciones para RAM', () => {
     const nombres = SECCIONES_RAM.map((s) => s.nombre.toLowerCase())
     expect(new Set(nombres).size).toBe(nombres.length)
     // y justo las que chocarían sin el prefijo existen en las dos tablas
-    for (const m of ['15 X 20', '20 X 25', '25 X 25']) {
+    for (const m of ['15 X 15', '15 X 20', '20 X 25', '25 X 25']) {
       expect(SECCIONES_RAM.some((s) => s.nombre === m && s.tipo === 'viga')).toBe(true)
       expect(SECCIONES_RAM.some((s) => s.nombre === `COL ${m}` && s.tipo === 'columna')).toBe(true)
     }
