@@ -180,3 +180,66 @@ describe('D/C de una trabe con bastones puntuales', () => {
     expect(r.texto).toMatch(/con puntuales \(corridas solas \d+ %\)/)
   })
 })
+
+describe('proyecto nuevo y abrir (autorizado por FB, 2026-11-09)', () => {
+  // La pantalla no existe en estas pruebas: un sustituto hace lo que App
+  // (applyProject) hace con los stores, para probar el comando.
+  let nombreActual = 'Edificio de práctica'
+  const recientes = []
+  beforeAll(async () => {
+    const { registrarUI } = await import('../src/core/consola/puente')
+    const vaciar = (data) => {
+      useBeamStore.getState().loadProject(data.sections || [], data.model || null)
+      useColumnStore.getState().loadColumns(data.columns || [])
+      nombreActual = data.projectName || ''
+    }
+    registrarUI({
+      proyecto: () => nombreActual,
+      nuevoProyecto: (nombre) => {
+        const antes = useBeamStore.getState().sections.length + useColumnStore.getState().columns.length
+        if (antes) recientes.push(nombreActual)
+        vaciar({ projectName: nombre })
+        return { aRecientes: antes ? nombreActual || 'Sin nombre' : null, nombre }
+      },
+      abrirProyecto: (data) => {
+        if (!Array.isArray(data.sections)) return { invalido: true }
+        vaciar(data)
+        return { aRecientes: null, nombre: data.projectName }
+      },
+    })
+  })
+
+  it('proyecto nuevo deja uno vacío con su nombre y contesta el estado', async () => {
+    expect(useBeamStore.getState().sections.length).toBeGreaterThan(0)
+    const r = await ejecutar('proyecto nuevo CH-26-001 v11 gravedad i02')
+    expect(r.ok).toBe(true)
+    expect(r.datos.proyecto).toBe('CH-26-001 v11 gravedad i02')
+    expect(r.texto).toContain('Proyecto nuevo «CH-26-001 v11 gravedad i02» · 0 trabes, 0 columnas')
+    expect(r.texto).toContain('quedó en Recientes')
+    expect(useBeamStore.getState().sections).toHaveLength(0)
+    expect(useColumnStore.getState().columns).toHaveLength(0)
+    expect(recientes).toEqual(['Edificio de práctica'])
+    const e = await ejecutar('proyecto')
+    expect(e.datos).toEqual({ proyecto: 'CH-26-001 v11 gravedad i02', trabes: 0, columnas: 0 })
+  })
+
+  it('después de proyecto nuevo, ram cargar y ram crear arman todo otra vez', async () => {
+    expect((await ejecutar('ram cargar', { origen: 'api', datos: { texto: MODELO } })).ok).toBe(true)
+    const c = await ejecutar('ram crear')
+    expect(c.texto).toContain('Creadas 7 sección(es)')
+  })
+
+  it('proyecto abrir carga un proyecto.json y rechaza lo que no lo es', async () => {
+    const proy = { projectName: 'Prueba', sections: [], columns: [] }
+    const r = await ejecutar('proyecto abrir', { datos: { texto: JSON.stringify(proy), nombre: 'prueba.json' } })
+    expect(r.ok).toBe(true)
+    expect(r.texto).toContain('Abierto prueba.json: proyecto «Prueba» · 0 trabes, 0 columnas')
+    expect((await ejecutar('proyecto abrir', { datos: { texto: '{no es json' } })).ok).toBe(false)
+    expect((await ejecutar('proyecto abrir', { datos: { texto: '{"hola":1}' } })).ok).toBe(false)
+    expect((await ejecutar('proyecto abrir')).ok).toBe(false)
+  })
+
+  it('el registro deja constancia de proyecto nuevo', () => {
+    expect(useConsola.getState().entradas.some((e) => e.linea.startsWith('proyecto nuevo') && e.estado !== 'error')).toBe(true)
+  })
+})

@@ -8,9 +8,10 @@
 //   texto  una o pocas líneas, para leer;
 //   datos  lo mismo en objeto, para un script (auxiliarIV.json()).
 //
-// Lo que la consola NO hace, a propósito: no borra chips ni empieza un
-// proyecto nuevo, no genera aplicar_agrupacion.py ni toca RAM, y no acepta
-// diseños. Aplicar una agrupación o una sección en RAM lo hace el Modelador
+// Lo que la consola NO hace, a propósito: no borra chips, no genera
+// aplicar_agrupacion.py ni toca RAM, y no acepta diseños. Sí empieza un
+// proyecto nuevo o abre uno («proyecto», autorizado por FB el 2026-11-09):
+// lo de antes queda primero en Recientes, como con el botón. Aplicar una agrupación o una sección en RAM lo hace el Modelador
 // con la aprobación de un ingeniero (ADR-009 de la Oficina IV).
 // ══════════════════════════════════════════════════════════════
 
@@ -269,14 +270,10 @@ async function cRam(args, ctx) {
     let nombre = ctx.datos?.nombre || 'modelo.json'
     if (!texto) {
       if (!url) return mal('Uso: ram cargar <url> (de este mismo servidor), o desde un script: auxiliarIV.cmd("ram cargar", { texto })')
-      let u
-      try { u = new URL(url, window.location.href) } catch { return mal(`URL inválida: ${url}`) }
-      // sólo del mismo servidor: la consola no trae nada de internet
-      if (u.origin !== window.location.origin) return mal('Sólo se cargan archivos de este mismo servidor.')
-      const res = await fetch(u.href, { cache: 'no-store' })
-      if (!res.ok) return mal(`No se pudo bajar ${u.pathname}: HTTP ${res.status}`)
-      texto = await res.text()
-      nombre = decodeURIComponent(u.pathname.split('/').pop() || nombre)
+      const b = await bajarLocal(url)
+      if (b.error) return mal(b.error)
+      texto = b.texto
+      nombre = b.nombre || nombre
     }
     return aplicarYResumir(texto, nombre, ctx)
   }
@@ -647,6 +644,63 @@ async function cGuardar() {
   return bien(`Proyecto ${r?.donde === 'carpeta' ? `guardado en ${r.ruta}; el anterior quedó en 3 Respaldos` : `descargado (${r?.ruta || ''})`}`, r || {})
 }
 
+/** Baja un archivo de este mismo servidor (la consola no trae nada de internet) */
+async function bajarLocal(url) {
+  let u
+  try { u = new URL(url, window.location.href) } catch { return { error: `URL inválida: ${url}` } }
+  if (u.origin !== window.location.origin) return { error: 'Sólo se cargan archivos de este mismo servidor.' }
+  const res = await fetch(u.href, { cache: 'no-store' })
+  if (!res.ok) return { error: `No se pudo bajar ${u.pathname}: HTTP ${res.status}` }
+  return { texto: await res.text(), nombre: decodeURIComponent(u.pathname.split('/').pop() || '') }
+}
+
+const SIN_RECIENTES = 'No se hizo nada: el navegador no dejó guardar lo actual en Recientes (¿sin espacio?). Guarda antes con «guardar».'
+
+/** proyecto · proyecto nuevo [nombre] · proyecto abrir <url> (autorizado por FB, 2026-11-09) */
+async function cProyecto(args, ctx) {
+  const [sub, ...resto] = args.pos
+  const ui = usarUI()
+  if (!sub) {
+    return bien(`Proyecto «${ui.proyecto?.() || 'sin nombre'}» · ${B().sections.length} trabe(s), ${C().columns.length} columna(s)`,
+      { proyecto: ui.proyecto?.() || '', trabes: B().sections.length, columnas: C().columns.length })
+  }
+  if (sub === 'nuevo') {
+    if (!ui.nuevoProyecto) return mal('La pantalla todavía no está lista.')
+    const nombre = resto.join(' ').trim()
+    const r = ui.nuevoProyecto(nombre)
+    if (r?.sinRecientes) return mal(SIN_RECIENTES)
+    ui.toast?.(`Proyecto nuevo «${nombre || 'sin nombre'}»${r?.aRecientes ? ` · «${r.aRecientes}» quedó en Recientes` : ''}`)
+    ver(ctx, 'detalle')
+    const m = await modeloActual()
+    const d = { proyecto: nombre, trabes: B().sections.length, columnas: C().columns.length, aRecientes: r?.aRecientes || null, modeloSincronizado: m ? m.archivo : null }
+    return bien(`Proyecto nuevo «${nombre || 'sin nombre'}» · ${d.trabes} trabes, ${d.columnas} columnas`
+      + (d.aRecientes ? ` · el anterior («${d.aRecientes}») quedó en Recientes` : ' · no había nada que guardar')
+      + (m ? `\nOjo: el modelo de RAM sincronizado sigue siendo el anterior (${m.archivo}): «ram cargar <url>» o «ram sync» antes de «ram crear».` : ''), d)
+  }
+  if (sub === 'abrir') {
+    if (!ui.abrirProyecto) return mal('La pantalla todavía no está lista.')
+    let texto = ctx.datos?.texto
+    let nombre = ctx.datos?.nombre || 'proyecto.json'
+    if (!texto) {
+      if (!resto[0]) return mal('Uso: proyecto abrir <url> (de este mismo servidor), o desde un script: auxiliarIV.cmd("proyecto abrir", { texto })')
+      const b = await bajarLocal(resto[0])
+      if (b.error) return mal(b.error)
+      texto = b.texto
+      nombre = b.nombre || nombre
+    }
+    let data
+    try { data = JSON.parse(texto) } catch { return mal(`${nombre} no es un JSON válido.`) }
+    const r = ui.abrirProyecto(data, nombre)
+    if (r?.invalido) return mal(`${nombre} no tiene secciones: no parece un proyecto de la app.`)
+    if (r?.sinRecientes) return mal(SIN_RECIENTES)
+    ver(ctx, 'detalle')
+    const d = { proyecto: data.projectName || '', archivo: nombre, trabes: B().sections.length, columnas: C().columns.length, aRecientes: r?.aRecientes || null }
+    return bien(`Abierto ${nombre}: proyecto «${d.proyecto || 'sin nombre'}» · ${d.trabes} trabes, ${d.columnas} columnas`
+      + (d.aRecientes ? ` · el anterior («${d.aRecientes}») quedó en Recientes` : ''), d)
+  }
+  return mal('Uso: proyecto · proyecto nuevo [nombre] · proyecto abrir <url>')
+}
+
 const PESTANAS = {
   secciones: 'detalle', detalle: 'detalle', calculo: 'calculo', 'cálculo': 'calculo', columnas: 'columnas',
   longitudinal: 'longitudinal', agrupacion: 'agrupacion', 'agrupación': 'agrupacion', deflexiones: 'deflexiones',
@@ -668,6 +722,7 @@ function cIr(args) {
 export const COMANDOS = [
   { nombre: 'ayuda', uso: 'ayuda [comando]', que: 'esta lista, o el uso de un comando' },
   { nombre: 'estado', uso: 'estado', que: 'proyecto, chips, modelo sincronizado y carpeta', fn: cEstado },
+  { nombre: 'proyecto', uso: 'proyecto | proyecto nuevo [nombre] | proyecto abrir <url>', que: 'empieza un proyecto vacío o abre un proyecto.json (lo de antes queda en Recientes)', fn: cProyecto },
   { nombre: 'ram', uso: 'ram sync | ram cargar <url> | ram faltan | ram crear', que: 'sincronizar con RAM (modelo.json de la carpeta o de una URL) y crear las secciones que faltan con su armado propuesto', fn: cRam },
   { nombre: 'grupos', uso: 'grupos [trabes|columnas]', que: 'los chips con su sección y su armado', fn: cGrupos },
   { nombre: 'miembros', uso: 'miembros <chip>', que: 'los miembros de RAM de un chip, con su longitud', fn: cMiembros },

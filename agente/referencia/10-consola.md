@@ -53,6 +53,9 @@ Los chips se escriben como en la barra: `T-1`, `t1` y `T 1` son el mismo. Las un
 |---|---|---|
 | `ayuda [comando]` | La lista de comandos, o el uso de uno. | — |
 | `estado` | Versión, proyecto, cuántos chips, el modelo sincronizado (archivo, grupos, miembros, hace cuánto), la carpeta y la pestaña. | Leer la barra y el Centro de carga. |
+| `proyecto` | El nombre del proyecto y cuántas trabes y columnas tiene. | Leer la barra. |
+| `proyecto nuevo [nombre]` | Lo que hay pasa a **Recientes** y queda un proyecto vacío con ese nombre. Contesta `Proyecto nuevo «…» · 0 trabes, 0 columnas`. No pregunta (el comando ya es la orden), pero si el navegador no deja guardar lo actual en Recientes, no hace nada y lo dice. | El botón «Proyecto nuevo (lo actual queda en Recientes)». |
+| `proyecto abrir <url>` | Abre un `proyecto.json` de **este mismo servidor** (por ejemplo `../agente/ejemplos/proyecto.json`). Lo que había queda antes en Recientes. Desde un script también se le pasa el texto: `cmd('proyecto abrir', { texto })`. | El botón Abrir. |
 | `ram sync` | Lee el `modelo.json` de la carpeta de la obra recordada y lo aplica. Si el modelo cambió y hay permiso de edición, el anterior va a `3 Respaldos`. | 📥 Reportes de RAM → 🔄 Sincronizar con RAM. |
 | `ram cargar <url>` | Aplica un `modelo.json` de **este mismo servidor** (por ejemplo `../agente/ejemplos/modelo.json`). Desde un script también se le pasa el texto: `cmd('ram cargar', { texto })`. | El input de archivos del Centro de carga. |
 | `ram faltan` | Los grupos del modelo que todavía no tienen sección. | El aviso azul del Centro de carga. |
@@ -76,6 +79,8 @@ Los chips se escriben como en la barra: `T-1`, `t1` y `T 1` son el mismo. Las un
 | `limpiar` | Borra el registro de la consola. No toca el proyecto. | — |
 
 **Opciones en cualquier comando:** `--json` contesta en JSON y `--quieto` no cambia de pestaña.
+
+**`proyecto nuevo`, igual que el botón:** vacía trabes, columnas, cargas y cimentación, y olvida la carpeta de la obra (`rutaRam`). **No** borra el modelo de RAM sincronizado: la consola lo avisa, y antes de `ram crear` hay que correr `ram cargar <url>` o `ram sync` con el modelo de la obra nueva. Recientes guarda los últimos 6, uno por nombre: un proyecto sin nombre reemplaza al anterior sin nombre. Lo autorizó el Ing. Fernando Burgos (FB) el 2026-11-09.
 
 **D/C de una trabe:** es demanda entre capacidad del miembro más exigido. Si un miembro sólo pasa gracias a los bastones puntuales que resolvió Longitudinal, su D/C es contra la resistencia con esos bastones; la consola da aparte el de las corridas solas: `D/C 95 % (M+ en M-122) con puntuales (corridas solas 184 %)`.
 
@@ -114,10 +119,10 @@ Sólo se aceptan los calibres de la app: varillas #2, #2.5, #3, #4, #5, #6 y #8;
 
 Es a propósito, para que no se pueda hacer sin un ingeniero:
 
-- No borra chips, no empieza un proyecto nuevo, no «olvida» la carpeta ni limpia la BD.
+- No borra chips ni limpia la BD. Sí empieza un proyecto nuevo o abre uno (`proyecto`, autorizado por FB el 2026-11-09), siempre con lo de antes guardado primero en Recientes.
 - No genera `aplicar_agrupacion.py` ni escribe nada en RAM. La agrupación la elige un ingeniero en Agrupación.
 - No elige la carpeta de la obra ni da permisos del navegador: eso pide un clic real de una persona. Si falta, `ram sync` lo dice.
-- No trae archivos de otros servidores: `ram cargar` sólo acepta URL del mismo servidor de la app.
+- No trae archivos de otros servidores: `ram cargar` y `proyecto abrir` sólo aceptan URL del mismo servidor de la app.
 - No acepta diseños: todo lo que fija es propuesta.
 - No escribe el usuario ni la contraseña de la pantalla de entrada.
 
@@ -168,11 +173,12 @@ Son los mismos números que esperan los ejercicios; `tests/consola.test.js` lo c
 | `No hay modelo sincronizado…` | `ram sync` o `ram cargar <url>` antes de `deflexiones`, `agrupar` o `ram crear`. |
 | `El modelo no trae desplazamientos…` | Generar otra vez `sincronizar.py` desde la app y correrlo en RAM. |
 | `No hay chip «…»` | `grupos` para ver los nombres. |
+| `No se hizo nada: el navegador no dejó guardar lo actual en Recientes…` | `guardar` primero; después `proyecto nuevo` otra vez. |
 | `La app está en la pantalla de entrada…` | Un ingeniero inicia la sesión. |
 
 ## 8. Para quien mantiene la app
 
 - Los comandos viven en `src/core/consola/comandos.js`, la API y `ejecutar` en `src/core/consola/index.js`, el registro en `src/core/consola/registro.js` y el panel en `src/components/Consola.jsx`.
-- La pantalla le presta sus acciones a la consola en `App.jsx` (`registrarUI`): cambiar de pestaña, abrir un módulo, los avisos, las exportaciones y guardar.
+- La pantalla le presta sus acciones a la consola en `App.jsx` (`registrarUI`): cambiar de pestaña, abrir un módulo, los avisos, las exportaciones, guardar, y empezar o abrir un proyecto (`nuevoProyecto` y `abrirProyecto`, que también usan los botones).
 - Sincronizar y crear secciones están en `src/core/ramAplicar.js`, y los usan el Centro de carga y la consola. Un cambio ahí cambia los dos.
 - Si cambias un botón o un motor que tiene comando, revisa su comando y esta referencia, y corre `npm test` (`tests/consola.test.js` repite los ejercicios de práctica por la consola).

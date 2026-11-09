@@ -287,14 +287,50 @@ export default function App() {
     showToast(`Proyecto reciente "${name}" abierto`)
   }, [applyProject, showToast])
 
-  const handleNew = useCallback(() => {
+  // Manda lo que hay a Recientes. Devuelve el nombre con que quedó, null si
+  // estaba vacío, o false si el navegador no lo guardó (sin espacio, etc.).
+  const actualARecientes = useCallback(() => {
     const current = packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() })
-    if (!isEmptyProject(current) && !confirm('¿Empezar un proyecto nuevo? Lo que hay ahora queda en "Recientes" (y en tu último .json guardado).')) return
-    if (!isEmptyProject(current)) { pushRecent(current); setRecents(listRecents()) }
-    applyProject({ sections: [], columns: [], cargas: {}, cimentacion: {}, projectName: '', dxfScale: 1 })
+    if (isEmptyProject(current)) return null
+    pushRecent(current)
+    const lista = listRecents()
+    setRecents(lista)
+    const nombre = (current.projectName || '').trim() || 'Sin nombre'
+    return lista.some((r) => r.name === nombre && r.savedAt === current.savedAt) ? nombre : false
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, empacarCim])
+
+  // Proyecto nuevo. El botón pregunta; la consola no (el comando ya es la
+  // orden), pero no borra nada si lo actual no quedó a salvo en Recientes.
+  const nuevoProyecto = useCallback((nombre = '', { preguntar = true } = {}) => {
+    const vacio = sections.length === 0 && columns.length === 0
+      && isEmptyProject(packProject({ cargas: packCargas(), cimentacion: empacarCim() }))
+    if (!vacio && preguntar && !confirm('¿Empezar un proyecto nuevo? Lo que hay ahora queda en "Recientes" (y en tu último .json guardado).')) return { cancelado: true }
+    const aRecientes = actualARecientes()
+    if (aRecientes === false && !preguntar) return { sinRecientes: true }
+    applyProject({ sections: [], columns: [], cargas: {}, cimentacion: {}, projectName: nombre, dxfScale: 1 })
     clearSnapshot()
-    setMainTab('detalle')
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, packCargas, empacarCim, applyProject])
+    return { aRecientes, nombre }
+  }, [sections.length, columns.length, packCargas, empacarCim, actualARecientes, applyProject])
+
+  const handleNew = useCallback(() => {
+    if (!nuevoProyecto('').cancelado) setMainTab('detalle')
+  }, [nuevoProyecto])
+
+  // Abrir un proyecto.json que ya se leyó (la consola lo baja de este mismo
+  // servidor). Lo que había queda antes en Recientes, igual que con Nuevo.
+  const abrirProyecto = useCallback((data, nombreArchivo = '') => {
+    if (!((data?.sections && Array.isArray(data.sections)) || data?.cargas || data?.cimentacion)) {
+      return { invalido: true }
+    }
+    const aRecientes = actualARecientes()
+    if (aRecientes === false) return { sinRecientes: true }
+    applyProject(data)
+    pushRecent({ ...data, savedAt: new Date().toISOString() })
+    setRecents(listRecents())
+    const nCim = data.cimentacion?.cimientos?.length || 0
+    showToast(`Proyecto abierto${nombreArchivo ? ` (${nombreArchivo})` : ''} · ${(data.sections || []).length} trabe(s), ${(data.columns || []).length} columna(s)${nCim ? `, ${nCim} cimiento(s)` : ''}`)
+    return { aRecientes, nombre: data.projectName || '' }
+  }, [actualARecientes, applyProject, showToast])
 
   // Una pestaña activa se dibuja como pestaña: contorno, barra de acento
   // arriba y el borde de abajo abierto hacia el contenido.
@@ -358,6 +394,8 @@ export default function App() {
     guardar: handleSave,
     pestana: () => (getModulo(mainTab)?.nombre || { detalle: 'Secciones', calculo: 'Calculo', columnas: 'Columnas' }[mainTab] || mainTab),
     proyecto: () => projectName,
+    nuevoProyecto: (nombre) => nuevoProyecto(nombre, { preguntar: false }),
+    abrirProyecto,
   })
 
   const vistaModulo = {
