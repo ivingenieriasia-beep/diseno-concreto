@@ -31,6 +31,7 @@ Este prompt es el mapa general. El detalle de cada pantalla, con las etiquetas e
 8. **📥 Reportes de RAM**: el Centro de carga del modelo (sincronizar, configurar RAM, scripts).
 9. Íconos de abrir proyecto, Recientes ▾ y Guardar.
 10. **SVG**, el selector de **escala** del DXF y **Exportar DXF** (cortes de trabes y columnas).
+11. El ícono de terminal (`>_`): la **consola** de la app, para operarla con comandos (`Ctrl`+`` ` ``).
 
 **Pestañas:**
 - Fijas: **Secciones**, **Calculo** (sin acento en la pestaña), **Columnas** y **Cimentaciones**.
@@ -152,6 +153,7 @@ PROCESO\Auxiliar IV\
 - Varias acciones abren `confirm()` o `alert()`, y Detallado y Vista PDF abren ventanas nuevas. Atiende esos diálogos.
 - **El selector de carpetas y los permisos del navegador necesitan un clic real del usuario.** No los puedes automatizar: pídele al usuario que elija la carpeta. Para cargar un archivo sin carpeta, usa los inputs de archivo (`centro-files` en el Centro de carga, «Cargar modelo.json…» en Agrupación y Deflexiones, «abrir modelo.json…» en ⚡ Desde RAM).
 - Para leer el estado sin tocar nada, el store de trabes está expuesto en `window.__BEAM_STORE__.getState()`. Para escribir, usa la interfaz.
+- **Mejor que los clics: la consola.** `await window.auxiliarIV.cmd('resultados')` contesta en texto corto (o JSON con `--json`), queda en el registro de la consola para que el ingeniero lo vea en vivo y la pantalla se actualiza sola. Hay comandos para sincronizar (`ram sync`, `ram cargar`, `ram crear`), leer chips (`grupos`, `miembros`), fijar sección y armado (`fijar`, queda como propuesto), revisar (`calculo`, `columnas`, `longitudinal`, `deflexiones`, `resultados`), la BD Global (`bd`), proponer una agrupación (`agrupar`) y exportar. No borra, no toca RAM y no pasa la pantalla de entrada. Todo está en `referencia/10-consola.md`.
 
 ## 9. Recetas
 
@@ -249,3 +251,4 @@ La tabla completa está en `referencia/01-manual-ram.md`, capítulo 13.
 | `referencia/07-pesos-unitarios.md` | Pesos Unitarios y la biblioteca de cargas. |
 | `referencia/08-formatos-de-archivo.md` | `proyecto.json`, `modelo.json`, `.dcheck` y la biblioteca de cargas. |
 | `referencia/09-practica.md` | Ejercicios con los archivos de `ejemplos/` y los resultados esperados, para aprender y para comprobar que operas bien. |
+| `referencia/10-consola.md` | La consola de la app y `window.auxiliarIV`: cada comando, qué contesta, qué no hace y un ejemplo con el edificio de práctica. |

@@ -27,6 +27,7 @@ Esta guía cubre lo que rodea a los módulos de cálculo: la barra superior, las
 | 13 | `SVG` | Exporta el SVG (§3.6). |
 | 14 | Selector de escala (title «Escala de exportación DXF»; muestra p. ej. `1:1`) | Valores fijos `50:1`, `20:1`, `10:1`, `1:1`, `1:10`, `1:20`, `1:50`, y `Personalizado` (`1:` + número + `OK` o Enter). |
 | 15 | `Exportar DXF` | Exporta el DXF de secciones y columnas (§3.5). |
+| 16 | Ícono de terminal `>_` (`data-testid="consola-btn"`, title «Consola de comandos (Ctrl+`)») | Abre y cierra la consola de la app. Un punto ámbar: el agente mandó comandos con la consola cerrada. Ver `10-consola.md`. |
 
 También hay un input oculto `data-testid="env-files"` (multiple, .txt/.csv) que reparte reportes de RAM entre trabes y columnas según el nombre del archivo. Ningún botón visible lo abre, pero un agente puede usarlo con `setInputFiles`.
 

@@ -30,6 +30,8 @@ La app pide usuario y contraseña al abrirse; son las mismas de siempre. No van 
 
 **Para que además opere la app** (no sólo que sepa de ella), el agente necesita un navegador que pueda controlar: Claude en Chrome, el uso de computadora o Playwright. Abre `app/index.html` en Chrome o Edge. Hay dos cosas que siempre necesitan un clic de una persona: elegir la carpeta de la obra y dar el permiso del navegador para editarla. El agente lo sabe y te lo va a pedir.
 
+Con un navegador controlable, el agente no tiene que hacer clics: la app trae una **consola** (el ícono `>_` de la barra) y la API `window.auxiliarIV.cmd('…')`, que contesta en texto corto o en JSON y deja cada comando a la vista en el registro. Ver `referencia/10-consola.md`.
+
 ## Cómo enseñarle
 
 1. Empieza con `referencia/09-practica.md`: pídele que haga los ejercicios 1 a 6 con `ejemplos/modelo.json` y que compare sus resultados con los esperados.

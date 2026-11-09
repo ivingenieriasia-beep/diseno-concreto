@@ -62,6 +62,14 @@ plantillas de fábrica se pueden ocultar y restaurar; las tuyas se borran.
 Todo lo capturado viaja en el `.json` del proyecto y en el autoguardado, junto a
 las trabes y las columnas.
 
+## Consola
+
+El ícono `>_` del final de la barra (o `Ctrl`+`` ` ``) abre la consola: la app se opera con comandos
+(`ram sync`, `grupos`, `fijar T-1 inf=3#4`, `calculo T-1`, `resultados`, `exportar dxf`…) y un agente
+la maneja sin clics con `await window.auxiliarIV.cmd('…')`. Cada comando queda en el registro con su
+resultado y la pantalla se actualiza sola. Los botones siguen igual. La lista completa está en
+`agente/referencia/10-consola.md`.
+
 ## Reportes de RAM Elements
 
 Todo se carga desde **📥 Reportes de RAM** (barra superior). Nombra cada archivo
