@@ -108,6 +108,24 @@ export default function ColumnForm() {
       </div>
 
       <div>
+        <div className="section-title">Factores de resistencia (NTC 3.8.2)</div>
+        <div className="mt-2 flex flex-col gap-1" style={{ fontSize: 11 }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <input type="checkbox" data-testid="col-zunchos" checked={!!form.zunchos} onChange={(e) => set({ zunchos: e.target.checked })} />
+            <span>Refuerzo helicoidal (zunchos) que cumple 14.7.4: FR 0.75 en compresión</span>
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <input type="checkbox" data-testid="col-fr-transicion" checked={!!form.frTransicionCompresion} onChange={(e) => set({ frTransicionCompresion: e.target.checked })} />
+            <span>3.8.2.6: usar en la transición el FR de compresión (más conservador)</span>
+          </label>
+          <div style={{ fontSize: 10, color: 'var(--color-tx3)', lineHeight: 1.5 }}>
+            Por omisión, estribos («Otros» de la tabla 3.8.2.2): FR = 0.65 controlada por compresión,
+            0.65 + 0.25(εt − εty)/0.003 en la transición y 0.90 controlada por tensión.
+          </div>
+        </div>
+      </div>
+
+      <div>
         <div className="section-title" style={{ color: '#9333ea' }}>Elementos mec&aacute;nicos (&uacute;ltimos)</div>
         <div className="mt-2 flex flex-col gap-2">
           <Field label="Pu — carga axial (ton)">

@@ -1,15 +1,15 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { checkPoint } from '../core/columnCalculator'
+import { mrEnCurva, contornoEnP } from '../core/columnasNTC'
 
 /**
- * Superficie de interacción 3D (geoide P–Mx–My).
- * Por cada nivel de P se traza la elipse (Mx/MRx)² + (My/MRy)² = 1, cuyos
- * semiejes son las fronteras de cada dirección; los meridianos θ=0 y θ=90°
- * son exactamente las curvas 2D. Cuadrada → geoide de revolución;
- * rectangular → alargado hacia la dirección fuerte.
+ * Superficie de interacción 3D de DISEÑO (NTC-Concreto 2023, con FR).
+ * Por cada nivel de P se traza el contorno de momentos que da el eje neutro
+ * inclinado (método general, 5.4.1.1); los meridianos θ=0 y θ=90° son las
+ * curvas de diseño 2D. Ya no es la elipse de referencia: en las esquinas el
+ * contorno se mete, porque la zona comprimida es un triángulo.
  *
  * Interacción: arrastrar rota · rueda hace zoom · presets de vista ·
- * el nivel de carga del punto activo se resalta con su elipse, de modo que
+ * el nivel de carga del punto activo se resalta con su contorno, de modo que
  * se aprecia si el punto queda dentro del contorno a SU nivel de P.
  */
 
@@ -21,7 +21,7 @@ const VIEWS = {
 }
 
 export default function Interaction3D({
-  anX, anY, Pu, MuX, MuY, biaxial,
+  an, anX, anY, Pu, MuX, MuY, biaxial,
   cloud = null, width = 580, height = 500,
 }) {
   const [rot, setRot] = useState(VIEWS.iso)
@@ -44,21 +44,21 @@ export default function Interaction3D({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  const sup = an?.superficie || anX.columna?.superficie
   const geo = useMemo(() => {
-    const POC = Math.min(anX.POC, anY.POC)
-    const Pmin = Math.max(
-      Math.min(...anX.curve.map((p) => p.P)),
-      Math.min(...anY.curve.map((p) => p.P)),
-    )
-    const NL = 24, NM = 48
+    const cX = anX.curveDiseno, cY = anY.curveDiseno
+    const POC = sup.PR0
+    const Pmin = Math.max(Math.min(...cX.map((p) => p.P)), Math.min(...cY.map((p) => p.P)))
+    const NL = 24
     const levels = []
     for (let i = 0; i <= NL; i++) {
       const P = Pmin + ((POC - Pmin) * i) / NL
-      levels.push({ P, MRx: checkPoint(anX.curve, P, 0).MR, MRy: checkPoint(anY.curve, P, 0).MR })
+      const cont = contornoEnP(sup, Math.min(P, POC - 1e-9))
+      levels.push({ P, MRx: mrEnCurva(cX, P).MR, MRy: mrEnCurva(cY, P).MR, verts: cont.verts })
     }
     const Mscale = Math.max(...levels.map((l) => Math.max(l.MRx, l.MRy)), 0.01)
-    return { levels, Pmin, POC, Mscale, NM }
-  }, [anX, anY])
+    return { levels, Pmin, POC, Mscale }
+  }, [anX, anY, sup])
 
   const projectWith = useCallback((mx, my, P, zoomV, panV) => {
     const { Pmin, POC, Mscale } = geo
@@ -105,17 +105,15 @@ export default function Interaction3D({
 
   const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }) }, [])
 
-  const ringPts = useCallback((MRx, MRy, P) => {
-    const pts = []
-    for (let j = 0; j <= geo.NM; j++) {
-      const th = (2 * Math.PI * j) / geo.NM
-      pts.push(project(MRx * Math.cos(th), MRy * Math.sin(th), P))
-    }
+  // Un anillo = el contorno de momentos de diseño del nivel (cerrado)
+  const ringPts = useCallback((verts, P) => {
+    const pts = verts.map((v) => project(v.Mx, v.My, P))
+    if (pts.length) pts.push(pts[0])
     return pts
-  }, [geo, project])
+  }, [project])
 
   const rings = useMemo(
-    () => geo.levels.map((l) => ({ P: l.P, pts: ringPts(l.MRx, l.MRy, l.P) })),
+    () => geo.levels.map((l) => ({ P: l.P, pts: ringPts(l.verts, l.P) })),
     [geo, ringPts],
   )
 
@@ -134,15 +132,15 @@ export default function Interaction3D({
     ? null
     : { Pu: +Pu || 0, Mux: +MuX || 0, Muy: +MuY || 0, ok: biaxial?.ok, member: null })
 
-  // Elipse del nivel de carga del punto activo → deja ver si cae dentro
+  // Contorno del nivel de carga del punto activo → deja ver si cae dentro
   const levelRing = useMemo(() => {
     if (!active) return null
     const P = active.Pu
     if (P < geo.Pmin || P > geo.POC) return null
-    const MRx = checkPoint(anX.curve, P, 0).MR
-    const MRy = checkPoint(anY.curve, P, 0).MR
-    return { pts: ringPts(MRx, MRy, P), MRx, MRy, P }
-  }, [active, geo, anX, anY, ringPts])
+    const MRx = mrEnCurva(anX.curveDiseno, P).MR
+    const MRy = mrEnCurva(anY.curveDiseno, P).MR
+    return { pts: ringPts(contornoEnP(sup, P).verts, P), MRx, MRy, P }
+  }, [active, geo, anX, anY, sup, ringPts])
 
   const toPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.X.toFixed(1)},${p.Y.toFixed(1)}`).join(' ')
 
@@ -211,7 +209,7 @@ export default function Interaction3D({
           <path key={i} d={toPath(m.pts)} fill="none" stroke={m.color} strokeWidth="2" opacity="0.95" />
         ))}
 
-        {/* Elipse del nivel de carga del punto activo */}
+        {/* Contorno del nivel de carga del punto activo */}
         {levelRing && (
           <>
             <path d={toPath(levelRing.pts)} fill="#f59e0b" fillOpacity="0.12"
@@ -287,13 +285,13 @@ export default function Interaction3D({
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 400 }}>
             Pu={active.Pu.toFixed(2)} t · Mux={active.Mux.toFixed(2)} · Muy={active.Muy.toFixed(2)} t·m
             {active.util !== undefined && ` · util=${isFinite(active.util) ? active.util.toFixed(3) : '∞'}`}
-            {active.util === undefined && biaxial && ` · (Mux/MRx)²+(Muy/MRy)²=${isFinite(biaxial.valor) ? biaxial.valor.toFixed(3) : '∞'}`}
+            {active.util === undefined && biaxial && ` · D/C NTC=${isFinite(biaxial.dc) ? biaxial.dc.toFixed(3) : '∞'} (${biaxial.gobierna === 'general' ? 'método general' : `ec. ${biaxial.aproximado.ecuacion}`})`}
           </span>
         </div>
       )}
       {cloud && cloud.length > 0 && !sel && (
         <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>
-          Pasa el cursor por un punto de la nube para resaltarlo y ver la elipse de su nivel de carga.
+          Pasa el cursor por un punto de la nube para resaltarlo y ver el contorno de su nivel de carga.
         </div>
       )}
     </div>

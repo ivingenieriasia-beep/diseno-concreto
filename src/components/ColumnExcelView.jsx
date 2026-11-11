@@ -42,6 +42,12 @@ function PointBlock({ pt, accent }) {
         <span>{pt.label}{pt.c != null ? ` — c = ${fmt(pt.c, 4)} cm` : ' — compresión pura'}</span>
         <span style={{ fontFamily: 'var(--font-mono)' }}>P = {fmt(pt.P, 4)} t · M = {fmt(pt.M, 5)} t·m</span>
       </div>
+      {pt.diseno && (
+        <div data-testid={`excel-fr-${pt.key}`} style={{ padding: '4px 12px', background: 'var(--color-bg)', fontFamily: 'var(--font-mono)', fontSize: 11, borderBottom: '1px solid var(--color-border)' }}>
+          NTC 3.8.2.2: εt = {fmt(pt.diseno.epsT, 5)} · {pt.diseno.clase} · FR = {fmt(pt.diseno.FR, 4)}{pt.diseno.inciso === '3.8.2.3' ? ' (topado, 3.8.2.3)' : ''}
+          {' '}→ FR·P = {fmt(pt.diseno.P, 4)} t · FR·M = {fmt(pt.diseno.M, 5)} t·m
+        </div>
+      )}
       {pt.detail && <div style={{ padding: '6px 10px', background: 'var(--color-panel)' }}><LechosTable detail={pt.detail} /></div>}
     </div>
   )
@@ -74,7 +80,7 @@ export default function ColumnExcelView({ col, analysis, dirLabel, accent, Mu })
         <span>r = {P.r} cm · d = {P.d} cm</span>
         <span>f'c = {P.fc} · β1 = {fmt(P.b1, 3)}</span>
         <span>fy = {P.fy} · E = {P.E.toExponential(0)}</span>
-        <span>εc = {P.epsC} · εy = {fmt(P.epsY, 4)}</span>
+        <span>εc = {P.epsC} · εy = εty = {fmt(P.epsY, 4)}</span>
         <span>Ast = {fmt(P.Ast, 2)} cm²</span>
         <span>e = {isFinite(ex.e) ? fmt(ex.e, 5) : '—'} m</span>
         <span style={{ color: 'var(--color-accent2)', fontWeight: 700 }}>{ex.modo}</span>

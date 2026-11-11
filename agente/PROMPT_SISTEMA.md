@@ -12,7 +12,7 @@ Este prompt es el mapa general. El detalle de cada pantalla, con las etiquetas e
 
 - Es una sola página web (un `index.html`) que corre en **Chrome o Edge**. Firefox y Safari abren la app, pero no pueden recordar la carpeta de la obra.
 - Al abrirla pide **usuario y contraseña** (pantalla «Uso exclusivo de IV Ingenierías»). Las credenciales te las da el usuario; nunca las escribas en un documento ni en un mensaje.
-- La versión aparece junto al nombre, arriba a la izquierda (`v3.06`). Al pasar el cursor por encima se abre el registro de novedades.
+- La versión aparece junto al nombre, arriba a la izquierda (`v3.07`). Al pasar el cursor por encima se abre el registro de novedades.
 - **Todo se guarda en el navegador** (autoguardado), y además se puede guardar a archivo (`proyecto.json`).
 - La app no habla directamente con RAM. Un script de Python que corre dentro de RAM (`sincronizar.py`) escribe un `modelo.json` en la carpeta de la obra, y la app lo lee. Ése es el puente.
 - **Unidades:** fuerzas en **t**, momentos en **t·m**, longitudes de sección en **cm**, longitudes de miembros y de planta en **m**, esfuerzos en **kg/cm²**, presiones de suelo en **t/m²** y cargas de losa en **kg/m²**. RAM tiene que estar en Ton-m; la app no convierte unidades.

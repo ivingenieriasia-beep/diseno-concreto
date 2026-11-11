@@ -65,7 +65,7 @@ Los chips se escriben como en la barra: `T-1`, `t1` y `T 1` son el mismo. Las un
 | `sel <chip>` | Selecciona el chip y lo muestra. | Clic en el chip. |
 | `fijar <chip> …` | Fija la sección y el armado (ver §4). Queda como **propuesto**. Contesta con la revisión al día. | Editar Secciones o Columnas. |
 | `calculo <chip>` | Trabe: MR+, MR−, Vr, Mu+, Mu−, Vu, el D/C y el miembro crítico, cuántos miembros pasan, As mín, As máx y b mín. | Calculo → Flexión, Cortante y Envolvente del modelo. |
-| `columnas [chip]` | Columna: armado, estribos, D/C biaxial, el punto crítico (miembro, combinación y extremo) con Pu, Mux y Muy, y cuántos puntos pasan. Sin chip, todas. | La pestaña Columnas. |
+| `columnas [chip]` | Columna: armado, estribos, D/C de la NTC-Concreto 2023 (el mayor del método general y de 5.4.1.2, y cuál gobierna), FR y clase del punto, el punto crítico (miembro, combinación y extremo) con Pu, Mux y Muy, y cuántos puntos pasan. Sin chip, todas. Campos del JSON en §«columnas: los campos NTC». | La pestaña Columnas. |
 | `longitudinal [chip]` | Unidades con corridas, con bastón, insuficientes, por cortante y al filo; kg de acero (y el uniforme); bastones puntuales; las unidades que fallan. Sin chip, todas. | Módulos → Longitudinal. |
 | `deflexiones [grupo] [--todos]` | La fórmula de servicio, cuántos tramos, cuántos no pasan y sin armado, y los tramos que no pasan (o todos), con total y posterior contra su límite. | Módulos → Deflexiones (con los papeles de caso y las opciones guardadas ahí). |
 | `bd` | Cuántas trabes tiene la BD Global. | La pestaña BD Global. |
@@ -139,14 +139,14 @@ modelo.json: 7 grupo(s) · 240 miembros · 201 nudos · CD / CSX / CSXN / CSZ / 
 Creadas 7 sección(es) con su armado PROPUESTO: 7 pasan
 ✓ T-4 15×40 · 96 miembros · inf 3#4 + 2#4 puntual · sup 3#4 + 3#4 puntual · E#2.5 @18/18 · 764 kg
 ✓ T-2 20×40 · 20 miembros · inf 2#4 + 2#4 puntual · sup 3#5 + 2#5 puntual · E#2.5 @18/18 · 202 kg
-✓ C-1 30×30 · 27 miembros · 8#5 (ρ 1.76 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro
+✓ C-1 30×30 · 27 miembros · 8#6 (ρ 2.53 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro
 …
 
 > longitudinal T-2
 ✓ T-2 · 2 unidades: 0 con corridas, 2 con bastón · acero 202 kg · puntuales inf 2 sup 2
 
 > columnas C-1
-✓ C-1 30×30 · 8#5 (ρ 1.76 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro · D/C 85 % (miembro 7 CSZN pie) · Pu 1.37 t · Mux 0.19 · Muy 7.13 t·m · 270/270 puntos
+✓ C-1 30×30 · 8#6 (ρ 2.53 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro · D/C 96 % (miembro 22 CSZ pie) · Pu 57.55 t · Mux 0.60 · Muy 9.10 t·m · NTC: general 94 % · 5.4.1.2.a 96 % · gobierna 5.4.1.2.a · FR 0.65 (transición) · 270/270 puntos
 
 > deflexiones
 CS = 1·CM + 1·CV · 51 tramo(s) · 3 no pasan · 0 sin armado · peor T5 tramo 173…184 · 2/3: 121 % del límite
@@ -182,3 +182,32 @@ Son los mismos números que esperan los ejercicios; `tests/consola.test.js` lo c
 - La pantalla le presta sus acciones a la consola en `App.jsx` (`registrarUI`): cambiar de pestaña, abrir un módulo, los avisos, las exportaciones, guardar, y empezar o abrir un proyecto (`nuevoProyecto` y `abrirProyecto`, que también usan los botones).
 - Sincronizar y crear secciones están en `src/core/ramAplicar.js`, y los usan el Centro de carga y la consola. Un cambio ahí cambia los dos.
 - Si cambias un botón o un motor que tiene comando, revisa su comando y esta referencia, y corre `npm test` (`tests/consola.test.js` repite los ejercicios de práctica por la consola).
+
+## columnas: los campos NTC
+
+Desde la 3.07, el `datos` de `await auxiliarIV.json('columnas C-1')` (o el JSON de `columnas C-1 --json`) trae, además de `dc`, `ok`, `critico`, `Pu`, `Mux` y `Muy`, la revisión de la NTC-Concreto 2023 del punto que manda (el ejemplar crítico de la envolvente o el punto capturado):
+
+| Campo | Qué es |
+|---|---|
+| `dc` | El D/C de la columna: el mayor de `dcGeneral` y `dc5412`. |
+| `gobierna` | `general` (método general) o `aproximado` (5.4.1.2). |
+| `ecuacion` | De qué ecuación sale el D/C que gobierna, en texto. |
+| `dcGeneral` | a) Método general, 5.4.1.1 con las hipótesis de 3.6 y el eje neutro inclinado: √(Mux² + Muy²)/MR(θ). |
+| `dc5412`, `ecuacion5412` | b) Método aproximado: `5.4.1.2.a` (Bresler, D/C = Pu/PR) o `5.4.1.2.b` (si PR/PR0 < 0.1: Mux/MRx + Muy/MRy). |
+| `PR`, `PRx`, `PRy`, `PR0`, `PRsobrePR0` | Los términos de la ec. 5.4.1.2.a, en t (de diseño, con FR). |
+| `MRx`, `MRy` | Momentos resistentes de diseño al nivel de Pu (t·m). |
+| `MRtheta`, `theta` | MR(θ) del método general y el ángulo θ del vector de momento (grados, 0 = Mx). |
+| `MuxDiseno`, `MuyDiseno`, `eminX`, `eminY` | Los momentos con que se revisó y si entró la excentricidad mínima de 5.3.2 en cada dirección. |
+| `FR`, `epsT`, `clase`, `incisoFR` | FR, εt y clasificación (compresión, transición o tensión) del punto resistente del método que gobierna; con 5.4.1.2, los del diagrama uniaxial más exigido. `incisoFR` es el inciso de la tabla 3.8.2.2 (o `3.8.2.3` si se topó por refuerzo asimétrico). |
+| `FRx`, `epsTx`, `FRy`, `epsTy`, `FRgeneral`, `epsTgeneral` | Lo mismo en cada diagrama. |
+| `fr` | Las opciones de la columna: `FRc` (0.65 o 0.75), `zunchos`, `transicionComoCompresion` (3.8.2.6), `asimetrico` y `PR0`. |
+
+Ejemplo, para leer los D/C nuevos sin abrir la pestaña:
+
+```js
+const { datos: d } = await auxiliarIV.json('columnas C-1')
+// d = { dc: 0.9637, gobierna: 'aproximado', ecuacion5412: '5.4.1.2.a', dcGeneral: 0.9397, dc5412: 0.9637, FR: 0.6505, epsT: 0.00209, clase: 'transición', … }
+// sin chip, datos es la lista de todas las columnas:
+const { datos: todas } = await auxiliarIV.json('columnas')
+todas.map((c) => [c.chip, c.dc, c.gobierna, c.ecuacion5412, c.dcGeneral, c.dc5412])
+```

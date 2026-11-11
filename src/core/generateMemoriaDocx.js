@@ -375,10 +375,12 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
             ? 'No se capturaron elementos mecánicos para esta columna; se reporta únicamente su capacidad. '
             : ''),
         run(`Con Pu = ${fmt(Pu)} ton, Mux = ${fmt(MuX)} ton·m y Muy = ${fmt(MuY)} ton·m `),
-        run(`(e = ${isFinite(ex.e) ? fmt(ex.e, 4) : '—'} m), el punto de demanda ${ok ? 'queda dentro' : 'NO queda dentro'} del diagrama de interacción: `),
+        run(`(e = ${isFinite(ex.e) ? fmt(ex.e, 4) : '—'} m), el punto de demanda ${ok ? 'queda dentro' : 'NO queda dentro'} del diagrama de interacción de diseño (nominal por FR, NTC 3.8.2.2): `),
         run(`MRx = ${fmt(cx.MR)} t·m`, { bold: true, color: '1D4ED8' }), run(` ${cx.ok ? '≥' : '<'} Mux · `),
         run(`MRy = ${fmt(cy.MR)} t·m`, { bold: true, color: 'B45309' }), run(` ${cy.ok ? '≥' : '<'} Muy · `),
-        run(`biaxial ${isFinite(bi.valor) ? fmt(bi.valor, 3) : '∞'} ${bi.ok ? '≤' : '>'} 1. `),
+        run(`biaxial NTC: general (5.4.1.1) D/C = ${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'}, ec. ${bi.aproximado.ecuacion} D/C = ${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'}; gobierna ${bi.gobierna === 'general' ? 'el método general' : `la ec. ${bi.aproximado.ecuacion}`} con D/C = `),
+        run(`${isFinite(bi.dc) ? fmt(bi.dc, 3) : '∞'} ${bi.ok ? '≤' : '>'} 1`, { bold: true, color: bi.ok ? OKC : BADC }),
+        run(`${bi.punto ? ` (FR = ${fmt(bi.punto.FR, 3)}, εt = ${fmt(bi.punto.epsT, 5)}, ${bi.punto.clase})` : ''}${bi.eminX || bi.eminY ? `; excentricidad mínima 5.3.2 en ${[bi.eminX && 'X', bi.eminY && 'Y'].filter(Boolean).join(' y ')}` : ''}. `),
         ...(D.fuente === 'envolvente'
           ? [run(`Revisados los ${D.env.total} ejemplares del reporte, ${D.env.passing} quedan dentro del diagrama${D.env.allOk ? '' : ` y ${D.env.failing} lo rebasan`}. `,
             { color: D.env.allOk ? OKC : BADC })]

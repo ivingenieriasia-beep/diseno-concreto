@@ -5,9 +5,10 @@ import ColumnCanvas from './ColumnCanvas'
 import InteractionDiagram from './InteractionDiagram'
 import Interaction3D from './Interaction3D'
 import ColumnExcelView from './ColumnExcelView'
-import { analyzeColumn, checkPoint, checkBiaxial, excentricidad } from '../core/columnCalculator'
+import RevisionNTC from './RevisionNTC'
+import { analyzeColumn, checkBiaxial, excentricidad } from '../core/columnCalculator'
 import { parseRamEnvelope } from '../core/ramParser'
-import { columnDemand } from '../core/columnDemand'
+import { columnDemand, demandCase } from '../core/columnDemand'
 
 export default function ColumnsView() {
   const columns = useColumnStore((s) => s.columns)
@@ -38,17 +39,19 @@ export default function ColumnsView() {
   const analysis = useMemo(() => {
     if (!valid) return null
     try { return analyzeColumn(form) } catch { return null }
-  }, [valid, form.b, form.h, form.r, form.fc, form.fy, form.epsC, JSON.stringify(form.lechos)]) // eslint-disable-line
+  }, [valid, form.b, form.h, form.r, form.fc, form.fy, form.epsC, form.zunchos, form.frTransicionCompresion, JSON.stringify(form.lechos)]) // eslint-disable-line
 
   // Punto capturado a mano — se sigue dibujando en los diagramas, pero NO
   // decide el veredicto cuando hay envolvente cargada (ver `demanda`).
   const checks = useMemo(() => {
     if (!analysis) return null
     const Pu = +form.Pu || 0, MuX = +form.MuX || 0, MuY = +form.MuY || 0
+    // Revisión NTC-Concreto 2023 (con FR): las uniaxiales salen de ella
+    const biaxial = checkBiaxial(analysis.dirX, analysis.dirY, Pu, MuX, MuY)
     return {
-      x: checkPoint(analysis.dirX.curve, Pu, MuX),
-      y: checkPoint(analysis.dirY.curve, Pu, MuY),
-      biaxial: checkBiaxial(analysis.dirX, analysis.dirY, Pu, MuX, MuY),
+      x: biaxial.checkX,
+      y: biaxial.checkY,
+      biaxial,
       ex: excentricidad(MuX, Pu, +form.b, +form.h),
     }
   }, [analysis, form.Pu, form.MuX, form.MuY, form.b, form.h])
@@ -59,6 +62,8 @@ export default function ColumnsView() {
   const env = form.envelope
   const demanda = useMemo(() => (analysis ? columnDemand(form, analysis) : null), [analysis, form])
   const envEval = demanda?.env || null
+  // El caso que se detalla en la revisión NTC: el ejemplar crítico o el punto capturado
+  const caso = demanda?.evaluado ? demandCase(demanda) : null
 
   function handleEnvFile(e) {
     const file = e.target.files?.[0]
@@ -152,7 +157,7 @@ export default function ColumnsView() {
               <>
                 <Badge ok={demanda.okX} label={`Mx ${demanda.okX ? '✓' : '✗'}`} />
                 <Badge ok={demanda.okY} label={`My ${demanda.okY ? '✓' : '✗'}`} />
-                <Badge ok={demanda.okBi} label={`Biaxial ${demanda.okBi ? '✓' : '✗'}`} />
+                <Badge ok={demanda.okBi} label={`Biaxial NTC ${demanda.okBi ? '✓' : '✗'}${caso?.bi && isFinite(caso.bi.dc) ? ` · D/C ${caso.bi.dc.toFixed(2)} (${caso.bi.gobierna === 'general' ? 'gral.' : caso.bi.aproximado.ecuacion})` : ''}`} />
               </>
             ) : (
               <Badge tone="neutral" label="sin revisar" />
@@ -270,6 +275,10 @@ export default function ColumnsView() {
                 </div>
               )}
 
+              {tab === 'diagrama' && caso?.bi && (
+                <RevisionNTC an={analysis} bi={caso.bi} titulo={caso.etiqueta} />
+              )}
+
               {tab === 'diagrama' && envEval && (
                 <div style={{ marginTop: 16, maxWidth: 900 }}>
                   <div className="section-title">Revisión de la envolvente — {envEval.total} puntos</div>
@@ -277,7 +286,7 @@ export default function ColumnsView() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
                       <thead style={{ position: 'sticky', top: 0 }}>
                         <tr>
-                          {['Miembro', 'Env.', 'Pu (t)', 'Mux (t·m)', 'Muy (t·m)', 'MRx', 'MRy', 'Util.', 'Estado'].map((t) => (
+                          {['Miembro', 'Env.', 'Pu (t)', 'Mux (t·m)', 'Muy (t·m)', 'MRx', 'MRy', 'FR', 'D/C gral.', 'D/C 5.4.1.2', 'Gobierna', 'Util.', 'Estado'].map((t) => (
                             <th key={t} style={{ padding: '5px 8px', background: '#1a2040', color: '#fff', fontSize: 10, textAlign: 'left' }}>{t}</th>
                           ))}
                         </tr>
@@ -292,6 +301,10 @@ export default function ColumnsView() {
                             <td style={TD}>{r.Muy.toFixed(2)}</td>
                             <td style={TD}>{r.cx.MR.toFixed(2)}</td>
                             <td style={TD}>{r.cy.MR.toFixed(2)}</td>
+                            <td style={TD}>{r.bi.punto ? r.bi.punto.FR.toFixed(2) : '—'}</td>
+                            <td style={TD}>{isFinite(r.bi.general.dc) ? r.bi.general.dc.toFixed(3) : '∞'}</td>
+                            <td style={TD}>{isFinite(r.bi.aproximado.dc) ? r.bi.aproximado.dc.toFixed(3) : '∞'}</td>
+                            <td style={TD}>{r.bi.gobierna === 'general' ? 'general' : r.bi.aproximado.ecuacion}</td>
                             <td style={{ ...TD, fontWeight: 700, color: r.util > 1 ? '#c62828' : r.util > 0.9 ? '#b45309' : '#15803d' }}>
                               {isFinite(r.util) ? r.util.toFixed(3) : '∞'}
                             </td>
@@ -306,8 +319,9 @@ export default function ColumnsView() {
                     </table>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--color-tx3)' }}>
-                    Utilización = √[(Mux/MRx)² + (Muy/MRy)²] al nivel de Pu de cada punto (contorno biaxial).
-                    La fila resaltada es el caso crítico.
+                    Utilización = D/C de la NTC-Concreto 2023: el mayor del método general (eje neutro
+                    inclinado, 5.4.1.1) y del aproximado (5.4.1.2), con FR de 3.8.2.2 y la excentricidad
+                    mínima de 5.3.2. MRx y MRy son de los diagramas de diseño. La fila resaltada es el caso crítico.
                   </div>
                 </div>
               )}
@@ -315,7 +329,7 @@ export default function ColumnsView() {
               {tab === '3d' && (
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <Interaction3D
-                    anX={analysis.dirX} anY={analysis.dirY}
+                    an={analysis} anX={analysis.dirX} anY={analysis.dirY}
                     Pu={form.Pu} MuX={form.MuX} MuY={form.MuY}
                     biaxial={checks.biaxial} cloud={envEval?.results} />
                   <div style={{ background: 'var(--color-panel)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 8 }}>

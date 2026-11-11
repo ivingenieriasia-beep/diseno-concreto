@@ -11,7 +11,7 @@
 // memoria dicen siempre lo mismo.
 // ══════════════════════════════════════════════════════════════
 
-import { checkPoint, checkBiaxial, excentricidad } from './columnCalculator'
+import { checkBiaxial, excentricidad } from './columnCalculator'
 import { evaluateEnvelope } from './ramParser'
 
 /**
@@ -27,12 +27,15 @@ export function columnDemand(col, an) {
   const Pu = +col?.Pu || 0, MuX = +col?.MuX || 0, MuY = +col?.MuY || 0
   const hayManual = Pu !== 0 || MuX !== 0 || MuY !== 0
 
+  // Una sola revisión (NTC-Concreto 2023, con FR): las uniaxiales salen de
+  // ella, con los diagramas de diseño y la excentricidad mínima de 5.3.2.
+  const bi = an ? checkBiaxial(an.dirX, an.dirY, Pu, MuX, MuY) : null
   const manual = an
     ? {
       Pu, MuX, MuY, hayManual,
-      cx: checkPoint(an.dirX.curve, Pu, MuX),
-      cy: checkPoint(an.dirY.curve, Pu, MuY),
-      bi: checkBiaxial(an.dirX, an.dirY, Pu, MuX, MuY),
+      cx: bi.checkX,
+      cy: bi.checkY,
+      bi,
       ex: excentricidad(MuX, Pu, +col?.b, +col?.h),
     }
     : null

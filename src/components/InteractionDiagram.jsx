@@ -2,8 +2,10 @@ import { useState, useMemo, useId } from 'react'
 
 /**
  * Diagrama de interacción P–M (2D) de una dirección.
- * Curva de frontera (barrido fino) + puntos canónicos del Excel +
- * punto de demanda (Mu, Pu) con estado.
+ * Curva de DISEÑO (FR·Pn, FR·Mn, NTC 3.8.2.2) en línea continua, la nominal
+ * de la hoja punteada, puntos canónicos del Excel (nominales) y punto de
+ * demanda (Mu, Pu) con estado. Con la excentricidad mínima de 5.3.2 el
+ * punto se dibuja con el momento de diseño (check.Mu).
  */
 export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#2563a8', title, width = 380, height = 330, cloud = null, cloudKey = 'Mux', ajuste = 'full' }) {
   const [hover, setHover] = useState(null)
@@ -16,8 +18,9 @@ export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#
 
   const hasDemand = (cloud && cloud.length) || +Mu || +Pu
 
-  const { xs, ys, xTicks, yTicks, path, areaPath } = useMemo(() => {
+  const { xs, ys, xTicks, yTicks, path, pathD, areaPath } = useMemo(() => {
     const curve = analysis.curve
+    const dis = analysis.curveDiseno || curve
     const cM = (cloud || []).map((r) => r[cloudKey] || 0)
     const cP = (cloud || []).map((r) => r.Pu || 0)
     let Mmax, Pmin, Pmax
@@ -46,15 +49,17 @@ export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#
     const ys = (P) => PAD.t + ((Pmax - P) / (Pmax - Pmin)) * ih
     const sorted = [...curve].sort((a, b) => b.P - a.P) // POC arriba → tensión abajo
     const path = sorted.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.M).toFixed(1)},${ys(p.P).toFixed(1)}`).join(' ')
-    // Región segura: frontera + eje M=0
-    const areaPath = `${path} L${xs(0).toFixed(1)},${ys(sorted[sorted.length - 1].P).toFixed(1)} L${xs(0).toFixed(1)},${ys(sorted[0].P).toFixed(1)} Z`
+    // De diseño, en el orden de c (puede no ser monótona en P en la transición)
+    const pathD = dis.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.M).toFixed(1)},${ys(p.P).toFixed(1)}`).join(' ')
+    // Región segura: frontera de diseño + eje M=0
+    const areaPath = `${pathD} L${xs(0).toFixed(1)},${ys(dis[dis.length - 1].P).toFixed(1)} L${xs(0).toFixed(1)},${ys(dis[0].P).toFixed(1)} Z`
     const nice = (v) => Number(v.toPrecision(2))
     const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => nice(Mmax * t))
     const yTicks = [Pmin, Pmin / 2, 0, Pmax * 0.33, Pmax * 0.66, Pmax].map(nice)
-    return { xs, ys, xTicks, yTicks, path, areaPath }
+    return { xs, ys, xTicks, yTicks, path, pathD, areaPath }
   }, [analysis, Mu, Pu, iw, ih, cloud, cloudKey, fit, hasDemand])
 
-  const demand = { x: xs(+Mu || 0), y: ys(+Pu || 0) }
+  const demand = { x: xs(check?.Mu ?? (+Mu || 0)), y: ys(+Pu || 0) }
   const okCol = check?.ok ? '#15803d' : '#dc2626'
 
   return (
@@ -92,6 +97,7 @@ export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#
             border: `1px solid ${check.ok ? '#a5d6a7' : '#ef9a9a'}`,
           }}>
             {check.ok ? '✓ DENTRO' : '✗ FUERA'} · MR={check.MR.toFixed(2)}
+            {check.punto && ` · FR ${check.punto.FR.toFixed(2)} · εt ${check.punto.epsT.toFixed(4)} · ${check.punto.clase}`}
           </span>
         )}
       </div>
@@ -122,8 +128,9 @@ export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#
         </defs>
         <g clipPath={`url(#plot-${clipId})`}>
           <path d={areaPath} fill={color} opacity="0.07" />
-          {/* Frontera */}
-          <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+          {/* Frontera nominal (la de la hoja) y de diseño (FR) */}
+          <path d={path} fill="none" stroke={color} strokeWidth="1.2" strokeDasharray="5,3" opacity="0.5" strokeLinejoin="round" />
+          <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
 
           {/* Puntos canónicos del Excel */}
           {analysis.canonical.map((pt) => (
@@ -159,13 +166,15 @@ export default function InteractionDiagram({ analysis, Mu, Pu, check, color = '#
           </text>
         </g>
 
+        <text x={width - PAD.r} y={height - PAD.b - 6} fontSize="8.5" fill="#6b6760" textAnchor="end">— diseño (FR) · - - nominal</text>
+
         {/* Tooltip de punto canónico */}
         {hover && (
           <g>
-            <rect x={Math.min(xs(hover.M) + 10, width - 150)} y={Math.max(ys(hover.P) - 40, 4)} width="142" height="36" rx="5"
+            <rect x={Math.min(xs(hover.M) + 10, width - 170)} y={Math.max(ys(hover.P) - 40, 4)} width="162" height="36" rx="5"
               fill="#1a2040" opacity="0.95" />
             <text x={Math.min(xs(hover.M) + 18, width - 142)} y={Math.max(ys(hover.P) - 25, 19)} fontSize="10" fill="#fbbf24" fontWeight="700">
-              {hover.label}{hover.c != null ? ` · c=${hover.c.toFixed(2)}` : ''}
+              {hover.label}{hover.c != null ? ` · c=${hover.c.toFixed(2)}` : ''}{hover.diseno ? ` · FR ${hover.diseno.FR.toFixed(2)}` : ''}
             </text>
             <text x={Math.min(xs(hover.M) + 18, width - 142)} y={Math.max(ys(hover.P) - 12, 32)} fontSize="10" fill="#e2e8f0">
               P={hover.P.toFixed(2)} t · M={hover.M.toFixed(3)}{hover.extra ? ` · ${hover.extra}` : ''}

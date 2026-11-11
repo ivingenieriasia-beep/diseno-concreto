@@ -32,6 +32,33 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.07',
+    fecha: '2026-11-11',
+    lema: 'Columnas con los factores de resistencia de la NTC-Concreto 2023 y la flexión biaxial de verdad, con el eje neutro inclinado.',
+    destacados: [
+      {
+        tipo: 'nuevo',
+        titulo: 'FR de la NTC en el diagrama de interacción',
+        texto: 'Cada punto del diagrama toma su FR de la tabla 3.8.2.2 según la deformación unitaria neta de tensión εt del lecho extremo: 0.65 si está controlado por compresión, 0.65 + 0.25(εt − εty)/0.003 en la transición y 0.90 controlado por tensión (con zunchos, 0.75 / 0.75 + 0.15(…) / 0.90). Se ve el diagrama nominal punteado y el de diseño continuo, y cada revisión dice el FR, el εt y la clase de su punto. Entra también la excentricidad mínima de 5.3.2 (0.05h o 20 mm).',
+        donde: 'Columnas → Diagramas P–M',
+      },
+      {
+        tipo: 'nuevo',
+        titulo: 'Flexión biaxial: método general y 5.4.1.2, y gobierna el mayor',
+        texto: 'Ya no se revisa con la elipse de los ejes aislados. El método general gira el eje neutro, comprime la zona que de verdad queda comprimida (un triángulo en las esquinas) y da el MR en la dirección del momento: D/C = √(Mux² + Muy²)/MR(θ). Al lado va el método aproximado de 5.4.1.2: Bresler (ec. 5.4.1.2.a) o, si PR/PR0 < 0.1, la suma lineal (ec. 5.4.1.2.b). El D/C de la columna es el mayor de los dos y se dice de qué ecuación sale. El contorno Mx–My al nivel de Pu se dibuja con el punto de demanda.',
+        donde: 'Columnas → Diagramas P–M → Revisión NTC-Concreto 2023',
+      },
+    ],
+    cambios: [
+      { tipo: 'mejora', texto: 'La propuesta automática de armado y la Agrupación de columnas usan la misma revisión NTC, así el diseño dice lo mismo en todas las pantallas, en los informes, en la memoria y en la consola.' },
+      { tipo: 'mejora', texto: 'Consola: «columnas» da en el JSON el D/C del método general (dcGeneral), el de 5.4.1.2 (dc5412, ecuacion5412), cuál gobierna, PR, PRx, PRy, PR0, FR, εt y la clase.' },
+      { tipo: 'mejora', texto: 'La superficie 3D es la de diseño: cada anillo es el contorno del eje neutro inclinado, no una elipse.' },
+      { tipo: 'nuevo', texto: 'Opciones en el formulario: zunchos que cumplen 14.7.4 y, según 3.8.2.6, usar el FR de compresión en la transición. Con refuerzo asimétrico el FR se topa según 3.8.2.3.' },
+      { tipo: 'arreglo', texto: 'Dirección Y con lechos de calibres distintos: el área de cada grupo de barras ya es la exacta (antes se tomaba el calibre de una barra del grupo).' },
+    ],
+    aviso: 'Las columnas que ya pasaban con el diagrama nominal pueden no pasar ahora: el FR baja la resistencia hasta 35 % en compresión. Revisa los proyectos abiertos y vuelve a pedir la propuesta de armado. Es una propuesta: no se usa en un proyecto hasta que el Ing. Fernando Burgos verifique los valores.',
+  },
+  {
     version: '3.06',
     fecha: '2026-09-24',
     lema: 'Cada zapata con su contratrabe de liga, mínimos de 0.60 m y el armado por separación o por cantidad.',

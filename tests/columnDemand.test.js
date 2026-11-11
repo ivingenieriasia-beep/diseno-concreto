@@ -9,7 +9,10 @@ const base = {
 }
 const an = analyzeColumn(base)
 const mk = (member, axial, m22, m33) => ({ id: `${member}-Max`, member, tipo: 'Max', axial, v2: 0, v3: 0, tors: 0, m22, m33, P: -axial, combo: 'ENV' })
-const env = { archivo: 'C1.txt', combo: 'ENV', mapping: 'M33X', points: [mk('M1', -24, 0.30, 0.64), mk('M2', -5.81, 1.0, 0.01), mk('M3', -12, 0.2, 0.2)] }
+// Con FR (NTC 2023, desde la 3.7) estos puntos se bajaron: con los de antes
+// (24 t, 0.64/0.30 t·m y 5.81 t, 1.0 t·m) la 15×15 con 6#3 ya no alcanza
+// (D/C 1.11 y 1.13). M2 sigue siendo el crítico.
+const env = { archivo: 'C1.txt', combo: 'ENV', mapping: 'M33X', points: [mk('M1', -12, 0.20, 0.40), mk('M2', -5.81, 0.8, 0.01), mk('M3', -12, 0.2, 0.2)] }
 
 describe('columnDemand — quién decide el veredicto', () => {
   it('sin demanda ni envolvente: no se evalúa (no es un falso CUMPLE)', () => {
@@ -18,7 +21,9 @@ describe('columnDemand — quién decide el veredicto', () => {
     expect(D.evaluado).toBe(false)
   })
   it('punto capturado que pasa / que no pasa', () => {
-    expect(columnDemand({ ...base, Pu: 24, MuX: 0.64, MuY: 0.3 }, an)).toMatchObject({ fuente: 'manual', ok: true, okX: true, okY: true, okBi: true })
+    // (24, 0.64, 0.30) pasaba con el diagrama nominal; con FR da D/C 1.11
+    expect(columnDemand({ ...base, Pu: 24, MuX: 0.64, MuY: 0.3 }, an)).toMatchObject({ fuente: 'manual', ok: false })
+    expect(columnDemand({ ...base, Pu: 12, MuX: 0.4, MuY: 0.2 }, an)).toMatchObject({ fuente: 'manual', ok: true, okX: true, okY: true, okBi: true })
     const D = columnDemand({ ...base, Pu: 24, MuX: 9, MuY: 0.3 }, an)
     expect(D).toMatchObject({ fuente: 'manual', ok: false, okX: false, okY: true, okBi: false })
   })

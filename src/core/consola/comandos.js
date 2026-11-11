@@ -157,23 +157,52 @@ export function revisarColumna(col) {
   }
   if (!an) return { ...base, ok: false, fuente: 'sin análisis', dc: null }
   const D = columnDemand(col, an)
+  const fr = { FRc: an.ntc.FRc, zunchos: an.ntc.fr.zunchos, transicionComoCompresion: an.ntc.fr.transicionComoCompresion, asimetrico: an.ntc.asimetrico, PR0: an.ntc.PR0 }
   if (D.fuente === 'envolvente') {
     const c = D.env.critical
     return {
       ...base, fuente: 'envolvente', ok: D.ok, pasan: D.env.passing, total: D.env.total,
       dc: c ? c.util : null, critico: c ? `${c.member} ${c.tipo || ''}`.trim() : null,
       Pu: c?.Pu ?? null, Mux: c?.Mux ?? null, Muy: c?.Muy ?? null,
+      ...(c ? camposNTC(c.bi) : {}), fr,
     }
   }
   if (D.fuente === 'manual') {
     const m = D.manual
-    return { ...base, fuente: 'capturado', ok: D.ok, dc: isFinite(m.bi.valor) ? Math.sqrt(m.bi.valor) : Infinity, Pu: m.Pu, Mux: m.MuX, Muy: m.MuY }
+    return { ...base, fuente: 'capturado', ok: D.ok, dc: m.bi.dc, Pu: m.Pu, Mux: m.MuX, Muy: m.MuY, ...camposNTC(m.bi), fr }
   }
-  return { ...base, fuente: 'sin demanda', ok: true, dc: null }
+  return { ...base, fuente: 'sin demanda', ok: true, dc: null, fr }
+}
+
+/**
+ * Lo que decide una columna según la NTC-Concreto 2023, en campos planos
+ * (el mismo objeto de la pestaña Columnas: checkBiaxial).
+ */
+export function camposNTC(bi) {
+  const r = (v, n = 4) => (v == null ? null : !isFinite(v) ? Infinity : +Number(v).toFixed(n))
+  const p = bi.punto
+  return {
+    norma: bi.norma,
+    gobierna: bi.gobierna,                       // 'general' | 'aproximado'
+    ecuacion: bi.gobiernaEcuacion,               // de qué ecuación sale el D/C
+    dcGeneral: r(bi.general.dc),                 // a) 5.4.1.1, eje neutro inclinado
+    dc5412: r(bi.aproximado.dc),                 // b) 5.4.1.2
+    ecuacion5412: bi.aproximado.ecuacion,        // '5.4.1.2.a' (Bresler) | '5.4.1.2.b' (lineal)
+    PR: r(bi.aproximado.PR, 3), PRx: r(bi.aproximado.PRx, 3), PRy: r(bi.aproximado.PRy, 3), PR0: r(bi.aproximado.PR0, 3),
+    PRsobrePR0: r(bi.aproximado.relacionPR),
+    MRx: r(bi.checkX.MR), MRy: r(bi.checkY.MR), MRtheta: r(bi.general.MR), theta: r(bi.general.thetaGrados, 2),
+    MuxDiseno: r(bi.MuxD), MuyDiseno: r(bi.MuyD), eminX: bi.eminX, eminY: bi.eminY,
+    FR: p ? r(p.FR) : null, epsT: p ? r(p.epsT, 6) : null, clase: p ? p.clase : null, incisoFR: p ? p.inciso : null,
+    FRx: bi.checkX.punto ? r(bi.checkX.punto.FR) : null, epsTx: bi.checkX.punto ? r(bi.checkX.punto.epsT, 6) : null,
+    FRy: bi.checkY.punto ? r(bi.checkY.punto.FR) : null, epsTy: bi.checkY.punto ? r(bi.checkY.punto.epsT, 6) : null,
+    FRgeneral: bi.general.punto ? r(bi.general.punto.FR) : null, epsTgeneral: bi.general.punto ? r(bi.general.punto.epsT, 6) : null,
+  }
 }
 
 const lineaColumna = (d) => `${marca(d.ok)} ${d.chip} ${d.b}×${d.h} · ${d.armado} · `
   + (d.dc == null ? d.fuente : `D/C ${pct(d.dc)}${d.critico ? ` (miembro ${d.critico})` : ''} · Pu ${f2(d.Pu)} t · Mux ${f2(d.Mux)} · Muy ${f2(d.Muy)} t·m`)
+  + (d.dc == null || d.dcGeneral == null ? '' : ` · NTC: general ${pct(d.dcGeneral)} · ${d.ecuacion5412} ${pct(d.dc5412)} · gobierna ${d.gobierna === 'general' ? 'general' : d.ecuacion5412}`
+    + (d.FR != null ? ` · FR ${Number(d.FR).toFixed(2)} (${d.clase})` : ''))
   + (d.fuente === 'envolvente' ? ` · ${d.pasan}/${d.total} puntos` : '')
 
 // ── Longitudinal (lo mismo que el módulo) ────────────────────
@@ -729,7 +758,7 @@ export const COMANDOS = [
   { nombre: 'sel', uso: 'sel <chip>', que: 'selecciona un chip y lo muestra', fn: cSel },
   { nombre: 'fijar', uso: 'fijar <chip> b= h= r= fc= inf=3#4 sup=2#4 binf=1#4 bsup=0 est=2.5@8/16 · columnas: lechos=3#5,2#5,3#5 est=3 sep=10/15', que: 'fija la sección y el armado de un chip (queda como propuesto)', fn: cFijar },
   { nombre: 'calculo', uso: 'calculo <chip>', que: 'MR, Mu, Vr, Vu y D/C de una trabe, como en Calculo', fn: cCalculo },
-  { nombre: 'columnas', uso: 'columnas [chip]', que: 'flexocompresión biaxial y D/C, como en Columnas', fn: cColumnas },
+  { nombre: 'columnas', uso: 'columnas [chip]', que: 'flexocompresión biaxial NTC 2023 (con FR): D/C del método general y de 5.4.1.2, cuál gobierna, FR y εt', fn: cColumnas },
   { nombre: 'longitudinal', uso: 'longitudinal [chip]', que: 'bastones puntuales, insuficientes, cortante y kg, como en Longitudinal', fn: cLongitudinal },
   { nombre: 'deflexiones', uso: 'deflexiones [grupo] [--todos]', que: 'flechas por tramo contra L/240+0.5 y L/480+0.3', fn: cDeflexiones },
   { nombre: 'bd', uso: 'bd <Mu+> <Mu−> [b=15,20] [h=30,35] [n=5] | bd usar <n> <chip>', que: 'busca en la BD Global y aplica una sección (propuesta)', fn: cBd },

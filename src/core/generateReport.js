@@ -417,7 +417,7 @@ function drawColumnCard(doc, col, y, marginL, contentW) {
     ty += 4
     drawVerifRow(doc, 'My', caso.cy.MR, caso.Muy, ty, tx)
     ty += 4
-    drawVerifRow(doc, 'Biaxial', 1, isFinite(caso.bi.valor) ? caso.bi.valor : 99, ty, tx)
+    drawVerifRow(doc, `Biaxial NTC (${caso.bi.gobierna === 'general' ? 'gral.' : caso.bi.aproximado.ecuacion})`, 1, isFinite(caso.bi.dc) ? caso.bi.dc : 99, ty, tx)
     ok = D.ok
 
     // Envolvente cargada

@@ -191,6 +191,7 @@ export function interactionSvgString(analysis, { Mu = 0, Pu = 0, check = null, c
   const ih = height - PAD.t - PAD.b
 
   const curve = analysis.curve
+  const dis = analysis.curveDiseno || curve
   const Ms = curve.map((p) => p.M).concat([+Mu || 0])
   const Ps = curve.map((p) => p.P).concat([+Pu || 0])
   const Mmax = Math.max(...Ms, 0.1) * 1.12
@@ -201,6 +202,8 @@ export function interactionSvgString(analysis, { Mu = 0, Pu = 0, check = null, c
 
   const sorted = [...curve].sort((a, b) => b.P - a.P)
   const path = sorted.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.M).toFixed(1)},${ys(p.P).toFixed(1)}`).join(' ')
+  // De diseño (FR·Pn, FR·Mn), en el orden de c: puede no ser monótona en P
+  const pathD = dis.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(p.M).toFixed(1)},${ys(p.P).toFixed(1)}`).join(' ')
   const nice = (v) => Number(v.toPrecision(2))
   const xT = [0, 0.25, 0.5, 0.75, 1].map((t) => nice(Mmax * t))
   const yT = [Pmin, 0, Pmax * 0.33, Pmax * 0.66, Pmax].map(nice)
@@ -216,8 +219,10 @@ export function interactionSvgString(analysis, { Mu = 0, Pu = 0, check = null, c
   }
   L.push(`<text x="${PAD.l + iw / 2}" y="${height - 6}" font-size="10" fill="#6b6760" text-anchor="middle">M (ton·m)</text>`)
   L.push(`<text x="12" y="${PAD.t + ih / 2}" font-size="10" fill="#6b6760" text-anchor="middle" transform="rotate(-90,12,${PAD.t + ih / 2})">P (ton)</text>`)
-  L.push(`<path d="${path} L${xs(0).toFixed(1)},${ys(sorted[sorted.length - 1].P).toFixed(1)} L${xs(0).toFixed(1)},${ys(sorted[0].P).toFixed(1)} Z" fill="${color}" opacity="0.07"/>`)
-  L.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>`)
+  L.push(`<path d="${pathD} L${xs(0).toFixed(1)},${ys(dis[dis.length - 1].P).toFixed(1)} L${xs(0).toFixed(1)},${ys(dis[0].P).toFixed(1)} Z" fill="${color}" opacity="0.07"/>`)
+  L.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.55"/>`)
+  L.push(`<path d="${pathD}" fill="none" stroke="${color}" stroke-width="2"/>`)
+  L.push(`<text x="${width - PAD.r}" y="${height - PAD.b - 6}" font-size="8.5" fill="#6b6760" text-anchor="end">— diseño (FR·Pn, FR·Mn) · - - nominal</text>`)
   for (const pt of analysis.canonical) {
     L.push(`<circle cx="${xs(pt.M).toFixed(1)}" cy="${ys(pt.P).toFixed(1)}" r="3.6" fill="#fff" stroke="${color}" stroke-width="1.5"/>`)
   }

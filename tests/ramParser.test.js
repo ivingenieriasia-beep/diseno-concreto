@@ -92,9 +92,13 @@ describe('evaluateEnvelope contra una columna', () => {
     expect(evG.total).toBe(46)
     expect(evG.allOk).toBe(true)
 
-    // La 15×15 con 4#3 todavía cubre el C1.txt (M33 máx 0.79 t·m vs MR ≈ 1.3); con los momentos ×6 ya no
+    // Con el diagrama nominal la 15×15 con 4#3 todavía cubría el C1.txt. Con
+    // FR (NTC 2023) su carga de diseño máxima es 0.65·59.1 = 38.4 t y, con la
+    // excentricidad mínima de 5.3.2, los puntos de 34.4 t ya no caben.
     const chica = analyzeColumn({ h: 15, b: 15, r: 3, fc: 250, fy: 4200, lechos: [{ n: 2, num: 3 }, { n: 2, num: 3 }] })
-    expect(evaluateEnvelope(pts, chica.dirX, chica.dirY).allOk).toBe(true)
+    const ev0 = evaluateEnvelope(pts, chica.dirX, chica.dirY)
+    expect(ev0.allOk).toBe(false)
+    expect(ev0.critical.Pu).toBeCloseTo(34.41, 2)
     const pesados = pts.map((p) => ({ ...p, m33: p.m33 * 6, m22: p.m22 * 6 }))
     const evC = evaluateEnvelope(pesados, chica.dirX, chica.dirY)
     expect(evC.failing).toBeGreaterThan(0)

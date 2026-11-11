@@ -13,6 +13,7 @@ import { computeSectionCapacities, resistenciasConPuntual } from './sectionResul
 import { evaluateBeamEnvelope } from './ramParser'
 import { analyzeColumn, estribosDe } from './columnCalculator'
 import { columnDemand, demandCase } from './columnDemand'
+import { resumenNTC } from './columnasNTC'
 
 const num = (v, d = 3) => (v === null || v === undefined || !isFinite(v) || v === 0 ? '' : String(Number(v.toFixed(d))))
 
@@ -73,7 +74,7 @@ export function buildDcheck({ projectName = '', reviso = '', sections = [], colu
     const ratios = [
       caso.cx.MR > 0 && caso.Mux > 0 ? caso.Mux / caso.cx.MR : null,
       caso.cy.MR > 0 && caso.Muy > 0 ? caso.Muy / caso.cy.MR : null,
-      isFinite(caso.bi.valor) && caso.bi.valor > 0 ? Math.sqrt(caso.bi.valor) : null,
+      isFinite(caso.bi.dc) && caso.bi.dc > 0 ? caso.bi.dc : null,
     ]
     const arm = (c.lechos || []).map((L, i) => `L${i + 1}:${L.n}#${L.num}`).join(' ')
     const envTxt = D.fuente === 'envolvente' ? ` · ${D.env.passing}/${D.env.total} ejemplares dentro` : ''
@@ -82,7 +83,7 @@ export function buildDcheck({ projectName = '', reviso = '', sections = [], colu
       ma: num(caso.Mux), mr: num(caso.cx.MR), un: 'ton·m',
       man: num(caso.Muy), mrn: num(caso.cy.MR),
       va: '', vr: '', unv: 'ton',
-      obs: `Columna ${c.b}×${c.h} cm · ${arm} · ${estribosDe(c).corto} · Pu = ${num(caso.Pu, 2) || '0'} t · Mx→M(+), My→M(−) · biaxial (Mux/MRx)²+(Muy/MRy)² = ${isFinite(caso.bi.valor) ? caso.bi.valor.toFixed(3) : '∞'} · ${caso.etiqueta}${envTxt}`,
+      obs: `Columna ${c.b}×${c.h} cm · ${arm} · ${estribosDe(c).corto} · Pu = ${num(caso.Pu, 2) || '0'} t · Mx→M(+), My→M(−) · ${resumenNTC(caso.bi)} · ${caso.etiqueta}${envTxt}`,
       mark: D.evaluado ? (D.ok ? markFromRatios(ratios) || 'ok' : 'bad') : null,
       manual: false, geo: false,
       imgA: null, imgB: null, imgC: null, imgD: null,

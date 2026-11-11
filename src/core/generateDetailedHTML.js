@@ -301,7 +301,9 @@ function renderColumnas(columnsArr, envStats = null) {
     // Tabla de puntos del diagrama
     const puntos = an.dirX.canonical.map((pt) => `
       <tr><td>${esc(pt.label)}</td><td>${pt.c != null ? fmt(pt.c, 3) : '—'}</td>
-      <td>${fmt(pt.P, 3)}</td><td>${fmt(pt.M, 4)}</td></tr>`).join('')
+      <td>${fmt(pt.P, 3)}</td><td>${fmt(pt.M, 4)}</td>
+      <td>${fmt(pt.diseno.epsT, 5)}</td><td>${fmt(pt.diseno.FR, 3)}</td><td>${esc(pt.diseno.clase)}</td>
+      <td>${fmt(pt.diseno.P, 3)}</td><td>${fmt(pt.diseno.M, 4)}</td></tr>`).join('')
 
     return `<div class="${i > 0 ? 'section-page' : ''}">
       <div style="border-bottom:2px solid ${MARCA.acento};padding-bottom:14px;margin-bottom:24px">
@@ -331,7 +333,7 @@ function renderColumnas(columnsArr, envStats = null) {
       <div style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid #1d4ed8;padding-bottom:8px;margin:24px 0 14px;text-transform:uppercase">
         Puntos del diagrama — dirección X (peralte h = ${esc(col.h)} cm)
       </div>
-      <table class="summary"><tr><th>Punto</th><th>c (cm)</th><th>P (ton)</th><th>M (ton·m)</th></tr>${puntos}</table>
+      <table class="summary"><tr><th>Punto</th><th>c (cm)</th><th>Pn (ton)</th><th>Mn (ton·m)</th><th>εt</th><th>FR</th><th>Clase</th><th>FR·Pn</th><th>FR·Mn</th></tr>${puntos}</table>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0">
         ${interactionSvgString(an.dirX, { Mu: MuX, Pu, check: cx, color: '#2563a8', title: `Dirección X — P–Mx` })}
@@ -343,16 +345,33 @@ function renderColumnas(columnsArr, envStats = null) {
       </div>
       <table class="summary">
         <tr><th>Revisión</th><th>Actuante</th><th>Resistente</th><th>Ratio</th><th>Estado</th></tr>
-        <tr><td>Momento en X (al nivel de Pu)</td><td>${fmt(MuX, 3)} t·m</td><td>${fmt(cx.MR, 3)} t·m</td>
-            <td>${cx.MR > 0 ? fmt(MuX / cx.MR, 3) : '—'}</td>
+        <tr><td>Momento en X (al nivel de Pu, diagrama de diseño)</td><td>${fmt(cx.Mu ?? MuX, 3)} t·m</td><td>${fmt(cx.MR, 3)} t·m</td>
+            <td>${isFinite(cx.ratio) ? fmt(cx.ratio, 3) : '∞'}</td>
             <td style="color:${cx.ok ? '#15803d' : '#dc2626'};font-weight:700">${cx.ok ? '✓ CUMPLE' : '✗ NO CUMPLE'}</td></tr>
-        <tr><td>Momento en Y (al nivel de Pu)</td><td>${fmt(MuY, 3)} t·m</td><td>${fmt(cy.MR, 3)} t·m</td>
-            <td>${cy.MR > 0 ? fmt(MuY / cy.MR, 3) : '—'}</td>
+        <tr><td>Momento en Y (al nivel de Pu, diagrama de diseño)</td><td>${fmt(cy.Mu ?? MuY, 3)} t·m</td><td>${fmt(cy.MR, 3)} t·m</td>
+            <td>${isFinite(cy.ratio) ? fmt(cy.ratio, 3) : '∞'}</td>
             <td style="color:${cy.ok ? '#15803d' : '#dc2626'};font-weight:700">${cy.ok ? '✓ CUMPLE' : '✗ NO CUMPLE'}</td></tr>
-        <tr><td>Flexocompresión biaxial (Mux/MRx)²+(Muy/MRy)²</td><td>${isFinite(bi.valor) ? fmt(bi.valor, 3) : '∞'}</td><td>1.000</td>
-            <td>${isFinite(bi.valor) ? fmt(bi.valor, 3) : '∞'}</td>
+        <tr><td>Biaxial · método general (NTC 5.4.1.1, eje neutro inclinado, θ = ${fmt(bi.general.thetaGrados, 1)}°)</td>
+            <td>${fmt(bi.general.Mu, 3)} t·m</td><td>${fmt(bi.general.MR, 3)} t·m</td>
+            <td>${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'}</td>
+            <td style="font-weight:700">${bi.gobierna === 'general' ? 'GOBIERNA' : ''}</td></tr>
+        <tr><td>Biaxial · método aproximado (NTC ec. ${bi.aproximado.ecuacion}${bi.aproximado.ecuacion === '5.4.1.2.a'
+          ? `, PRx = ${fmt(bi.aproximado.PRx, 2)} t, PRy = ${fmt(bi.aproximado.PRy, 2)} t, PR0 = ${fmt(bi.aproximado.PR0, 2)} t`
+          : `, PR/PR0 ${bi.aproximado.relacionPR == null ? 'sin compresión' : `= ${fmt(bi.aproximado.relacionPR, 3)} < 0.1`}`})</td>
+            <td>${bi.aproximado.ecuacion === '5.4.1.2.a' ? `Pu = ${fmt(Pu, 2)} t` : 'Mux/MRx + Muy/MRy'}</td>
+            <td>${bi.aproximado.ecuacion === '5.4.1.2.a' ? `PR = ${fmt(bi.aproximado.PR, 2)} t` : '1.000'}</td>
+            <td>${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'}</td>
+            <td style="font-weight:700">${bi.gobierna === 'aproximado' ? 'GOBIERNA' : ''}</td></tr>
+        <tr><td><b>Flexocompresión biaxial · D/C de la columna</b> (el mayor de los dos)</td><td colspan="2">${esc(bi.gobiernaEcuacion)}</td>
+            <td><b>${isFinite(bi.dc) ? fmt(bi.dc, 3) : '∞'}</b></td>
             <td style="color:${bi.ok ? '#15803d' : '#dc2626'};font-weight:700">${bi.ok ? '✓ CUMPLE' : '✗ NO CUMPLE'}</td></tr>
       </table>
+      <div style="font-size:10px;color:#6b7280;margin-top:4px">
+        Resistencias de diseño = FR × nominal, con FR de la tabla 3.8.2.2 de la NTC-Concreto 2023 según εt
+        ${bi.punto ? `(punto resistente: FR = ${fmt(bi.punto.FR, 3)}, εt = ${fmt(bi.punto.epsT, 5)}, ${esc(bi.punto.clase)})` : ''}.
+        ${bi.eminX || bi.eminY ? `Momentos con la excentricidad mínima de 5.3.2 (Mux = ${fmt(bi.MuxD, 3)}, Muy = ${fmt(bi.MuyD, 3)} t·m).` : ''}
+        No se revisan esbeltez ni cortante.
+      </div>
 
       <div style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid ${MARCA.acentoTexto};padding-bottom:8px;margin:24px 0 14px;text-transform:uppercase">
         Acero transversal

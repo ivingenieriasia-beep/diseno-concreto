@@ -101,8 +101,15 @@ describe('el diagrama de cada sección', () => {
     expect(u).toBeGreaterThan(0.2)
     expect(usoPunto(D, { P: 60, Mx: 8, My: 4 })).toBeCloseTo(2 * u, 2)
     expect(usoPunto(D, { P: 0, Mx: 0, My: 0 })).toBe(0)
-    // compresión pura: la frontera es el POC
-    expect(usoPunto(D, { P: D.x.Pmax, Mx: 0, My: 0 })).toBeCloseTo(1, 2)
+    // compresión pura: con la excentricidad mínima de 5.3.2 (2 cm en cada
+    // dirección) ya no se llega a PR0 = FR·P0; el uso coincide con la revisión
+    const u0 = usoPunto(D, { P: D.PR0, Mx: 0, My: 0 })
+    expect(u0).toBeGreaterThan(1)
+    const P1 = D.PR0 / u0
+    const ev = evaluateEnvelope([{ id: 'a', member: '1', tipo: 'x', P: P1 * 0.99, m22: 0, m33: 0 }], D.an.dirX, D.an.dirY, 'M33X')
+    expect(ev.allOk).toBe(true)
+    const ev2 = evaluateEnvelope([{ id: 'a', member: '1', tipo: 'x', P: P1 * 1.01, m22: 0, m33: 0 }], D.an.dirX, D.an.dirY, 'M33X')
+    expect(ev2.allOk).toBe(false)
   })
 })
 

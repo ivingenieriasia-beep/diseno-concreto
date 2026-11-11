@@ -13,12 +13,18 @@
 //      puede armar). El APROVECHAMIENTO de una columna en esa sección es qué
 //      tanto habría que crecer su demanda —P y M juntos, en la misma
 //      proporción— para tocar la frontera: 100 % = justo en el diagrama.
+//      La frontera es la misma revisión del módulo Columnas (NTC-Concreto
+//      2023): diagramas de diseño con FR de 3.8.2.2, excentricidad mínima de
+//      5.3.2, método general con eje neutro inclinado (5.4.1.1) y 5.4.1.2;
+//      aquí en tablas por nivel de P para no recorrer la superficie en cada
+//      punto. La Fase 1 (proponerColumna) revisa con la revisión exacta.
 //   4. A partir de ahí es el mismo agrupador: sección mínima de cada columna,
 //      clases, tres umbrales, acomodo manual. Cada grupo pasa por la Fase 1
 //      (proponerColumna, el motor del módulo Columnas): armado y veredicto.
 // ══════════════════════════════════════════════════════════════
 
-import { analyzeColumn, checkPoint, bdLookup } from './columnCalculator'
+import { analyzeColumn, bdLookup } from './columnCalculator'
+import { mrEnCurva, contornoEnP, mrEnDireccion, prConExcentricidad, excentricidadMinima } from './columnasNTC'
 import { arreglosColumna, proponerColumna } from './propuesta'
 import { SECCIONES_RAM } from './catalogoRam'
 import { memberKind, planAxes } from './modelView'
@@ -78,12 +84,12 @@ export function textoArmado(arm, s) {
   return `${barras} (ρ ${((As / (s.b * s.h)) * 100).toFixed(2)} %)`
 }
 
-/** MR(P) de una curva en tabla, para no recorrerla en cada punto */
+/** MR(P) de una curva de DISEÑO en tabla, para no recorrerla en cada punto */
 function tablaMR(curve, N = 240) {
   const Ps = curve.map((p) => p.P)
   const Pmin = Math.min(...Ps), Pmax = Math.max(...Ps)
   const MR = new Float64Array(N + 1)
-  for (let i = 0; i <= N; i++) MR[i] = checkPoint(curve, Pmin + ((Pmax - Pmin) * i) / N, 0).MR
+  for (let i = 0; i <= N; i++) MR[i] = mrEnCurva(curve, Pmin + ((Pmax - Pmin) * i) / N).MR
   return {
     Pmin, Pmax,
     /** −1 fuera del rango de P */
@@ -92,6 +98,32 @@ function tablaMR(curve, N = 240) {
       const t = Math.min(N, Math.max(0, ((P - Pmin) / (Pmax - Pmin || 1)) * N))
       const i = Math.min(N - 1, Math.floor(t))
       return MR[i] + (MR[i + 1] - MR[i]) * (t - i)
+    },
+  }
+}
+
+/**
+ * MR(P, θ) del método general (eje neutro inclinado) en tabla: NP niveles de
+ * P y NT ángulos de 0 a 90° (las demandas se revisan en magnitud).
+ */
+function tablaGeneral(sup, Pmin, Pmax, NP = 120, NT = 45) {
+  const MR = Array.from({ length: NP + 1 }, () => new Float64Array(NT + 1))
+  for (let i = 0; i <= NP; i++) {
+    const cont = contornoEnP(sup, Pmin + ((Pmax - Pmin) * i) / NP)
+    for (let j = 0; j <= NT; j++) MR[i][j] = cont.fuera ? 0 : mrEnDireccion(cont, (Math.PI / 2) * (j / NT)).MR
+  }
+  return {
+    Pmin, Pmax,
+    /** −1 fuera del rango de P */
+    at(P, theta) {
+      if (P < Pmin - 1e-9 || P > Pmax + 1e-9) return -1
+      const t = Math.min(NP, Math.max(0, ((P - Pmin) / (Pmax - Pmin || 1)) * NP))
+      const i = Math.min(NP - 1, Math.floor(t)), fi = t - i
+      const s = Math.min(NT, Math.max(0, (theta / (Math.PI / 2)) * NT))
+      const j = Math.min(NT - 1, Math.floor(s)), fj = s - j
+      const a = MR[i][j] + (MR[i][j + 1] - MR[i][j]) * fj
+      const b = MR[i + 1][j] + (MR[i + 1][j + 1] - MR[i + 1][j]) * fj
+      return a + (b - a) * fi
     },
   }
 }
@@ -105,26 +137,48 @@ export function diagramaDe(s) {
     const arm = armadoDeReferencia(s)
     const col = { b: s.b, h: s.h, r: RECUB, fc: FC, fy: 4200, nLechos: arm?.nh || 2, lechos: arm?.lechos || [] }
     const an = analyzeColumn(col)
-    DIAGRAMAS.set(k, { arm, col, an, x: tablaMR(an.dirX.curve), y: tablaMR(an.dirY.curve), texto: textoArmado(arm, s) })
+    const x = tablaMR(an.dirX.curveDiseno), y = tablaMR(an.dirY.curveDiseno)
+    const g = tablaGeneral(an.superficie, Math.max(x.Pmin, y.Pmin), Math.min(x.Pmax, y.Pmax))
+    DIAGRAMAS.set(k, {
+      arm, col, an, x, y, g, texto: textoArmado(arm, s),
+      exMin: excentricidadMinima(s.h), eyMin: excentricidadMinima(s.b), PR0: an.superficie.PR0,
+    })
   }
   return DIAGRAMAS.get(k)
 }
 
 /**
  * Qué tanto usa un punto (P, Mx, My) el diagrama: 1/λ, con λ lo que hay que
- * multiplicar el punto para llegar a la frontera. El contorno es el mismo que
- * revisa el módulo Columnas: dentro del rango de P y (Mx/MRx)² + (My/MRy)² ≤ 1.
+ * multiplicar el punto para llegar a la frontera. La frontera es la misma
+ * revisión del módulo Columnas (NTC-Concreto 2023, con FR): uniaxiales de
+ * diseño, método general (eje neutro inclinado) y 5.4.1.2 (Bresler o, si
+ * PR/PR0 < 0.1, la suma lineal), con la excentricidad mínima de 5.3.2.
+ * Al escalar P y M juntos la excentricidad no cambia, así que PR de Bresler
+ * es fijo y basta comparar k·P con él.
  */
 export function usoPunto(D, p) {
-  const { P, Mx, My } = p
-  if (Math.abs(P) < 1e-9 && Mx < 1e-9 && My < 1e-9) return 0
+  const P = +p.P || 0
+  if (Math.abs(P) < 1e-9 && p.Mx < 1e-9 && p.My < 1e-9) return 0
+  const comp = P > 0
+  const Mx = comp ? Math.max(p.Mx, P * D.exMin) : p.Mx
+  const My = comp ? Math.max(p.My, P * D.eyMin) : p.My
+  const Mu = Math.hypot(Mx, My), theta = Math.atan2(My, Mx)
+  let PR = 0
+  if (comp) {
+    const PRx = prConExcentricidad(D.an.dirX.curveDiseno, Mx / P)
+    const PRy = prConExcentricidad(D.an.dirY.curveDiseno, My / P)
+    const inv = PRx > 0 && PRy > 0 ? 1 / PRx + 1 / PRy - 1 / D.PR0 : Infinity
+    PR = inv > 0 && isFinite(inv) ? 1 / inv : 0
+  }
+  const bresler = comp && PR / D.PR0 >= 0.1
+  const r = (M, MR) => (MR > 1e-9 ? M / MR : M > 1e-9 ? Infinity : 0)
   const dentro = (k) => {
     const q = k * P
-    const mx = D.x.at(q), my = D.y.at(q)
-    if (mx < 0 || my < 0) return false
-    const a = mx > 1e-9 ? (k * Mx) / mx : (k * Mx > 1e-9 ? Infinity : 0)
-    const b = my > 1e-9 ? (k * My) / my : (k * My > 1e-9 ? Infinity : 0)
-    return a * a + b * b <= 1
+    const mx = D.x.at(q), my = D.y.at(q), mg = D.g.at(q, theta)
+    if (mx < 0 || my < 0 || mg < 0) return false
+    if (k * Mx > mx + 1e-9 || k * My > my + 1e-9) return false
+    if (k * Mu > mg + 1e-9) return false
+    return bresler ? q <= PR + 1e-9 : r(k * Mx, mx) + r(k * My, my) <= 1 + 1e-9
   }
   let lo = 0, hi = 1
   if (dentro(1)) {

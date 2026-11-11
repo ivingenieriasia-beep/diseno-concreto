@@ -22,6 +22,9 @@ const defaultColumn = (nombre = '') => ({
   MuX: 0,         // momento que trabaja el peralte h (hoja de Excel tal cual)
   MuY: 0,         // momento en la otra dirección
   estriboNum: '2.5',
+  // Factores de resistencia (NTC-Concreto 2023, 3.8.2): por omisión estribos
+  zunchos: false,               // refuerzo helicoidal que cumple 14.7.4
+  frTransicionCompresion: false, // 3.8.2.6: FR de compresión en la transición
   // Envolvente de elementos mecánicos (p. ej. reporte RAM) — opcional
   envelope: null, // { archivo, combo, mapping, points:[...] }
 })

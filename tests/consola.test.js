@@ -57,8 +57,9 @@ describe('el edificio de ejemplo por la consola (09-practica.md)', () => {
     expect(r.texto).toContain('inf 3#4 + 2#4 puntual · sup 3#4 + 3#4 puntual · E#2.5 @18/18')
     expect(r.texto).toContain('T-2 20×40')
     expect(r.texto).toContain('inf 2#4 + 2#4 puntual · sup 3#5 + 2#5 puntual · E#2.5 @18/18')
-    expect(r.texto).toContain('8#5 (ρ 1.76 %)')
-    expect(r.texto).toContain('4#6 (ρ 1.82 %)')
+    // Desde la 3.7 las columnas se revisan con FR (NTC 2023): antes 8#5 y 4#6
+    expect(r.texto).toContain('C-1 30×30 · 27 miembros · 8#6 (ρ 2.53 %)')
+    expect(r.texto).toContain('C-2 25×25 · 9 miembros · 4#8 (ρ 3.24 %)')
     expect(useBeamStore.getState().sections).toHaveLength(5)
     expect(useColumnStore.getState().columns).toHaveLength(2)
   })

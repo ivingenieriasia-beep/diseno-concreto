@@ -3,7 +3,7 @@ IV Ingenierías · Estructuras
 # Auxiliar IV con RAM Elements
 
 Manual de uso para el equipo: del modelo analizado en RAM a las secciones armadas y la cimentación, pasando por la agrupación de trabes.
-**Versión 3.06**Septiembre de 2026
+**Versión 3.07**Noviembre de 2026
 burgos2177-create.github.io/auxiliar-iv Chrome o Edge
 
 ## Lo esencial en una página
@@ -330,7 +330,7 @@ _Figura:_ **Agrupación → Columnas** con el edificio de prueba, por entrepiso.
 ### Cómo se mide el aprovechamiento
 
 1. Cada sección del catálogo tiene su **diagrama de interacción** con un armado de referencia: el de menos varillas con cuantía entre 1.5 y 2.5 % (8#5 en 30×30, 4#6 en 25×25, 8#6 en 36×36). Es un armado cómodo; el de cada grupo lo pone después la Fase 1.
-2. Cada combinación en el pie y en la cabeza de una columna es un **punto** (P, Mx, My): Mx = |M33| trabaja el peralte h y My = |M22| el ancho b, como en el módulo Columnas, y los dos se revisan juntos con el contorno biaxial.
+2. Cada combinación en el pie y en la cabeza de una columna es un **punto** (P, Mx, My): Mx = |M33| trabaja el peralte h y My = |M22| el ancho b, como en el módulo Columnas, y los dos se revisan juntos con la revisión biaxial de la NTC-Concreto 2023 (FR de 3.8.2.2, método general con el eje neutro inclinado y 5.4.1.2).
 3. El **aprovechamiento** de un punto es qué tanto habría que crecer su P y sus momentos, juntos y en la misma proporción, para tocar la frontera: 100 % es justo en el diagrama; 50 % es que aguantaría el doble. El de la columna es el de su punto más exigido.
 4. De ahí en adelante es igual que con las trabes: la sección mínima de cada columna, las clases, los tres umbrales (50, 65 y 80 %) y los grupos **C1, C2…** de la sección más grande a la más chica. Cada grupo lo arma la Fase 1 con el motor del módulo Columnas (capítulo 8).
 
@@ -552,7 +552,7 @@ Para saber qué está suponiendo la app cuando propone, y qué no revisa.
 | **Materiales** | f'c 250 kg/cm² y fy 4 200 kg/cm² para dimensionar la agrupación. Ec según NTC: clase 1 (f'c ≥ 250) 14 000√f'c con agregado calizo (11 000√f'c si es basáltico); clase 2 (200 ≤ f'c < 250) 8 000√f'c. |
 | **Sección mínima de una trabe** (Agrupación) | Flexión: MR con ρ = ½ ρ balanceada, FR = 0.9, recubrimiento 3 cm; con eso se arma cómoda y es dúctil. Cortante: estribos #2.5 de dos ramas a no menos de 8 cm; si el acero de cortante pasa de FR · 1.1√f'c · b · d la separación máxima baja a d/4, y en poco peralte eso ya no se arma: pide peralte. Sin pasar del cortante máximo de la sección. |
 | **Propuestas de agrupación** | Una clase sube a la sección del grupo de arriba si todas sus trabes caben y la más cargada la aprovecharía al menos al 50, 65 u 80 %. Sólo trabes horizontales; sólo secciones del catálogo con los anchos y peraltes permitidos. La sección se elige con la cuantía de dimensionamiento (½ ρ balanceada); el armado real lo pone después la verificación, que puede usar más acero (hasta 0.9 ρ balanceada) si hace falta. |
-| **Sección mínima de una columna** (Agrupación) | El diagrama de interacción de cada sección con el armado de menos varillas entre 1.5 y 2.5 % de cuantía; P, Mx = \|M33\| y My = \|M22\| de la misma combinación, en el pie y la cabeza, con el contorno biaxial del módulo Columnas. Aprovechamiento: cuánto habría que crecer la demanda, P y M en la misma proporción, para llegar a la frontera. Mismos umbrales que las trabes; sólo columnas del catálogo y secciones permitidas. |
+| **Sección mínima de una columna** (Agrupación) | El diagrama de interacción de cada sección con el armado de menos varillas entre 1.5 y 2.5 % de cuantía; P, Mx = \|M33\| y My = \|M22\| de la misma combinación, en el pie y la cabeza, con la revisión NTC del módulo Columnas (FR de 3.8.2.2, excentricidad mínima de 5.3.2, método general y 5.4.1.2). Aprovechamiento: cuánto habría que crecer la demanda, P y M en la misma proporción, para llegar a la frontera. Mismos umbrales que las trabes; sólo columnas del catálogo y secciones permitidas. |
 | **Armado de trabes** | El de menos acero que pasa con los motores de Longitudinal. Corridas por lecho: 3 si b ≤ 25 cm, 4 si b ≤ 35 cm, 5 si es mayor. Estribos #2.5 (o #3) de dos ramas. |
 | **Armado de columnas** | Menos varillas primero; ρ de 1 a 4 %; separación c. a c. ≤ 20 cm; #4 o mayor si algún lado ≥ 20 cm. Flexocompresión con el diagrama de interacción de la app. |
 | **Estribos de columna** | Centro y extremos según el capítulo 9, con H del modelo. |

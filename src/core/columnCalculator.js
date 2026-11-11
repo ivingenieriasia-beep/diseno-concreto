@@ -5,6 +5,10 @@
 // del eje neutro para un diagrama de interacción continuo.
 // ══════════════════════════════════════════════════════════════
 
+import {
+  curvaDeDiseno, puntoDeDiseno, frCompresion, opcionesFR, superficieDeDiseno, revisarFlexocompresionNTC,
+} from './columnasNTC'
+
 // ── Tabla BD (hoja "BD" del Excel — diámetro cm / área cm²) ──
 // Nota: difiere ligeramente de VARILLAS del módulo de vigas en #9/#10
 // (6.41 vs 6.45, 7.92 vs 8.19); se conservan los valores del Excel.
@@ -49,7 +53,9 @@ function prepare({ h, b, r, fc, fy = 4200, E = 2e6, epsC = 0.003, lechos }) {
   const capas = lechos.map((L, i) => ({
     n: +L.n || 0,
     num: L.num,
-    area: bdLookup(L.num).area * (+L.n || 0), // Excel E25 = LOOKUP(ϕ)·n
+    // Excel E25 = LOOKUP(ϕ)·n; en la dirección Y, el área exacta del grupo
+    // (puede mezclar calibres de lechos distintos)
+    area: L.area !== undefined ? +L.area : bdLookup(L.num).area * (+L.n || 0),
     dp: L.dp !== undefined ? L.dp : dps[i],   // dp explícito (dirección Y) o distribuido
   }))
   const Ast = capas.reduce((s, c) => s + c.area, 0)
@@ -131,7 +137,27 @@ export function analyzeDirection(input, opts = {}) {
   // Empalme final hacia compresión pura
   curve.push({ c: null, P: POC, M: 0 })
 
-  return { params: P, POC, cD, cM0, c1, c2, c3, canonical, curve }
+  // ── Diagrama de DISEÑO (NTC-Concreto 2023, 3.8.1.1 y 3.8.2.2) ──
+  // FR por punto según εt del lecho extremo a tensión (dt); P = FR·Pn, M = FR·Mn.
+  const fr = opts.fr || {}
+  const FRc = frCompresion(fr)
+  const conAcero = P.capas.filter((L) => L.area > 0)
+  const dt = Math.max(...(conAcero.length ? conAcero : P.capas).map((L) => L.dp))
+  const epsTy = P.epsY // 3.8.2.4: εty = fy/Es
+  const cb = (P.epsC * dt) / (P.epsC + epsTy)
+  const SD = {
+    epsC: P.epsC, epsTy, dt, FRc, fr,
+    asimetrico: !!opts.asimetrico,
+    PbR: FRc * pointForC(cb, P).P,
+    P01: (0.1 * P.fc * P.h * P.b) / 1000,
+  }
+  const curveDiseno = curvaDeDiseno(curve, SD)
+  for (const k of canonical) {
+    const d = puntoDeDiseno(k.c, k.P, SD)
+    k.diseno = { ...d, P: d.FR * k.P, M: d.FR * k.M }
+  }
+
+  return { params: P, POC, cD, cM0, c1, c2, c3, canonical, curve, curveDiseno, diseno: { ...SD, PR0: FRc * POC, cb } }
 }
 
 function ptWrap(pt) {
@@ -183,9 +209,23 @@ export function lechosY(input) {
 }
 
 /**
+ * ¿El acero es simétrico respecto al eje de flexión X? (lecho i ↔ lecho N+1−i
+ * con la misma área). En Y la retícula siempre es simétrica: cada lecho
+ * reparte sus barras de r a b−r. Sirve para 3.8.2.3.
+ */
+export function aceroAsimetrico(lechos) {
+  const a = (lechos || []).map((L) => bdLookup(L.num).area * (+L.n || 0))
+  return a.some((v, i) => Math.abs(v - a[a.length - 1 - i]) > 1e-9)
+}
+
+/**
  * Análisis biaxial completo de la columna.
  *  - X: flexión que trabaja el peralte h (la hoja de Excel tal cual)
  *  - Y: sección girada 90° (h↔b) con capas agrupadas por x
+ *  - superficie: diagrama de diseño con eje neutro inclinado (NTC 5.4.1.1)
+ * Cada dirección trae su curva nominal (`curve`, la del Excel) y la de
+ * diseño (`curveDiseno`, con FR de la tabla 3.8.2.2).
+ * opts.fr = { zunchos, transicionComoCompresion } (por omisión, los de la columna)
  */
 export function analyzeColumn(col, opts = {}) {
   const base = {
@@ -193,24 +233,40 @@ export function analyzeColumn(col, opts = {}) {
     fy: +col.fy || 4200, E: +col.E || 2e6, epsC: +col.epsC || 0.003,
   }
   const lechos = (col.lechos || []).map((L) => ({ n: +L.n || 0, num: L.num }))
+  const fr = { ...opcionesFR(col), ...(opts.fr || {}) }
+  const asimetrico = aceroAsimetrico(lechos)
+  const o = { ...opts, fr, asimetrico }
 
-  const dirX = analyzeDirection({ ...base, lechos }, opts)
+  const dirX = analyzeDirection({ ...base, lechos }, o)
 
-  // Dirección Y: swap h↔b, capas desde la retícula real
+  // Dirección Y: swap h↔b, capas desde la retícula real, con el área exacta
+  // de cada grupo (antes se tomaba el calibre representativo del grupo).
   const capasY = lechosY({ h: base.h, b: base.b, r: base.r, lechos })
-    .map((L) => ({ n: L.n, num: L.num, dp: L.dp }))
-  // áreas exactas del agrupado (mezcla de calibres posible)
-  const lechosYExact = lechosY({ h: base.h, b: base.b, r: base.r, lechos })
+    .map((L) => ({ n: L.n, num: L.num, dp: L.dp, area: L.areaOverride }))
   const dirY = analyzeDirection(
     { ...base, h: base.b, b: base.h, lechos: capasY },
-    opts,
+    o,
   )
-  // Corrige áreas de capas Y con las áreas agrupadas exactas
-  dirY.params.capas.forEach((c, i) => {
-    if (lechosYExact[i]) c.area = lechosYExact[i].areaOverride
-  })
 
-  return { dirX, dirY }
+  // Superficie de diseño (eje neutro inclinado), con las barras reales
+  const bars = barGrid({ h: base.h, b: base.b, r: base.r, lechos })
+    .map((br) => ({ u: br.x - base.b / 2, v: base.h / 2 - br.y, area: br.area }))
+  const P = dirX.params
+  const superficie = superficieDeDiseno({
+    b: base.b, h: base.h, fc: base.fc, fy: base.fy, E: base.E, epsC: base.epsC,
+    epsY: P.epsY, epsTy: P.epsY, b1: P.b1, bars, P0: dirX.POC, Ag: base.b * base.h,
+    asimetrico, fr,
+  }, opts.superficie)
+
+  const res = {
+    dirX, dirY, superficie,
+    ntc: { fr, asimetrico, epsTy: P.epsY, FRc: superficie.FRc, P0: dirX.POC, PR0: superficie.PR0 },
+  }
+  // Para que checkBiaxial(dirX, dirY, …) llegue a la superficie sin cambiar
+  // de firma. No enumerable: no entra a JSON ni crea ciclos al serializar.
+  Object.defineProperty(dirX, 'columna', { value: res, enumerable: false })
+  Object.defineProperty(dirY, 'columna', { value: res, enumerable: false })
+  return res
 }
 
 // ── Excentricidad y modo de revisión · Excel D8/B10 ───────────
@@ -245,16 +301,35 @@ export function checkPoint(curve, Pu, Mu) {
 }
 
 /**
- * Revisión biaxial (referencia, contorno elíptico α=2):
- * (Mux/MRx)² + (Muy/MRy)² ≤ 1 al nivel Pu.
+ * Revisión de flexocompresión de la columna según la NTC-Concreto 2023, con
+ * los diagramas de DISEÑO (FR de 3.8.2.2) y la excentricidad mínima de 5.3.2:
+ *   a) método general (5.4.1.1, hipótesis de 3.6, eje neutro inclinado):
+ *      D/C = √(Mux² + Muy²) / MR(θ) al nivel Pu;
+ *   b) método aproximado 5.4.1.2: Bresler (ec. 5.4.1.2.a) o, si
+ *      PR/PR0 < 0.1, Mux/MRx + Muy/MRy (ec. 5.4.1.2.b).
+ * El D/C de la columna es el mayor de los dos (`dc`, `gobierna`).
+ * El contorno elíptico α = 2 de antes ya no se usa (pedido de FB, 2026-11-11).
+ */
+export function revisarColumnaNTC(an, Pu, Mux, Muy) {
+  return revisarFlexocompresionNTC(datosNTC(an), Pu, Mux, Muy)
+}
+
+/** Lo que piden las funciones de columnasNTC.js (curvas de diseño y superficie) */
+export function datosNTC(an) {
+  return {
+    curvaX: an.dirX.curveDiseno, curvaY: an.dirY.curveDiseno, superficie: an.superficie,
+    h: an.dirX.params.h, b: an.dirX.params.b,
+  }
+}
+
+/**
+ * La misma revisión con la firma de siempre (dirX, dirY). Devuelve además
+ * `checkX` y `checkY` (uniaxiales con los diagramas de diseño).
  */
 export function checkBiaxial(anX, anY, Pu, Mux, Muy) {
-  const cx = checkPoint(anX.curve, Pu, Mux)
-  const cy = checkPoint(anY.curve, Pu, Muy)
-  const ux = cx.MR > 0 ? Mux / cx.MR : (Mux > 0 ? Infinity : 0)
-  const uy = cy.MR > 0 ? Muy / cy.MR : (Muy > 0 ? Infinity : 0)
-  const val = ux * ux + uy * uy
-  return { checkX: cx, checkY: cy, valor: val, ok: val <= 1 }
+  const an = anX?.columna || anY?.columna
+  if (!an) throw new Error('checkBiaxial: la dirección no viene de analyzeColumn')
+  return revisarColumnaNTC(an, Pu, Mux, Muy)
 }
 
 // ── Estribos · Excel D163–D167 (fórmulas exactas de la hoja) ───

@@ -173,11 +173,12 @@ export function evaluateEnvelope(points, anX, anY, mapping = 'M33X') {
     const Mux = Math.abs(mapping === 'M33X' ? pt.m33 : pt.m22)
     const Muy = Math.abs(mapping === 'M33X' ? pt.m22 : pt.m33)
     const Pu = pt.P
-    const cx = checkPoint(anX.curve, Pu, Mux)
-    const cy = checkPoint(anY.curve, Pu, Muy)
+    // Revisión NTC-Concreto 2023 (FR de 3.8.2.2, excentricidad mínima de
+    // 5.3.2, método general y 5.4.1.2): util = el D/C que gobierna.
     const bi = checkBiaxial(anX, anY, Pu, Mux, Muy)
-    const util = isFinite(bi.valor) ? Math.sqrt(bi.valor) : Infinity
-    return { ...pt, Pu, Mux, Muy, cx, cy, bi, util, ok: bi.ok && cx.ok && cy.ok }
+    const cx = bi.checkX, cy = bi.checkY
+    const util = bi.dc
+    return { ...pt, Pu, Mux, Muy, cx, cy, bi, util, ok: bi.ok }
   })
   const sorted = [...out].sort((a, b) => (b.util === Infinity ? 1 : a.util === Infinity ? -1 : b.util - a.util))
   const failing = out.filter((r) => !r.ok)

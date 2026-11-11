@@ -168,7 +168,7 @@ Aparte de esto, cada sección tiene su memoria individual en **Calculo → Memor
 
 - **Contenido:** un JSON `{"format":"sogrub-dcheck","version":1,"meta":{proyecto,reviso,fecha},"sections":[…]}` con un elemento por trabe y por columna:
   - **Trabe:** `ma` = Mu+, `mr` = MR+, `man`/`mrn` = negativos, `va` = Vu, `vr` = Vr, y en `obs` la sección, el armado, los estribos y la fuente de la demanda (la envolvente de RAM si existe; si no, el punto capturado).
-  - **Columna:** Mux/MRx, Muy/MRy, Pu y el índice biaxial.
+  - **Columna:** Mux/MRx, Muy/MRy (de diseño, con FR), Pu y el D/C biaxial de la NTC-Concreto 2023 (el mayor del método general y de 5.4.1.2, con cuál gobierna).
   - La marca `mark` vale ok si el peor ratio es ≤ 0.9, warn si es ≤ 1 y bad si pasa de 1.
   - Las imágenes A–D van vacías, porque las capturas se agregan después en la ventana Double Check.
 - **Pasos:** `Verificar ▾` → `Exportar a Double Check`. Después abre `Módulos → Double Check` → `Abrir .dcheck`, pega las capturas y guarda.
