@@ -183,10 +183,12 @@ export function camposNTC(bi) {
   const p = bi.punto
   return {
     norma: bi.norma,
-    gobierna: bi.gobierna,                       // 'general' | 'aproximado'
+    gobierna: bi.gobierna,                       // 'general' desde la 3.08 (criterio de FB)
+    criterio: bi.criterio,
     ecuacion: bi.gobiernaEcuacion,               // de qué ecuación sale el D/C
     dcGeneral: r(bi.general.dc),                 // a) 5.4.1.1, eje neutro inclinado
-    dc5412: r(bi.aproximado.dc),                 // b) 5.4.1.2
+    dc5412: r(bi.aproximado.dc),                 // b) 5.4.1.2, solo referencia
+    referencia5412: true,
     ecuacion5412: bi.aproximado.ecuacion,        // '5.4.1.2.a' (Bresler) | '5.4.1.2.b' (lineal)
     PR: r(bi.aproximado.PR, 3), PRx: r(bi.aproximado.PRx, 3), PRy: r(bi.aproximado.PRy, 3), PR0: r(bi.aproximado.PR0, 3),
     PRsobrePR0: r(bi.aproximado.relacionPR),
@@ -201,7 +203,7 @@ export function camposNTC(bi) {
 
 const lineaColumna = (d) => `${marca(d.ok)} ${d.chip} ${d.b}×${d.h} · ${d.armado} · `
   + (d.dc == null ? d.fuente : `D/C ${pct(d.dc)}${d.critico ? ` (miembro ${d.critico})` : ''} · Pu ${f2(d.Pu)} t · Mux ${f2(d.Mux)} · Muy ${f2(d.Muy)} t·m`)
-  + (d.dc == null || d.dcGeneral == null ? '' : ` · NTC: general ${pct(d.dcGeneral)} · ${d.ecuacion5412} ${pct(d.dc5412)} · gobierna ${d.gobierna === 'general' ? 'general' : d.ecuacion5412}`
+  + (d.dc == null || d.dcGeneral == null ? '' : ` · NTC: general ${pct(d.dcGeneral)} (gobierna) · referencia ${d.ecuacion5412} ${pct(d.dc5412)}`
     + (d.FR != null ? ` · FR ${Number(d.FR).toFixed(2)} (${d.clase})` : ''))
   + (d.fuente === 'envolvente' ? ` · ${d.pasan}/${d.total} puntos` : '')
 

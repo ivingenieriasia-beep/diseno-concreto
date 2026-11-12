@@ -24,7 +24,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { analyzeColumn, bdLookup } from './columnCalculator'
-import { mrEnCurva, contornoEnP, mrEnDireccion, prConExcentricidad, excentricidadMinima } from './columnasNTC'
+import { mrEnCurva, contornoEnP, mrEnDireccion, excentricidadMinima } from './columnasNTC'
 import { arreglosColumna, proponerColumna } from './propuesta'
 import { SECCIONES_RAM } from './catalogoRam'
 import { memberKind, planAxes } from './modelView'
@@ -151,10 +151,9 @@ export function diagramaDe(s) {
  * Qué tanto usa un punto (P, Mx, My) el diagrama: 1/λ, con λ lo que hay que
  * multiplicar el punto para llegar a la frontera. La frontera es la misma
  * revisión del módulo Columnas (NTC-Concreto 2023, con FR): uniaxiales de
- * diseño, método general (eje neutro inclinado) y 5.4.1.2 (Bresler o, si
- * PR/PR0 < 0.1, la suma lineal), con la excentricidad mínima de 5.3.2.
- * Al escalar P y M juntos la excentricidad no cambia, así que PR de Bresler
- * es fijo y basta comparar k·P con él.
+ * diseño y método general (eje neutro inclinado), con la excentricidad mínima
+ * de 5.3.2. Desde la 3.08 el 5.4.1.2 no decide (criterio del Ing. Fernando
+ * Burgos, 2026-11-11), así que tampoco entra aquí.
  */
 export function usoPunto(D, p) {
   const P = +p.P || 0
@@ -163,22 +162,12 @@ export function usoPunto(D, p) {
   const Mx = comp ? Math.max(p.Mx, P * D.exMin) : p.Mx
   const My = comp ? Math.max(p.My, P * D.eyMin) : p.My
   const Mu = Math.hypot(Mx, My), theta = Math.atan2(My, Mx)
-  let PR = 0
-  if (comp) {
-    const PRx = prConExcentricidad(D.an.dirX.curveDiseno, Mx / P)
-    const PRy = prConExcentricidad(D.an.dirY.curveDiseno, My / P)
-    const inv = PRx > 0 && PRy > 0 ? 1 / PRx + 1 / PRy - 1 / D.PR0 : Infinity
-    PR = inv > 0 && isFinite(inv) ? 1 / inv : 0
-  }
-  const bresler = comp && PR / D.PR0 >= 0.1
-  const r = (M, MR) => (MR > 1e-9 ? M / MR : M > 1e-9 ? Infinity : 0)
   const dentro = (k) => {
     const q = k * P
     const mx = D.x.at(q), my = D.y.at(q), mg = D.g.at(q, theta)
     if (mx < 0 || my < 0 || mg < 0) return false
     if (k * Mx > mx + 1e-9 || k * My > my + 1e-9) return false
-    if (k * Mu > mg + 1e-9) return false
-    return bresler ? q <= PR + 1e-9 : r(k * Mx, mx) + r(k * My, my) <= 1 + 1e-9
+    return k * Mu <= mg + 1e-9
   }
   let lo = 0, hi = 1
   if (dentro(1)) {

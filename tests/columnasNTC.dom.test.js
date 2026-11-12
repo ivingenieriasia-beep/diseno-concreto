@@ -23,7 +23,7 @@ describe('la revisión NTC se ve y se puede revisar', () => {
   const an = analyzeColumn(col)
   const bi = checkBiaxial(an.dirX, an.dirY, col.Pu, col.MuX, col.MuY)
 
-  it('pestaña Columnas: los dos métodos, cuál gobierna, FR y εt, y el contorno Mx–My', async () => {
+  it('pestaña Columnas: gobierna el método general, 5.4.1.2 como referencia, FR y εt, y el contorno Mx–My', async () => {
     // vitest compila el JSX con el runtime clásico (sin el plugin de React de vite)
     globalThis.React = React
     const { default: RevisionNTC } = await import('../src/components/RevisionNTC.jsx')
@@ -33,21 +33,24 @@ describe('la revisión NTC se ve y se puede revisar', () => {
     expect(html).toContain('NTC 5.4.1.1')
     expect(html).toContain('5.4.1.2.b')
     expect(html).toContain('GOBIERNA')
+    expect(html).toContain('solo referencia')
     expect(html).toMatch(/FR 0\.900 · εt 0\.007\d+ · tensión/)
     expect(html).toContain(bi.dc.toFixed(3))
     expect(html).not.toMatch(/el[ií]ptic/i)          // la elipse α = 2 de antes ya no se usa
+    expect(bi.dc).toBe(bi.general.dc)
     expect(html).toContain('✗ no pasa')
   })
 
-  it('memoria y detallado dicen los dos D/C y de qué ecuación sale', () => {
+  it('memoria y detallado dicen los dos D/C, que gobierna el general y que 5.4.1.2 es referencia', () => {
     generateMemoria({ columns: [col] })
     expect(escrito).toContain('método general (5.4.1.1, eje neutro inclinado)')
-    expect(escrito).toContain('la ec. 5.4.1.2.b')
+    expect(escrito).toContain('como referencia, método aproximado (ec. 5.4.1.2.b)')
+    expect(escrito).toContain('gobierna el método general (criterio del Ing. Fernando Burgos)')
     expect(escrito).toContain('NTC-Concreto 2023, 3.8.2.2')
     escrito = ''
     generateDetailedReport([], '', [col])
     expect(escrito).toContain('Biaxial · método general')
-    expect(escrito).toContain('Biaxial · método aproximado (NTC ec. 5.4.1.2.b')
+    expect(escrito).toContain('Biaxial · referencia, no decide · método aproximado (NTC ec. 5.4.1.2.b')
     expect(escrito).toContain('GOBIERNA')
     expect(escrito).toContain('<th>FR</th>')
   })
@@ -55,7 +58,7 @@ describe('la revisión NTC se ve y se puede revisar', () => {
   it('Double Check: la observación trae el resumen NTC', () => {
     const d = buildDcheck({ sections: [], columns: [col] })
     const c = (d.sections || d.data?.sections || []).find((s) => s.name === 'C-1')
-    expect(c.obs).toMatch(/NTC-Concreto 2023 · D\/C 1\.06\d, gobierna ec\. 5\.4\.1\.2\.b/)
+    expect(c.obs).toMatch(/NTC-Concreto 2023 · D\/C 1\.04\d, gobierna método general \(5\.4\.1\.1\) · referencia 5\.4\.1\.2/)
     expect(c.mark).toBe('bad')
   })
 })

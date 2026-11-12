@@ -307,7 +307,9 @@ export function checkPoint(curve, Pu, Mu) {
  *      D/C = √(Mux² + Muy²) / MR(θ) al nivel Pu;
  *   b) método aproximado 5.4.1.2: Bresler (ec. 5.4.1.2.a) o, si
  *      PR/PR0 < 0.1, Mux/MRx + Muy/MRy (ec. 5.4.1.2.b).
- * El D/C de la columna es el mayor de los dos (`dc`, `gobierna`).
+ * Desde la 3.08 el D/C de la columna es el del método general (`dc`); 5.4.1.2
+ * se queda como referencia (`aproximado.referencia`). Criterio de FB, 2026-11-11:
+ * «ok, vamos a manejar el método general en la aplicación».
  * El contorno elíptico α = 2 de antes ya no se usa (pedido de FB, 2026-11-11).
  */
 export function revisarColumnaNTC(an, Pu, Mux, Muy) {

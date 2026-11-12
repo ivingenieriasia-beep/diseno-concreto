@@ -135,12 +135,19 @@ describe('caso real 15×15 4#4, f\'c 250: Pu 0.373 t, Mux 0.02, Muy 1.051 t·m',
     expect(r.general.dc).toBeCloseTo(1.041, 2)
   })
 
-  it('gobierna el mayor (5.4.1.2.b) y la columna NO pasa', () => {
-    expect(r.dc).toBe(Math.max(r.general.dc, r.aproximado.dc))
-    expect(r.gobierna).toBe('aproximado')
-    expect(r.gobiernaEcuacion).toMatch(/5\.4\.1\.2\.b/)
+  // 3.08, criterio del Ing. Fernando Burgos (2026-11-11): «ok, vamos a manejar
+  // el método general en la aplicación». 5.4.1.2 queda solo como referencia.
+  it('gobierna el método general (1.041) y la columna NO pasa; 5.4.1.2.b (1.061) es referencia', () => {
+    expect(r.dc).toBe(r.general.dc)
+    expect(r.dc).toBeCloseTo(1.041, 2)
+    expect(r.aproximado.dc).toBeCloseTo(1.0606, 3)
+    expect(r.aproximado.referencia).toBe(true)
+    expect(r.aproximado.mayorQueGeneral).toBe(true)
+    expect(r.gobierna).toBe('general')
+    expect(r.gobiernaEcuacion).toMatch(/5\.4\.1\.1/)
+    expect(r.criterio).toMatch(/criterio de FB/)
     expect(r.ok).toBe(false)
-    expect(resumenNTC(r)).toMatch(/gobierna ec\. 5\.4\.1\.2\.b/)
+    expect(resumenNTC(r)).toMatch(/gobierna método general \(5\.4\.1\.1\) · referencia 5\.4\.1\.2 1\.06\d \(ec\. 5\.4\.1\.2\.b\)/)
     // el contorno elíptico α = 2 de antes ya no se calcula
     expect(r).not.toHaveProperty('elipticoAnterior')
   })
@@ -301,3 +308,25 @@ function mrPorFibras(col, Pu, theta, N = 200) {
   const p = enP((lo + hi) / 2)
   return Math.hypot(p.Mx, p.My)
 }
+
+// Casos de una iteración real (datos de prueba, sin nombre de cliente), del
+// Diseñador de concreto con el motor de 6fe3d8d. C-1 ya trae los momentos
+// amplificados por esbeltez (Fab 1.10, Cm = 1), porque la app no la revisa.
+describe('3.08: con el método general, los dos casos del Diseñador de concreto', () => {
+  it("15×15 4#5, f'c 250: Pu 0.373, Mux 0.022007, Muy 1.156489 → general 0.776 (5.4.1.2.b 0.791, referencia)", () => {
+    const an = analyzeColumn({ h: 15, b: 15, r: 3, fc: 250, fy: 4200, lechos: [{ n: 2, num: '5' }, { n: 2, num: '5' }] })
+    const r = revisarColumnaNTC(an, 0.373, 0.022007, 1.156489)
+    expect(r.general.dc).toBeCloseTo(0.77623, 4)
+    expect(r.aproximado.dc).toBeCloseTo(0.79080, 4)
+    expect(r.dc).toBe(r.general.dc)
+    expect(r.ok).toBe(true)
+  })
+  it("15×15 4#3, f'c 200: Pu 0.273, Mux 0.337, Muy 0.013 → general 0.566 (5.4.1.2.b 0.587, referencia)", () => {
+    const an = analyzeColumn({ h: 15, b: 15, r: 3, fc: 200, fy: 4200, lechos: [{ n: 2, num: '3' }, { n: 2, num: '3' }] })
+    const r = revisarColumnaNTC(an, 0.273, 0.337, 0.013)
+    expect(r.general.dc).toBeCloseTo(0.56602, 4)
+    expect(r.aproximado.dc).toBeCloseTo(0.58742, 4)
+    expect(r.dc).toBe(r.general.dc)
+    expect(r.ok).toBe(true)
+  })
+})

@@ -264,8 +264,8 @@ function columnasHTML(columnsArr, M) {
       (resistencia nominal por FR, NTC-Concreto 2023, 3.8.2.2):
       MRx = ${fmt(cx.MR, 2)} t·m ${cx.ok ? '≥' : '<'} Mux · MRy = ${fmt(cy.MR, 2)} t·m ${cy.ok ? '≥' : '<'} Muy ·
       flexocompresión biaxial: método general (5.4.1.1, eje neutro inclinado) D/C = ${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'};
-      método aproximado (ec. ${bi.aproximado.ecuacion}) D/C = ${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'};
-      gobierna ${bi.gobierna === 'general' ? 'el método general' : `la ec. ${bi.aproximado.ecuacion}`}
+      como referencia, método aproximado (ec. ${bi.aproximado.ecuacion}) D/C = ${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'}, que no decide;
+      gobierna el método general (criterio del Ing. Fernando Burgos)
       con D/C = <b>${isFinite(bi.dc) ? fmt(bi.dc, 3) : '∞'}</b> ${bi.ok ? '≤' : '>'} 1${bi.punto ? ` (FR = ${fmt(bi.punto.FR, 3)}, εt = ${fmt(bi.punto.epsT, 5)}, ${esc(bi.punto.clase)})` : ''}.
       ${bi.eminX || bi.eminY ? `Se aplicó la excentricidad mínima de 5.3.2 en ${[bi.eminX && 'X', bi.eminY && 'Y'].filter(Boolean).join(' y ')}.` : ''}
       ${D.fuente === 'envolvente'

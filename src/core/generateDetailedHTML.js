@@ -355,14 +355,14 @@ function renderColumnas(columnsArr, envStats = null) {
             <td>${fmt(bi.general.Mu, 3)} t·m</td><td>${fmt(bi.general.MR, 3)} t·m</td>
             <td>${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'}</td>
             <td style="font-weight:700">${bi.gobierna === 'general' ? 'GOBIERNA' : ''}</td></tr>
-        <tr><td>Biaxial · método aproximado (NTC ec. ${bi.aproximado.ecuacion}${bi.aproximado.ecuacion === '5.4.1.2.a'
+        <tr style="color:#6b7280"><td>Biaxial · referencia, no decide · método aproximado (NTC ec. ${bi.aproximado.ecuacion}${bi.aproximado.ecuacion === '5.4.1.2.a'
           ? `, PRx = ${fmt(bi.aproximado.PRx, 2)} t, PRy = ${fmt(bi.aproximado.PRy, 2)} t, PR0 = ${fmt(bi.aproximado.PR0, 2)} t`
           : `, PR/PR0 ${bi.aproximado.relacionPR == null ? 'sin compresión' : `= ${fmt(bi.aproximado.relacionPR, 3)} < 0.1`}`})</td>
             <td>${bi.aproximado.ecuacion === '5.4.1.2.a' ? `Pu = ${fmt(Pu, 2)} t` : 'Mux/MRx + Muy/MRy'}</td>
             <td>${bi.aproximado.ecuacion === '5.4.1.2.a' ? `PR = ${fmt(bi.aproximado.PR, 2)} t` : '1.000'}</td>
             <td>${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'}</td>
-            <td style="font-weight:700">${bi.gobierna === 'aproximado' ? 'GOBIERNA' : ''}</td></tr>
-        <tr><td><b>Flexocompresión biaxial · D/C de la columna</b> (el mayor de los dos)</td><td colspan="2">${esc(bi.gobiernaEcuacion)}</td>
+            <td>referencia</td></tr>
+        <tr><td><b>Flexocompresión biaxial · D/C de la columna</b> (método general; criterio del Ing. Fernando Burgos)</td><td colspan="2">${esc(bi.gobiernaEcuacion)}</td>
             <td><b>${isFinite(bi.dc) ? fmt(bi.dc, 3) : '∞'}</b></td>
             <td style="color:${bi.ok ? '#15803d' : '#dc2626'};font-weight:700">${bi.ok ? '✓ CUMPLE' : '✗ NO CUMPLE'}</td></tr>
       </table>

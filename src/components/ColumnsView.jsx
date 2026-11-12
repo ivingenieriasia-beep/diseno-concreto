@@ -286,7 +286,7 @@ export default function ColumnsView() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
                       <thead style={{ position: 'sticky', top: 0 }}>
                         <tr>
-                          {['Miembro', 'Env.', 'Pu (t)', 'Mux (t·m)', 'Muy (t·m)', 'MRx', 'MRy', 'FR', 'D/C gral.', 'D/C 5.4.1.2', 'Gobierna', 'Util.', 'Estado'].map((t) => (
+                          {['Miembro', 'Env.', 'Pu (t)', 'Mux (t·m)', 'Muy (t·m)', 'MRx', 'MRy', 'FR', 'D/C gral. (gobierna)', 'D/C 5.4.1.2 (ref.)', 'Ec. ref.', 'Util.', 'Estado'].map((t) => (
                             <th key={t} style={{ padding: '5px 8px', background: '#1a2040', color: '#fff', fontSize: 10, textAlign: 'left' }}>{t}</th>
                           ))}
                         </tr>
@@ -304,7 +304,7 @@ export default function ColumnsView() {
                             <td style={TD}>{r.bi.punto ? r.bi.punto.FR.toFixed(2) : '—'}</td>
                             <td style={TD}>{isFinite(r.bi.general.dc) ? r.bi.general.dc.toFixed(3) : '∞'}</td>
                             <td style={TD}>{isFinite(r.bi.aproximado.dc) ? r.bi.aproximado.dc.toFixed(3) : '∞'}</td>
-                            <td style={TD}>{r.bi.gobierna === 'general' ? 'general' : r.bi.aproximado.ecuacion}</td>
+                            <td style={TD}>{r.bi.aproximado.ecuacion}</td>
                             <td style={{ ...TD, fontWeight: 700, color: r.util > 1 ? '#c62828' : r.util > 0.9 ? '#b45309' : '#15803d' }}>
                               {isFinite(r.util) ? r.util.toFixed(3) : '∞'}
                             </td>
@@ -319,9 +319,9 @@ export default function ColumnsView() {
                     </table>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--color-tx3)' }}>
-                    Utilización = D/C de la NTC-Concreto 2023: el mayor del método general (eje neutro
-                    inclinado, 5.4.1.1) y del aproximado (5.4.1.2), con FR de 3.8.2.2 y la excentricidad
-                    mínima de 5.3.2. MRx y MRy son de los diagramas de diseño. La fila resaltada es el caso crítico.
+                    Utilización = D/C de la NTC-Concreto 2023 por el método general (eje neutro
+                    inclinado, 5.4.1.1), criterio del Ing. Fernando Burgos; el aproximado (5.4.1.2) va solo
+                    como referencia. Con FR de 3.8.2.2 y la excentricidad mínima de 5.3.2. MRx y MRy son de los diagramas de diseño. La fila resaltada es el caso crítico.
                   </div>
                 </div>
               )}

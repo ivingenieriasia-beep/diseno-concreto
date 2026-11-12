@@ -4,7 +4,7 @@
 
 La pestaña fija **Columnas** (en la barra de pestañas, entre «Calculo» y los módulos; si ya hay columnas muestra una píldora con cuántas son) revisa columnas rectangulares de concreto reforzado por **flexocompresión biaxial**. Por cada columna capturas la sección (b, h, r, f'c, fy, εc), el acero longitudinal por lechos y los estribos por zonas. La app construye los diagramas de interacción P–M de las dos direcciones, que replican celda por celda la hoja «Columnas» de `DISEN_O_DE_CONCRETO_v2.xlsx`, y la superficie 3D P–Mx–My. Después revisa contra ellos el punto capturado a mano o la envolvente que llega de RAM Elements. Las columnas se guardan con el proyecto (proyecto.json), alimentan el detallado DXF/SVG (una retícula de 4 secciones por renglón) y entran en la memoria y en los informes de verificación.
 
-**Desde la 3.07 (pedido del Ing. Fernando Burgos, 2026-11-11) la revisión es la de la NTC-Concreto 2023:** cada diagrama tiene su versión **nominal** (la de la hoja, punteada) y la de **diseño** (FR·Pn, FR·Mn, con el FR de la tabla 3.8.2.2 según εt, en línea continua), y la flexión biaxial se revisa con el **método general** (eje neutro inclinado, 5.4.1.1) y con el **método aproximado** de 5.4.1.2. El D/C de la columna es el mayor de los dos (§4.5). El contorno elíptico α = 2 de antes ya no se usa.
+**Desde la 3.07 (pedido del Ing. Fernando Burgos, 2026-11-11) la revisión es la de la NTC-Concreto 2023:** cada diagrama tiene su versión **nominal** (la de la hoja, punteada) y la de **diseño** (FR·Pn, FR·Mn, con el FR de la tabla 3.8.2.2 según εt, en línea continua), y la flexión biaxial se revisa con el **método general** (eje neutro inclinado, 5.4.1.1) y con el **método aproximado** de 5.4.1.2. **Desde la 3.08 el D/C de la columna es el del método general** (criterio del Ing. Fernando Burgos, 2026-11-11: «ok, vamos a manejar el método general en la aplicación»). El 5.4.1.2 se calcula y se muestra **solo como referencia**; no decide (§4.5). El contorno elíptico α = 2 de antes ya no se usa.
 
 ## 2. Anatomía de la pantalla
 
@@ -12,7 +12,7 @@ La pestaña fija **Columnas** (en la barra de pestañas, entre «Calculo» y los
 - **Un chip por columna** (`data-testid="chip-col-{i}"`) con su nombre; si no tiene nombre muestra `C-{i+1}`. Con un clic la seleccionas. Arrástralo para reordenar, o usa **Alt + ← / →** con el chip enfocado. El orden es el mismo del tablero y del DXF.
 - **×** en cada chip (`data-testid="col-chip-x-{i}"`, tooltip «Eliminar la columna»). Pide confirmación: «¿Seguro que quieres eliminar la columna «C-1»? Se pierden su armado y sus demandas (lo guardado en proyecto.json no se toca).»
 - **+ Nueva**: crea `C-1`, `C-2`… con los valores por defecto y la deja seleccionada.
-- **Insignias de veredicto** (a la derecha). Primero aparece la fuente de la demanda (`envolvente · N ejemplares`, `punto capturado` o `sin demanda`) y luego **Mx ✓/✗**, **My ✓/✗** y **Biaxial NTC ✓/✗ · D/C x.xx (gral. | 5.4.1.2.a | 5.4.1.2.b)**, con el D/C del caso que manda y de dónde sale. Si no hay ninguna demanda aparece la insignia gris **sin revisar**.
+- **Insignias de veredicto** (a la derecha). Primero aparece la fuente de la demanda (`envolvente · N ejemplares`, `punto capturado` o `sin demanda`) y luego **Mx ✓/✗**, **My ✓/✗** y **Biaxial NTC ✓/✗ · D/C x.xx (gral.)**, con el D/C del método general del caso que manda. Si no hay ninguna demanda aparece la insignia gris **sin revisar**.
 
 ### 2.2 Panel lateral (formulario)
 Si no hay columna seleccionada, el panel dice «Crea una columna con el botón “+ Nueva”».
@@ -116,8 +116,8 @@ Abre el diálogo «Cargar el modelo de RAM», con dos pestañas:
 - Si el Pu de un punto se sale del rango de la curva de diseño (más compresión que PR0 = FR·POC, o más tensión que la del último punto, c = h/20), el punto queda **fuera**, con MR = 0 y util ∞.
 
 ### 4.2 Tabla «Revisión de la envolvente — N puntos»
-Aparece debajo de la revisión NTC cuando hay envolvente. Sus columnas son: **Miembro · Env. · Pu (t) · Mux (t·m) · Muy (t·m) · MRx · MRy · FR · D/C gral. · D/C 5.4.1.2 · Gobierna · Util. · Estado** («✓ pasa» o «✗ no pasa»). Está ordenada de mayor a menor utilización. La fila resaltada en amarillo es el caso crítico. Util. se pinta en verde si es ≤ 0.9, en ámbar si está entre 0.9 y 1 y en rojo si es > 1.
-- **Utilización = D/C de la NTC** = el mayor del método general y de 5.4.1.2 (§4.5), con MRx y MRy de diseño al nivel de Pu de cada punto. Un ejemplar **pasa** si util ≤ 1 **y** además Mux ≤ MRx y Muy ≤ MRy (con la excentricidad mínima).
+Aparece debajo de la revisión NTC cuando hay envolvente. Sus columnas son: **Miembro · Env. · Pu (t) · Mux (t·m) · Muy (t·m) · MRx · MRy · FR · D/C gral. (gobierna) · D/C 5.4.1.2 (ref.) · Ec. ref. · Util. · Estado** («✓ pasa» o «✗ no pasa»). Está ordenada de mayor a menor utilización. La fila resaltada en amarillo es el caso crítico. Util. se pinta en verde si es ≤ 0.9, en ámbar si está entre 0.9 y 1 y en rojo si es > 1.
+- **Utilización = D/C de la NTC** = el del método general (§4.5); el 5.4.1.2 va como referencia, con MRx y MRy de diseño al nivel de Pu de cada punto. Un ejemplar **pasa** si util ≤ 1 **y** además Mux ≤ MRx y Muy ≤ MRy (con la excentricidad mínima).
 
 ### 4.3 Superficie 3D
 - Muestra la superficie de **diseño** P–Mx–My: en cada nivel de P traza el contorno de momentos del eje neutro inclinado (el del método general), que en las esquinas se mete respecto a la elipse. Los meridianos azul (Mx) y naranja (My) son las curvas 2D de diseño.
@@ -128,7 +128,7 @@ Aparece debajo de la revisión NTC cuando hay envolvente. Sus columnas son: **Mi
 ### 4.4 Estado ✓/✗ (resumen)
 - **Mx ✓**: todos los ejemplares (o el punto manual) tienen Mux ≤ MRx (de diseño, con la excentricidad mínima).
 - **My ✓**: lo mismo con Muy ≤ MRy.
-- **Biaxial NTC ✓**: todos tienen D/C ≤ 1 (el mayor del método general y de 5.4.1.2).
+- **Biaxial NTC ✓**: todos tienen D/C ≤ 1 por el método general.
 - El mismo veredicto (`columnDemand` → `checkBiaxial`) alimenta el informe resumido, el detallado, la memoria, el Double Check, la consola, la propuesta automática y la Agrupación. Con envolvente, esos documentos reportan el «ejemplar crítico».
 
 ### 4.5 Revisión NTC-Concreto 2023 (`data-testid="revision-ntc"`)
@@ -138,7 +138,7 @@ Debajo de los diagramas, para el caso que manda (el ejemplar crítico de la envo
   - Uniaxial X y Y: MR de diseño al nivel de Pu, con FR, εt y clase del punto resistente.
   - **a) Método general** (NTC 5.4.1.1, hipótesis de 3.6): el eje neutro se gira; para cada ángulo se barre c, se integra el bloque 0.85 f'c hasta β1c medido perpendicular al eje neutro (la zona comprimida es un triángulo, un trapecio o un pentágono) y las barras reales de la retícula con deformación plana y εc = 0.003; cada punto lleva el FR de su εt (el acero más alejado de la fibra extrema comprimida). Al nivel de Pu se arma el contorno Mx–My y se corta con el rayo del vector (Mux, Muy): **D/C = √(Mux² + Muy²)/MR(θ)**.
   - **b) Método aproximado 5.4.1.2**: con los diagramas de diseño, **Bresler** 1/PR = 1/PRx + 1/PRy − 1/PR0 (ec. 5.4.1.2.a, D/C = Pu/PR), o, si **PR/PR0 < 0.1**, **Mux/MRx + Muy/MRy** (ec. 5.4.1.2.b). PRx y PRy son la carga de diseño de cada diagrama con su excentricidad (e = Mu/Pu); PR0 = FR·P0.
-  - **D/C de la columna** = el mayor de a) y b), con la fila que gobierna resaltada y la ecuación de la que sale.
+  - **D/C de la columna** = el de a), el método general, que es la fila resaltada «GOBIERNA». La fila b) dice «referencia» y no decide. Criterio del Ing. Fernando Burgos (2026-11-11): «ok, vamos a manejar el método general en la aplicación». Hasta la 3.07 gobernaba el mayor de a) y b).
 - **Contorno de diseño Mx–My a P = Pu** (`data-testid="contorno-mxmy"`): azul, el del método general (con el rayo de la demanda hasta MR(θ)); morado discontinuo, el de 5.4.1.2 (Bresler si Pu/PR0 ≥ 0.1, si no la recta lineal). El punto (Mux, Muy) sale verde o rojo.
 
 ## 5. Vista «Cálculo (Excel)»
@@ -155,7 +155,7 @@ Es la réplica de la hoja de cálculo, para auditar o comparar con el Excel. Tie
 2. Captura el nombre, b, h, r, f'c y fy.
 3. Pon el Número de lechos y, en cada lecho, n y el calibre. Verifica Ast en la línea de resumen.
 4. Captura Pu, Mux y Muy.
-5. Lee las insignias Mx / My / Biaxial NTC. En **Diagramas P–M** revisa «✓ DENTRO» de cada dirección y, abajo, la **Revisión NTC-Concreto 2023**: el D/C del método general y el de 5.4.1.2, cuál gobierna, y el contorno Mx–My al nivel de Pu.
+5. Lee las insignias Mx / My / Biaxial NTC. En **Diagramas P–M** revisa «✓ DENTRO» de cada dirección y, abajo, la **Revisión NTC-Concreto 2023**: el D/C del método general (el que gobierna), el de 5.4.1.2 como referencia y el contorno Mx–My al nivel de Pu.
 6. En Estribos elige el calibre, captura **Altura H (m)** y pulsa **Según NTC: …**.
 
 **B. Con RAM (recomendado)**
@@ -212,11 +212,11 @@ Para pruebas e integraciones, el store queda expuesto en `window.__COL_STORE__` 
 - **FR, 3.8.1.1 y 3.8.2.2** (tabla 3.8.2.2): por punto del diagrama, según εt del acero extremo a tensión, con εty = fy/Es (3.8.2.4). Estribos: 0.65 / 0.65 + 0.25(εt − εty)/0.003 / 0.90; zunchos (14.7.4): 0.75 / 0.75 + 0.15(…)/0.003 / 0.90. Opción de 3.8.2.6 (FR de compresión en la transición).
 - **3.8.2.3 refuerzo asimétrico**: si los lechos no son simétricos, FR no pasa de la recta entre el FR de compresión en PbR y 0.9 en 0.1 f'c Ag (P de diseño).
 - **5.3.1 / 5.3.2**: flexocompresión con diagramas según 3.6 y FR de 3.8.2.2; excentricidad mínima de diseño máx(0.05h, 20 mm) en la dirección de cada flexión. Se aplica en las dos direcciones a la vez, también en la revisión biaxial (criterio a confirmar por los ingenieros).
-- **5.4.1.1 y 5.4.1.2**: biaxial con las hipótesis de 3.6 (método general, eje neutro inclinado) y con el método aproximado (Bresler, o la suma lineal si PR/PR0 < 0.1). Gobierna el mayor.
+- **5.4.1.1 y 5.4.1.2**: biaxial con las hipótesis de 3.6 (método general, eje neutro inclinado) y con el método aproximado (Bresler, o la suma lineal si PR/PR0 < 0.1). Gobierna el método general (criterio de FB, 3.08); 5.4.1.2 es referencia.
 - **Tope de carga axial**: la NTC-Concreto 2023 no trae un tope general del tipo 0.8·FR·P0 para columnas (sólo 0.8·FR·Po para pilas y pilotes, 9.7.3.1.b). La app limita la carga de diseño a PR0 = FR·P0. Para marcos de ductilidad alta, 8.4.2.3 pide además Ag ≥ Pu/(0.5 f'c); la app no lo revisa (es un requisito geométrico del capítulo 8, no un tope de resistencia).
 
 **Criterios que el Ing. Fernando Burgos debe confirmar (la revisión es una propuesta hasta que él verifique los valores)**
-- **MRx y MRy de la ec. 5.4.1.2.b**: la app toma el momento resistente de diseño **al nivel de Pu** de cada diagrama. La norma no lo dice en el texto que se extrajo (los símbolos de la fig. 5.4.1.2 no salieron en el texto). La otra lectura es el MR a flexión pura (P = 0).
+- ~~**MRx y MRy de la ec. 5.4.1.2.b**~~: desde la 3.08 ya no cambia el resultado, porque 5.4.1.2 solo es referencia. La app sigue tomando el MR de diseño al nivel de Pu.
 - **Excentricidad mínima en biaxial**: se aplica en las dos direcciones a la vez (5.3.2.1 habla de flexión en una dirección).
 - **Signo de los momentos**: se revisan en magnitud. Con refuerzo asimétrico (lecho superior distinto del inferior) el signo de Mux importa y la app sólo revisa el lado en que el lecho 1 queda comprimido.
 - **β1**: ver «Qué NO revisa».

@@ -49,11 +49,11 @@ function TablaNTC({ an, bi, titulo }) {
       dc: g.dc, gobierna: bi.gobierna === 'general',
     },
     {
-      k: 'a', metodo: `b) ${ETIQUETA_EC[a.ecuacion]}`,
+      k: 'a', metodo: `b) ${ETIQUETA_EC[a.ecuacion]} · solo referencia`,
       detalle: a.ecuacion === '5.4.1.2.a'
         ? <>PRx = {f(a.PRx, 2)} · PRy = {f(a.PRy, 2)} · PR0 = {f(a.PR0, 2)} → PR = {f(a.PR, 2)} t (PR/PR0 = {f(a.relacionPR)}) · D/C = Pu/PR</>
         : <>PR/PR0 = {a.relacionPR == null ? 'sin compresión' : `${f(a.relacionPR)} < 0.1`} · {f(bi.MuxD)}/{f(a.MRx)} + {f(bi.MuyD)}/{f(a.MRy)}</>,
-      dc: a.dc, gobierna: bi.gobierna === 'aproximado',
+      dc: a.dc, gobierna: false, referencia: true,
     },
   ]
   return (
@@ -75,12 +75,12 @@ function TablaNTC({ an, bi, titulo }) {
                 <td style={{ ...TD, fontWeight: 700, maxWidth: 220 }}>{r.metodo}</td>
                 <td style={TD}>{r.detalle}</td>
                 <td style={{ ...TD, fontWeight: 800, color: colorDC(r.dc) }}>{f(r.dc)}</td>
-                <td style={{ ...TD, fontWeight: 800 }}>{r.gobierna ? 'GOBIERNA' : ''}</td>
+                <td style={{ ...TD, fontWeight: 800, color: r.referencia ? 'var(--color-tx3)' : undefined }}>{r.gobierna ? 'GOBIERNA' : r.referencia ? 'referencia' : ''}</td>
               </tr>
             ))}
             <tr data-testid="ntc-fila-dc">
               <td style={{ ...TD, fontWeight: 800 }}>D/C de la columna</td>
-              <td style={TD}>el mayor de a) y b): {bi.gobiernaEcuacion}</td>
+              <td style={TD}>a) método general: {bi.gobiernaEcuacion}. El 5.4.1.2 no decide (criterio de FB, 2026-11-11)</td>
               <td style={{ ...TD, fontWeight: 900, color: colorDC(bi.dc) }}>{f(bi.dc)}</td>
               <td style={{ ...TD, fontWeight: 800, color: bi.ok ? '#15803d' : '#c62828' }}>{bi.ok ? '✓ pasa' : '✗ no pasa'}</td>
             </tr>
@@ -139,7 +139,7 @@ function ContornoMxMy({ an, bi, size = 330 }) {
       </svg>
       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-tx2)', lineHeight: 1.6 }}>
         <div><span style={{ color: '#2563a8', fontWeight: 800 }}>━</span> método general (eje neutro inclinado) · D/C {f(g.dc)}</div>
-        <div><span style={{ color: '#7c3aed', fontWeight: 800 }}>╍</span> ec. {C.ecuacion} · D/C {f(bi.aproximado.dc)}</div>      </div>
+        <div><span style={{ color: '#7c3aed', fontWeight: 800 }}>╍</span> ec. {C.ecuacion} · D/C {f(bi.aproximado.dc)} (solo referencia)</div>      </div>
     </div>
   )
 }

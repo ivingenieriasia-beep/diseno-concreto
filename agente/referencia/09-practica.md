@@ -28,7 +28,7 @@ Empieza con la app vacía: si hay algo, usa el ícono **Proyecto nuevo** (lo act
 | C-1 | 30×30 | 8#6 (ρ 2.53 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro |
 | C-2 | 25×25 | 4#8 (ρ 3.24 %) · E#2.5 @ 6 cm en extremos (60 cm) · @ 12 cm al centro |
 
-Desde la 3.07 las columnas se revisan con el FR de la NTC-Concreto 2023 y la revisión biaxial del método general y de 5.4.1.2 (ver `04-columnas.md`); con la revisión nominal de antes salían 8#5 y 4#6.
+Desde la 3.07 las columnas se revisan con el FR de la NTC-Concreto 2023 y la revisión biaxial del método general y de 5.4.1.2; desde la 3.08 decide el método general y 5.4.1.2 es referencia (ver `04-columnas.md`); con la revisión nominal de antes salían 8#5 y 4#6.
 
 **Comprueba que entiendes:** ¿por qué T-4 lleva bastones puntuales y no corridos? (Porque el momento sólo los pide en ciertas zonas; los resuelve Longitudinal y no van en el corte.) ¿De dónde salen las medidas? (De `secciones` del `modelo.json`, la tabla de RAM.)
 

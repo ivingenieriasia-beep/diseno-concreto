@@ -105,12 +105,14 @@ describe('checkPoint / checkBiaxial', () => {
     expect(checkPoint(dirX.curve, 500, 0).ok).toBe(false)
     expect(checkPoint(dirX.curve, -100, 0).ok).toBe(false)
   })
-  // Desde la 3.7 (pedido de FB, 2026-11-11) la revisión biaxial es la de la
-  // NTC-Concreto 2023 con FR: método general y 5.4.1.2. El contorno elíptico
-  // α = 2 de antes ya no se usa.
-  it('biaxial NTC: D/C = el mayor del método general y de 5.4.1.2', () => {
+  // Desde la 3.07 (pedido de FB, 2026-11-11) la revisión biaxial es la de la
+  // NTC-Concreto 2023 con FR. Desde la 3.08 gobierna el método general (criterio
+  // de FB) y 5.4.1.2 es referencia. El contorno elíptico α = 2 ya no se usa.
+  it('biaxial NTC: D/C = el del método general; 5.4.1.2 solo referencia', () => {
     const b = checkBiaxial(dirX, dirY, 10, 0.5, 0.5)
-    expect(b.dc).toBe(Math.max(b.general.dc, b.aproximado.dc))
+    expect(b.dc).toBe(b.general.dc)
+    expect(b.gobierna).toBe('general')
+    expect(b.aproximado.referencia).toBe(true)
     expect(b.ok).toBe(b.dc <= 1 && b.checkX.ok && b.checkY.ok)
     expect(b).not.toHaveProperty('elipticoAnterior')
   })

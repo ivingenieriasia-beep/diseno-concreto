@@ -32,6 +32,22 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.08',
+    fecha: '2026-11-11',
+    lema: 'En la flexión biaxial de columnas gobierna el método general; el 5.4.1.2 queda como referencia.',
+    destacados: [
+      {
+        tipo: 'mejora',
+        titulo: 'Biaxial: decide el método general (5.4.1.1)',
+        texto: 'Criterio del Ing. Fernando Burgos (2026-11-11): «ok, vamos a manejar el método general en la aplicación». El D/C de la columna es el del eje neutro inclinado, D/C = √(Mux² + Muy²)/MR(θ). El método aproximado de 5.4.1.2 (Bresler o la suma lineal) se sigue calculando y se muestra marcado como referencia en la pestaña Columnas, la memoria, el informe detallado y la consola, pero ya no decide. La agrupación y la propuesta automática usan el mismo D/C.',
+      },
+    ],
+    cambios: [
+      { tipo: 'mejora', texto: 'Consola: «columnas» trae criterio, referencia5412: true y gobierna = general; dc5412 sigue en el JSON como referencia.' },
+    ],
+    aviso: 'Es una propuesta: no se usa en un proyecto hasta que el Ing. Fernando Burgos verifique los valores.',
+  },
+  {
     version: '3.07',
     fecha: '2026-11-11',
     lema: 'Columnas con los factores de resistencia de la NTC-Concreto 2023 y la flexión biaxial de verdad, con el eje neutro inclinado.',

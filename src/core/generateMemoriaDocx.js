@@ -378,7 +378,7 @@ export async function generateMemoriaDocx({ sections = [], columns = [], meta = 
         run(`(e = ${isFinite(ex.e) ? fmt(ex.e, 4) : '—'} m), el punto de demanda ${ok ? 'queda dentro' : 'NO queda dentro'} del diagrama de interacción de diseño (nominal por FR, NTC 3.8.2.2): `),
         run(`MRx = ${fmt(cx.MR)} t·m`, { bold: true, color: '1D4ED8' }), run(` ${cx.ok ? '≥' : '<'} Mux · `),
         run(`MRy = ${fmt(cy.MR)} t·m`, { bold: true, color: 'B45309' }), run(` ${cy.ok ? '≥' : '<'} Muy · `),
-        run(`biaxial NTC: general (5.4.1.1) D/C = ${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'}, ec. ${bi.aproximado.ecuacion} D/C = ${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'}; gobierna ${bi.gobierna === 'general' ? 'el método general' : `la ec. ${bi.aproximado.ecuacion}`} con D/C = `),
+        run(`biaxial NTC: general (5.4.1.1) D/C = ${isFinite(bi.general.dc) ? fmt(bi.general.dc, 3) : '∞'}, referencia ec. ${bi.aproximado.ecuacion} D/C = ${isFinite(bi.aproximado.dc) ? fmt(bi.aproximado.dc, 3) : '∞'} (no decide); gobierna el método general (criterio del Ing. Fernando Burgos) con D/C = `),
         run(`${isFinite(bi.dc) ? fmt(bi.dc, 3) : '∞'} ${bi.ok ? '≤' : '>'} 1`, { bold: true, color: bi.ok ? OKC : BADC }),
         run(`${bi.punto ? ` (FR = ${fmt(bi.punto.FR, 3)}, εt = ${fmt(bi.punto.epsT, 5)}, ${bi.punto.clase})` : ''}${bi.eminX || bi.eminY ? `; excentricidad mínima 5.3.2 en ${[bi.eminX && 'X', bi.eminY && 'Y'].filter(Boolean).join(' y ')}` : ''}. `),
         ...(D.fuente === 'envolvente'

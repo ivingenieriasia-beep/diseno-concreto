@@ -308,6 +308,8 @@ const angDiff = (a, b) => {
 const cociente = (Mu, MR, enRango) => (!enRango ? Infinity : MR > 1e-12 ? Mu / MR : Mu > 1e-12 ? Infinity : 0)
 
 export const METODO_GENERAL = 'NTC 5.4.1.1 · hipótesis de 3.6 (eje neutro inclinado)'
+/** Criterio de la app desde la 3.08 (Ing. Fernando Burgos, 2026-11-11). */
+export const CRITERIO_FB = 'gobierna el método general (5.4.1.1); 5.4.1.2 solo como referencia (criterio de FB, 2026-11-11)'
 export const ETIQUETA_EC = {
   '5.4.1.2.a': 'NTC ec. 5.4.1.2.a (Bresler): 1/PR = 1/PRx + 1/PRy − 1/PR0',
   '5.4.1.2.b': 'NTC ec. 5.4.1.2.b: Mux/MRx + Muy/MRy ≤ 1 (PR/PR0 < 0.1)',
@@ -369,21 +371,23 @@ export function revisarFlexocompresionNTC(N, Pu, Mux, Muy) {
     dcLineal, dcBresler: usaA ? Pu / PR : (comp && PR > 0 ? Pu / PR : null),
   }
 
-  const gobiernaGeneral = !(dcAprox > dcGeneral)
-  const dc = Math.max(dcGeneral, dcAprox)
+  // Criterio de FB (2026-11-11, 3.08): «ok, vamos a manejar el método general
+  // en la aplicación». El D/C de la columna es el del método general (5.4.1.1);
+  // 5.4.1.2 se calcula y se muestra solo como referencia, sin decidir.
+  aproximado.referencia = true
+  aproximado.mayorQueGeneral = dcAprox > dcGeneral
+  const dc = dcGeneral
   const ok = dc <= 1 + 1e-9 && checkX.ok && checkY.ok
   return {
     norma: 'NTC-Concreto 2023',
     Pu, Mux, Muy, MuxD, MuyD, eminX, eminY, exMin, eyMin,
     checkX, checkY, general, aproximado,
     dc, ok,
-    gobierna: gobiernaGeneral ? 'general' : 'aproximado',
-    gobiernaEcuacion: gobiernaGeneral ? METODO_GENERAL : ETIQUETA_EC[ecuacion],
-    // FR, εt y clase del punto resistente del método que gobierna (si es el
-    // aproximado, los del diagrama de la dirección más exigida)
-    punto: gobiernaGeneral
-      ? ray.punto
-      : (checkX.ratio >= checkY.ratio ? rx.punto : ry.punto),
+    criterio: CRITERIO_FB,
+    gobierna: 'general',
+    gobiernaEcuacion: METODO_GENERAL,
+    // FR, εt y clase del punto resistente del método general
+    punto: ray.punto,
   }
 }
 
@@ -395,15 +399,15 @@ const f3 = (v) => (v == null ? '—' : !isFinite(v) ? '∞' : Number(v).toFixed(
 export const nombreGobierna = (bi) => (bi.gobierna === 'general' ? 'método general (5.4.1.1)' : `ec. ${bi.aproximado.ecuacion}`)
 
 /**
- * Una línea con lo que decide la columna:
- * «NTC-Concreto 2023 · D/C 1.061, gobierna ec. 5.4.1.2.b · general 1.041 ·
- *  5.4.1.2 1.061 (ec. 5.4.1.2.b) · FR 0.900, εt 0.00756 (tensión)»
+ * Una línea con lo que decide la columna (desde la 3.08 gobierna el método general):
+ * «NTC-Concreto 2023 · D/C 1.041, gobierna método general (5.4.1.1) ·
+ *  referencia 5.4.1.2 1.061 (ec. 5.4.1.2.b) · FR 0.900, εt 0.00756 (tensión)»
  */
 export function resumenNTC(bi) {
   if (!bi) return ''
   const p = bi.punto
-  return `NTC-Concreto 2023 · D/C ${f3(bi.dc)}, gobierna ${nombreGobierna(bi)} · general ${f3(bi.general.dc)} · `
-    + `5.4.1.2 ${f3(bi.aproximado.dc)} (ec. ${bi.aproximado.ecuacion})`
+  return `NTC-Concreto 2023 · D/C ${f3(bi.dc)}, gobierna ${nombreGobierna(bi)} · `
+    + `referencia 5.4.1.2 ${f3(bi.aproximado.dc)} (ec. ${bi.aproximado.ecuacion})`
     + (p ? ` · FR ${f3(p.FR)}, εt ${p.epsT == null ? '—' : p.epsT.toFixed(5)} (${p.clase})` : '')
     + (bi.eminX || bi.eminY ? ` · excentricidad mínima 5.3.2 en ${[bi.eminX && 'X', bi.eminY && 'Y'].filter(Boolean).join(' y ')}` : '')
 }

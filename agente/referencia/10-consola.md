@@ -65,7 +65,7 @@ Los chips se escriben como en la barra: `T-1`, `t1` y `T 1` son el mismo. Las un
 | `sel <chip>` | Selecciona el chip y lo muestra. | Clic en el chip. |
 | `fijar <chip> …` | Fija la sección y el armado (ver §4). Queda como **propuesto**. Contesta con la revisión al día. | Editar Secciones o Columnas. |
 | `calculo <chip>` | Trabe: MR+, MR−, Vr, Mu+, Mu−, Vu, el D/C y el miembro crítico, cuántos miembros pasan, As mín, As máx y b mín. | Calculo → Flexión, Cortante y Envolvente del modelo. |
-| `columnas [chip]` | Columna: armado, estribos, D/C de la NTC-Concreto 2023 (el mayor del método general y de 5.4.1.2, y cuál gobierna), FR y clase del punto, el punto crítico (miembro, combinación y extremo) con Pu, Mux y Muy, y cuántos puntos pasan. Sin chip, todas. Campos del JSON en §«columnas: los campos NTC». | La pestaña Columnas. |
+| `columnas [chip]` | Columna: armado, estribos, D/C de la NTC-Concreto 2023 (el del método general desde la 3.08; el de 5.4.1.2 como referencia), FR y clase del punto, el punto crítico (miembro, combinación y extremo) con Pu, Mux y Muy, y cuántos puntos pasan. Sin chip, todas. Campos del JSON en §«columnas: los campos NTC». | La pestaña Columnas. |
 | `longitudinal [chip]` | Unidades con corridas, con bastón, insuficientes, por cortante y al filo; kg de acero (y el uniforme); bastones puntuales; las unidades que fallan. Sin chip, todas. | Módulos → Longitudinal. |
 | `deflexiones [grupo] [--todos]` | La fórmula de servicio, cuántos tramos, cuántos no pasan y sin armado, y los tramos que no pasan (o todos), con total y posterior contra su límite. | Módulos → Deflexiones (con los papeles de caso y las opciones guardadas ahí). |
 | `bd` | Cuántas trabes tiene la BD Global. | La pestaña BD Global. |
@@ -146,7 +146,7 @@ Creadas 7 sección(es) con su armado PROPUESTO: 7 pasan
 ✓ T-2 · 2 unidades: 0 con corridas, 2 con bastón · acero 202 kg · puntuales inf 2 sup 2
 
 > columnas C-1
-✓ C-1 30×30 · 8#6 (ρ 2.53 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro · D/C 96 % (miembro 22 CSZ pie) · Pu 57.55 t · Mux 0.60 · Muy 9.10 t·m · NTC: general 94 % · 5.4.1.2.a 96 % · gobierna 5.4.1.2.a · FR 0.65 (transición) · 270/270 puntos
+✓ C-1 30×30 · 8#6 (ρ 2.53 %) · E#2.5 @ 7 cm en extremos (60 cm) · @ 15 cm al centro · D/C 94 % (miembro 22 CSZ pie) · Pu 57.55 t · Mux 0.60 · Muy 9.10 t·m · NTC: general 94 % (gobierna) · referencia 5.4.1.2.a 96 % · FR 0.65 (transición) · 270/270 puntos
 
 > deflexiones
 CS = 1·CM + 1·CV · 51 tramo(s) · 3 no pasan · 0 sin armado · peor T5 tramo 173…184 · 2/3: 121 % del límite
@@ -190,7 +190,8 @@ Desde la 3.07, el `datos` de `await auxiliarIV.json('columnas C-1')` (o el JSON 
 | Campo | Qué es |
 |---|---|
 | `dc` | El D/C de la columna: el mayor de `dcGeneral` y `dc5412`. |
-| `gobierna` | `general` (método general) o `aproximado` (5.4.1.2). |
+| `gobierna` | Siempre `general` desde la 3.08 (criterio del Ing. Fernando Burgos). |
+| `criterio` | El criterio en texto. `referencia5412: true` marca que `dc5412` no decide. |
 | `ecuacion` | De qué ecuación sale el D/C que gobierna, en texto. |
 | `dcGeneral` | a) Método general, 5.4.1.1 con las hipótesis de 3.6 y el eje neutro inclinado: √(Mux² + Muy²)/MR(θ). |
 | `dc5412`, `ecuacion5412` | b) Método aproximado: `5.4.1.2.a` (Bresler, D/C = Pu/PR) o `5.4.1.2.b` (si PR/PR0 < 0.1: Mux/MRx + Muy/MRy). |
@@ -206,7 +207,7 @@ Ejemplo, para leer los D/C nuevos sin abrir la pestaña:
 
 ```js
 const { datos: d } = await auxiliarIV.json('columnas C-1')
-// d = { dc: 0.9637, gobierna: 'aproximado', ecuacion5412: '5.4.1.2.a', dcGeneral: 0.9397, dc5412: 0.9637, FR: 0.6505, epsT: 0.00209, clase: 'transición', … }
+// d = { dc: 0.9397, gobierna: 'general', ecuacion5412: '5.4.1.2.a', dcGeneral: 0.9397, dc5412: 0.9637 (referencia), FR: 0.6505, epsT: 0.00209, clase: 'transición', … }
 // sin chip, datos es la lista de todas las columnas:
 const { datos: todas } = await auxiliarIV.json('columnas')
 todas.map((c) => [c.chip, c.dc, c.gobierna, c.ecuacion5412, c.dcGeneral, c.dc5412])
