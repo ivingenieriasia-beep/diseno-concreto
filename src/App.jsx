@@ -395,6 +395,7 @@ export default function App() {
     pestana: () => (getModulo(mainTab)?.nombre || { detalle: 'Secciones', calculo: 'Calculo', columnas: 'Columnas' }[mainTab] || mainTab),
     proyecto: () => projectName,
     nuevoProyecto: (nombre) => nuevoProyecto(nombre, { preguntar: false }),
+    renombrarProyecto: (nombre) => setProjectName(String(nombre)),
     abrirProyecto,
   })
 

@@ -55,6 +55,7 @@ Los chips se escriben como en la barra: `T-1`, `t1` y `T 1` son el mismo. Las un
 | `estado` | Versión, proyecto, cuántos chips, el modelo sincronizado (archivo, grupos, miembros, hace cuánto), la carpeta y la pestaña. | Leer la barra y el Centro de carga. |
 | `proyecto` | El nombre del proyecto y cuántas trabes y columnas tiene. | Leer la barra. |
 | `proyecto nuevo [nombre]` | Lo que hay pasa a **Recientes** y queda un proyecto vacío con ese nombre. Contesta `Proyecto nuevo «…» · 0 trabes, 0 columnas`. No pregunta (el comando ya es la orden), pero si el navegador no deja guardar lo actual en Recientes, no hace nada y lo dice. | El botón «Proyecto nuevo (lo actual queda en Recientes)». |
+| `proyecto renombrar <nombre>` | Desde la 3.09. Cambia **solo el nombre** del proyecto abierto: no toca trabes, columnas, cargas ni la carpeta, y no pasa nada a Recientes. Las descargas (`secciones-<nombre>…`) salen con el nombre nuevo. Contesta `Proyecto «viejo» → «nuevo»`. Sin nombre, contesta el uso. |
 | `proyecto abrir <url>` | Abre un `proyecto.json` de **este mismo servidor** (por ejemplo `../agente/ejemplos/proyecto.json`). Lo que había queda antes en Recientes. Desde un script también se le pasa el texto: `cmd('proyecto abrir', { texto })`. | El botón Abrir. |
 | `ram sync` | Lee el `modelo.json` de la carpeta de la obra recordada y lo aplica. Si el modelo cambió y hay permiso de edición, el anterior va a `3 Respaldos`. | 📥 Reportes de RAM → 🔄 Sincronizar con RAM. |
 | `ram cargar <url>` | Aplica un `modelo.json` de **este mismo servidor** (por ejemplo `../agente/ejemplos/modelo.json`). Desde un script también se le pasa el texto: `cmd('ram cargar', { texto })`. | El input de archivos del Centro de carga. |
@@ -113,13 +114,13 @@ Sólo se aceptan los calibres de la app: varillas #2, #2.5, #3, #4, #5, #6 y #8;
 
 **Lo que fija la consola queda como armado propuesto** (la marca «propuesto» de la app), hasta que un ingeniero lo edita o lo acepta en la pantalla. Es un borrador, igual que el que propone `ram crear`.
 
-**Si cambias b o h,** la consola avisa: las demandas son de RAM con la sección anterior. El cambio tiene que ir a RAM, reanalizar y sincronizar. En la Oficina IV eso lo aplica el Modelador con la aprobación de un ingeniero.
+**Si cambias b o h** (desde la 3.09, solo si de verdad son distintos de los que ya tiene la sección; `b=15 h=15` en una 15×15 no avisa), la consola avisa: las demandas son de RAM con la sección anterior. El cambio tiene que ir a RAM, reanalizar y sincronizar. En la Oficina IV eso lo aplica el Modelador con la aprobación de un ingeniero.
 
 ## 5. Lo que la consola no hace
 
 Es a propósito, para que no se pueda hacer sin un ingeniero:
 
-- No borra chips ni limpia la BD. Sí empieza un proyecto nuevo o abre uno (`proyecto`, autorizado por FB el 2026-11-09), siempre con lo de antes guardado primero en Recientes.
+- No borra chips ni limpia la BD. Sí empieza un proyecto nuevo o abre uno (`proyecto`, autorizado por FB el 2026-11-09), siempre con lo de antes guardado primero en Recientes, y le cambia el nombre (`proyecto renombrar`, 3.09).
 - No genera `aplicar_agrupacion.py` ni escribe nada en RAM. La agrupación la elige un ingeniero en Agrupación.
 - No elige la carpeta de la obra ni da permisos del navegador: eso pide un clic real de una persona. Si falta, `ram sync` lo dice.
 - No trae archivos de otros servidores: `ram cargar` y `proyecto abrir` sólo aceptan URL del mismo servidor de la app.

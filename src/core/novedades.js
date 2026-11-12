@@ -32,6 +32,16 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.09',
+    fecha: '2026-11-11',
+    lema: 'Dos arreglos de la consola que encontró el Diseñador de concreto.',
+    destacados: [],
+    cambios: [
+      { tipo: 'arreglo', texto: 'fijar: solo avisa «Cambió la sección (b×h)» si b o h son distintos de los que ya tenía la sección. Antes avisaba con b=15 h=15 en una columna que ya era de 15×15.' },
+      { tipo: 'nuevo', texto: 'Consola: «proyecto renombrar <nombre>» cambia solo el nombre del proyecto; las descargas salen con el nombre nuevo.' },
+    ],
+  },
+  {
     version: '3.08',
     fecha: '2026-11-11',
     lema: 'En la flexión biaxial de columnas gobierna el método general; el 5.4.1.2 queda como referencia.',

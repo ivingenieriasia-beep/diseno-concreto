@@ -408,8 +408,8 @@ function cFijar(args, ctx) {
       const conocidas = ['b', 'h', 'r', 'fc', 'inf', 'sup', 'binf', 'bsup', 'est']
       const otras = Object.keys(kv).filter((k) => !conocidas.includes(k))
       if (otras.length) throw new Error(`no conozco ${otras.join(', ')} (uso: ${conocidas.join(' ')})`)
-      if (kv.b) { patch.ancho = num(kv.b, 'b'); cambiaSeccion = true }
-      if (kv.h) { patch.peralte = num(kv.h, 'h'); cambiaSeccion = true }
+      if (kv.b) patch.ancho = num(kv.b, 'b')
+      if (kv.h) patch.peralte = num(kv.h, 'h')
       if (kv.r) patch.recub = num(kv.r, 'r')
       if (kv.fc) patch.fc = num(kv.fc, "f'c")
       if (kv.inf) { const x = leerBarras(kv.inf, REBAR_OPTIONS, 'inf'); if (!x.n) throw new Error('inf: el lecho inferior lleva al menos 2 varillas'); patch.cantInf = x.n; patch.calInf = x.cal }
@@ -427,8 +427,8 @@ function cFijar(args, ctx) {
       const conocidas = ['b', 'h', 'r', 'fc', 'lechos', 'est', 'sep']
       const otras = Object.keys(kv).filter((k) => !conocidas.includes(k))
       if (otras.length) throw new Error(`no conozco ${otras.join(', ')} (uso: ${conocidas.join(' ')})`)
-      if (kv.b) { patch.b = num(kv.b, 'b'); cambiaSeccion = true }
-      if (kv.h) { patch.h = num(kv.h, 'h'); cambiaSeccion = true }
+      if (kv.b) patch.b = num(kv.b, 'b')
+      if (kv.h) patch.h = num(kv.h, 'h')
       if (kv.r) patch.r = num(kv.r, 'r')
       if (kv.fc) patch.fc = num(kv.fc, "f'c")
       if (kv.lechos) {
@@ -450,6 +450,13 @@ function cFijar(args, ctx) {
       }
     }
   } catch (e) { return mal(e.message) }
+
+  // Solo cambia la sección si b o h son distintos de los que ya tiene (3.09:
+  // fijar C-1 b=15 h=15 en una 15×15 avisaba aunque no cambiara nada).
+  const distinto = (nuevo, actual) => nuevo !== undefined && Math.abs(+nuevo - (+actual || 0)) > 1e-9
+  cambiaSeccion = ch.tipo === 'trabe'
+    ? distinto(patch.ancho, ch.chip.ancho) || distinto(patch.peralte, ch.chip.peralte)
+    : distinto(patch.b, ch.chip.b) || distinto(patch.h, ch.chip.h)
 
   // Lo que fija la consola es un borrador: queda como «armado propuesto»
   // hasta que un ingeniero lo edita o lo acepta en la pantalla.
@@ -687,7 +694,8 @@ async function bajarLocal(url) {
 
 const SIN_RECIENTES = 'No se hizo nada: el navegador no dejó guardar lo actual en Recientes (¿sin espacio?). Guarda antes con «guardar».'
 
-/** proyecto · proyecto nuevo [nombre] · proyecto abrir <url> (autorizado por FB, 2026-11-09) */
+/** proyecto · proyecto nuevo [nombre] · proyecto abrir <url> (autorizado por FB, 2026-11-09)
+ *  · proyecto renombrar <nombre> (3.09): solo cambia el nombre; no toca secciones ni columnas */
 async function cProyecto(args, ctx) {
   const [sub, ...resto] = args.pos
   const ui = usarUI()
@@ -707,6 +715,16 @@ async function cProyecto(args, ctx) {
     return bien(`Proyecto nuevo «${nombre || 'sin nombre'}» · ${d.trabes} trabes, ${d.columnas} columnas`
       + (d.aRecientes ? ` · el anterior («${d.aRecientes}») quedó en Recientes` : ' · no había nada que guardar')
       + (m ? `\nOjo: el modelo de RAM sincronizado sigue siendo el anterior (${m.archivo}): «ram cargar <url>» o «ram sync» antes de «ram crear».` : ''), d)
+  }
+  if (sub === 'renombrar') {
+    if (!ui.renombrarProyecto) return mal('La pantalla todavía no está lista.')
+    const nombre = resto.join(' ').trim()
+    if (!nombre) return mal('Uso: proyecto renombrar <nombre>')
+    const antes = ui.proyecto?.() || ''
+    ui.renombrarProyecto(nombre)
+    ui.toast?.(`Proyecto renombrado: «${nombre}»`)
+    return bien(`Proyecto «${antes || 'sin nombre'}» → «${nombre}». Las descargas salen con el nombre nuevo.`,
+      { antes, proyecto: nombre, trabes: B().sections.length, columnas: C().columns.length })
   }
   if (sub === 'abrir') {
     if (!ui.abrirProyecto) return mal('La pantalla todavía no está lista.')
@@ -729,7 +747,7 @@ async function cProyecto(args, ctx) {
     return bien(`Abierto ${nombre}: proyecto «${d.proyecto || 'sin nombre'}» · ${d.trabes} trabes, ${d.columnas} columnas`
       + (d.aRecientes ? ` · el anterior («${d.aRecientes}») quedó en Recientes` : ''), d)
   }
-  return mal('Uso: proyecto · proyecto nuevo [nombre] · proyecto abrir <url>')
+  return mal('Uso: proyecto · proyecto nuevo [nombre] · proyecto renombrar <nombre> · proyecto abrir <url>')
 }
 
 const PESTANAS = {
@@ -753,7 +771,7 @@ function cIr(args) {
 export const COMANDOS = [
   { nombre: 'ayuda', uso: 'ayuda [comando]', que: 'esta lista, o el uso de un comando' },
   { nombre: 'estado', uso: 'estado', que: 'proyecto, chips, modelo sincronizado y carpeta', fn: cEstado },
-  { nombre: 'proyecto', uso: 'proyecto | proyecto nuevo [nombre] | proyecto abrir <url>', que: 'empieza un proyecto vacío o abre un proyecto.json (lo de antes queda en Recientes)', fn: cProyecto },
+  { nombre: 'proyecto', uso: 'proyecto | proyecto nuevo [nombre] | proyecto renombrar <nombre> | proyecto abrir <url>', que: 'empieza un proyecto vacío, le cambia el nombre o abre un proyecto.json (lo de antes queda en Recientes)', fn: cProyecto },
   { nombre: 'ram', uso: 'ram sync | ram cargar <url> | ram faltan | ram crear', que: 'sincronizar con RAM (modelo.json de la carpeta o de una URL) y crear las secciones que faltan con su armado propuesto', fn: cRam },
   { nombre: 'grupos', uso: 'grupos [trabes|columnas]', que: 'los chips con su sección y su armado', fn: cGrupos },
   { nombre: 'miembros', uso: 'miembros <chip>', que: 'los miembros de RAM de un chip, con su longitud', fn: cMiembros },

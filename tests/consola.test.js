@@ -146,6 +146,22 @@ describe('el edificio de ejemplo por la consola (09-practica.md)', () => {
     expect(buscarChip('T-5').chip.peralte).toBe(40)
   })
 
+  // 3.09: al fijar C-1 y K-1 con b=15 h=15 en columnas que ya eran 15×15 la
+  // consola avisaba «Cambió la sección» sin que cambiara nada.
+  it('fijar con la misma b y h no avisa que cambió la sección', async () => {
+    const t = buscarChip('T-5').chip
+    const r = await ejecutar(`fijar T-5 b=${t.ancho} h=${t.peralte} inf=3#4`)
+    expect(r.ok).toBe(true)
+    expect(r.texto).not.toMatch(/Cambió la sección/)
+    const c = buscarChip('C-2').chip
+    const rc = await ejecutar(`fijar C-2 b=${c.b} h=${c.h}`)
+    expect(rc.ok).toBe(true)
+    expect(rc.texto).not.toMatch(/Cambió la sección/)
+    const rc2 = await ejecutar(`fijar C-2 b=${+c.b + 5} h=${c.h}`)
+    expect(rc2.texto).toMatch(/Cambió la sección/)
+    await ejecutar(`fijar C-2 b=${c.b}`)              // la deja como estaba
+  })
+
   it('fijar rechaza lo que la app no tiene', async () => {
     expect((await ejecutar('fijar T-5 inf=3#7')).ok).toBe(false)
     expect((await ejecutar('fijar T-5 est=5@10/15')).ok).toBe(false)
@@ -207,7 +223,23 @@ describe('proyecto nuevo y abrir (autorizado por FB, 2026-11-09)', () => {
         vaciar(data)
         return { aRecientes: null, nombre: data.projectName }
       },
+      renombrarProyecto: (nombre) => { nombreActual = nombre },
     })
+  })
+
+  // 3.09: el proyecto de la i03 se quedó con el nombre de la i02 y las
+  // descargas salían con ese nombre.
+  it('proyecto renombrar cambia solo el nombre', async () => {
+    const antes = { t: useBeamStore.getState().sections.length, c: useColumnStore.getState().columns.length }
+    const r = await ejecutar('proyecto renombrar CH-26-001 v05 i03')
+    expect(r.ok).toBe(true)
+    expect(r.datos.proyecto).toBe('CH-26-001 v05 i03')
+    expect(r.texto).toContain('→ «CH-26-001 v05 i03»')
+    expect((await ejecutar('proyecto')).datos.proyecto).toBe('CH-26-001 v05 i03')
+    expect(useBeamStore.getState().sections.length).toBe(antes.t)
+    expect(useColumnStore.getState().columns.length).toBe(antes.c)
+    expect((await ejecutar('proyecto renombrar')).ok).toBe(false)
+    await ejecutar('proyecto renombrar Edificio de práctica')   // lo deja como estaba para las pruebas de abajo
   })
 
   it('proyecto nuevo deja uno vacío con su nombre y contesta el estado', async () => {
