@@ -34,11 +34,12 @@ export const NOVEDADES = [
   {
     version: '3.10',
     fecha: '2026-11-13',
-    lema: 'La vista 3D de columnas dibuja la superficie completa del eje inclinado.',
+    lema: 'Columnas: la superficie 3D completa del eje inclinado y el desglose del método general.',
     destacados: [],
     cambios: [
       { tipo: 'mejora', texto: 'Columnas, superficie 3D: además de las curvas θ = 0° y 90°, se dibujan los meridianos del eje inclinado cada 15° y caras sombreadas entre los anillos (botón «Caras»). Salen del mismo contorno de cada nivel de P con el que se calcula el D/C. Pedido del Ing. Fernando Burgos.' },
-      { tipo: 'mejora', texto: 'Solo cambia el dibujo: el cálculo y el D/C son los de la 3.09.' },
+      { tipo: 'nuevo', texto: 'Columnas, Cálculo (Excel): sección «Método general (5.4.1.1): punto que gobierna». Demanda y rayo, eje neutro (φ, c, a = β1·c), zona comprimida, fuerzas barra por barra con sus brazos, Cc, ΣF = P, MRx, MRy, εt, FR (3.8.2.2 y 3.8.2.6), MR sobre el rayo y D/C = Mu/MR, con 5.4.1.2 de referencia. Pedido del Ing. Fernando Burgos.' },
+      { tipo: 'mejora', texto: 'Solo cambia la presentación: el cálculo y el D/C son los de la 3.09. El desglose muestra el eje neutro exacto sobre el rayo y su diferencia con la capacidad que usa la app.' },
     ],
     aviso: 'Es una propuesta: no se usa en un proyecto hasta que un ingeniero la apruebe.',
   },

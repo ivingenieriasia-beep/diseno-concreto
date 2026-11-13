@@ -5,6 +5,7 @@ import ColumnCanvas from './ColumnCanvas'
 import InteractionDiagram from './InteractionDiagram'
 import Interaction3D from './Interaction3D'
 import ColumnExcelView from './ColumnExcelView'
+import MetodoGeneralExcel from './MetodoGeneralExcel'
 import RevisionNTC from './RevisionNTC'
 import { analyzeColumn, checkBiaxial, excentricidad } from '../core/columnCalculator'
 import { parseRamEnvelope } from '../core/ramParser'
@@ -359,6 +360,7 @@ export default function ColumnsView() {
                     dirLabel={excelDir === 'X' ? `Dirección X (h=${form.h} cm)` : `Dirección Y (h=${form.b} cm, sección girada)`}
                     accent={excelDir === 'X' ? '#2563a8' : '#c94f2a'}
                     Mu={excelDir === 'X' ? form.MuX : form.MuY} />
+                  <MetodoGeneralExcel col={form} an={analysis} caso={caso} />
                 </div>
               )}
             </>
