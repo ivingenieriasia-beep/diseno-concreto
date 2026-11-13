@@ -3,7 +3,7 @@ IV Ingenierías · Estructuras
 # Auxiliar IV con RAM Elements
 
 Manual de uso para el equipo: del modelo analizado en RAM a las secciones armadas y la cimentación, pasando por la agrupación de trabes.
-**Versión 3.09**Noviembre de 2026
+**Versión 3.10**Noviembre de 2026
 burgos2177-create.github.io/auxiliar-iv Chrome o Edge
 
 ## Lo esencial en una página

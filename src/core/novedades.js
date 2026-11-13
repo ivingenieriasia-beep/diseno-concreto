@@ -32,6 +32,17 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.10',
+    fecha: '2026-11-13',
+    lema: 'La vista 3D de columnas dibuja la superficie completa del eje inclinado.',
+    destacados: [],
+    cambios: [
+      { tipo: 'mejora', texto: 'Columnas, superficie 3D: además de las curvas θ = 0° y 90°, se dibujan los meridianos del eje inclinado cada 15° y caras sombreadas entre los anillos (botón «Caras»). Salen del mismo contorno de cada nivel de P con el que se calcula el D/C. Pedido del Ing. Fernando Burgos.' },
+      { tipo: 'mejora', texto: 'Solo cambia el dibujo: el cálculo y el D/C son los de la 3.09.' },
+    ],
+    aviso: 'Es una propuesta: no se usa en un proyecto hasta que un ingeniero la apruebe.',
+  },
+  {
     version: '3.09',
     fecha: '2026-11-11',
     lema: 'Dos arreglos de la consola que encontró el Diseñador de concreto.',

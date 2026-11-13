@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { mrEnCurva, contornoEnP } from '../core/columnasNTC'
+import { mrEnCurva, contornoEnP, mrEnDireccion } from '../core/columnasNTC'
 
 /**
  * Superficie de interacción 3D de DISEÑO (NTC-Concreto 2023, con FR).
@@ -11,7 +11,17 @@ import { mrEnCurva, contornoEnP } from '../core/columnasNTC'
  * Interacción: arrastrar rota · rueda hace zoom · presets de vista ·
  * el nivel de carga del punto activo se resalta con su contorno, de modo que
  * se aprecia si el punto queda dentro del contorno a SU nivel de P.
+ *
+ * 3.10 (pedido del Ing. Fernando Burgos): se dibuja la superficie completa del
+ * eje inclinado, no solo los meridianos θ = 0° y 90°. Meridianos cada 15° y
+ * caras sombreadas entre anillos, tomados del mismo contorno de cada nivel con
+ * mrEnDireccion, el rayo con el que se calcula el D/C. Es solo dibujo: el D/C
+ * no cambia.
  */
+
+const PASO_MERIDIANO = 15          // grados entre meridianos del eje inclinado
+const PASO_CARA = 5                // grados entre caras (más fino que la malla)
+const LUZ = (() => { const v = [-0.35, 0.55, 1]; const n = Math.hypot(...v); return v.map((c) => c / n) })()
 
 const VIEWS = {
   iso:   { yaw: 0.7,  pitch: 0.42, label: 'Iso' },
@@ -28,6 +38,7 @@ export default function Interaction3D({
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [showRings, setShowRings] = useState(true)
+  const [showFaces, setShowFaces] = useState(true)
   const [sel, setSel] = useState(null) // punto de la nube resaltado
   const drag = useRef(null)
   const svgRef = useRef(null)
@@ -54,7 +65,14 @@ export default function Interaction3D({
     for (let i = 0; i <= NL; i++) {
       const P = Pmin + ((POC - Pmin) * i) / NL
       const cont = contornoEnP(sup, Math.min(P, POC - 1e-9))
-      levels.push({ P, MRx: mrEnCurva(cX, P).MR, MRy: mrEnCurva(cY, P).MR, verts: cont.verts })
+      // Rayos del contorno cada PASO_CARA grados: el mismo MR(θ) del D/C
+      const rayos = []
+      for (let g = 0; g < 360; g += PASO_CARA) {
+        const t = (g * Math.PI) / 180
+        const MR = cont.fuera ? 0 : mrEnDireccion(cont, t).MR
+        rayos.push({ g, Mx: MR * Math.cos(t), My: MR * Math.sin(t) })
+      }
+      levels.push({ P, MRx: mrEnCurva(cX, P).MR, MRy: mrEnCurva(cY, P).MR, verts: cont.verts, rayos })
     }
     const Mscale = Math.max(...levels.map((l) => Math.max(l.MRx, l.MRy)), 0.01)
     return { levels, Pmin, POC, Mscale }
@@ -70,10 +88,12 @@ export default function Interaction3D({
     const z1 = x * sy + z * cy
     const y1 = y * cp - z1 * sp
     const S = Math.min(width, height) * 0.30 * zoomV
+    const depth = z1 * cp + y * sp
     return {
       X: width / 2 + panV.x + x1 * S * 1.3,
       Y: height / 2 + panV.y - y1 * S * 1.25,
-      depth: z1 * cp + y * sp,
+      depth,
+      v: [x1, y1, depth],            // coordenadas de vista, para sombrear
     }
   }, [geo, rot, width, height])
 
@@ -126,6 +146,44 @@ export default function Interaction3D({
       { color: '#c94f2a', pts: mk(() => 0, (l) => -l.MRy) },
     ]
   }, [geo, project])
+
+  // Meridianos del eje inclinado cada PASO_MERIDIANO grados (sin 0, 90, 180 y 270,
+  // que ya son las curvas de diseño 2D de arriba)
+  const meridianosInclinados = useMemo(() => {
+    const out = []
+    const n = geo.levels[0]?.rayos.length || 0
+    for (let k = 0; k < n; k++) {
+      const g = geo.levels[0].rayos[k].g
+      if (g % PASO_MERIDIANO !== 0 || g % 90 === 0) continue
+      out.push(geo.levels.map((l) => project(l.rayos[k].Mx, l.rayos[k].My, l.P)))
+    }
+    return out
+  }, [geo, project])
+
+  // Caras entre anillos, de atrás hacia adelante, sombreadas según la luz
+  const caras = useMemo(() => {
+    if (!showFaces) return []
+    const L = geo.levels
+    const n = L[0]?.rayos.length || 0
+    const pr = L.map((l) => l.rayos.map((r) => project(r.Mx, r.My, l.P)))
+    const out = []
+    for (let i = 0; i < L.length - 1; i++) {
+      for (let k = 0; k < n; k++) {
+        const k2 = (k + 1) % n
+        const q = [pr[i][k], pr[i][k2], pr[i + 1][k2], pr[i + 1][k]]
+        const [a, b, , d] = q.map((p) => p.v)
+        const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+        const w = [d[0] - a[0], d[1] - a[1], d[2] - a[2]]
+        const nn = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]
+        const m = Math.hypot(...nn)
+        if (m < 1e-12) continue
+        const luz = Math.abs(nn[0] * LUZ[0] + nn[1] * LUZ[1] + nn[2] * LUZ[2]) / m
+        const P = (L[i].P + L[i + 1].P) / 2
+        out.push({ q, depth: q.reduce((s, p) => s + p.depth, 0) / 4, luz, comp: P >= 0 })
+      }
+    }
+    return out.sort((x, y) => x.depth - y.depth)
+  }, [geo, project, showFaces])
 
   // Punto activo: el seleccionado de la nube, o la demanda manual
   const active = sel || (cloud && cloud.length
@@ -181,6 +239,8 @@ export default function Interaction3D({
           title="Acerca y centra la vista en la demanda">⤢ demanda</button>
         <button style={btn(false)} onClick={resetView}>⌂</button>
         <button style={btn(showRings)} onClick={() => setShowRings((v) => !v)}>Malla</button>
+        <button style={btn(showFaces)} onClick={() => setShowFaces((v) => !v)}
+          title="Caras sombreadas de la superficie del eje inclinado">Caras</button>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 9.5, color: 'var(--color-tx3)', fontFamily: 'var(--font-mono)' }}>
           arrastra = rotar · rueda = zoom
@@ -198,10 +258,22 @@ export default function Interaction3D({
           return <line x1={bot.X} y1={bot.Y} x2={top.X} y2={top.Y} stroke="#b8b2a6" strokeWidth="1" strokeDasharray="4,3" />
         })()}
 
+        {/* Caras de la superficie del eje inclinado (solo dibujo) */}
+        {caras.map((c, i) => (
+          <path key={`c${i}`} d={toPath([...c.q, c.q[0]])}
+            fill={c.comp ? `hsl(222, 28%, ${Math.round(38 + 42 * c.luz)}%)` : `hsl(24, 34%, ${Math.round(40 + 40 * c.luz)}%)`}
+            fillOpacity="0.32" stroke="none" />
+        ))}
+
         {/* Malla de anillos (por nivel de P) */}
         {showRings && rings.map((r, i) => (
           <path key={i} d={toPath(r.pts)} fill="none"
-            stroke={r.P >= 0 ? '#9aa5c4' : '#c9a68a'} strokeWidth="0.7" opacity="0.4" />
+            stroke={r.P >= 0 ? '#8592b5' : '#bf9775'} strokeWidth="0.8" opacity="0.55" />
+        ))}
+
+        {/* Meridianos del eje inclinado, cada 15° */}
+        {showRings && meridianosInclinados.map((pts, i) => (
+          <path key={`m${i}`} d={toPath(pts)} fill="none" stroke="#5b6b8c" strokeWidth="1.1" opacity="0.75" />
         ))}
 
         {/* Meridianos = curvas 2D */}
