@@ -32,6 +32,18 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.11.1',
+    fecha: '2026-11-14',
+    lema: 'Cimentaciones: dos correcciones que encontró el Diseñador de concreto al validar la 3.11. El diseño no cambia.',
+    destacados: [],
+    cambios: [
+      { tipo: 'arreglo', texto: 'Cantidades con ejes ligados: un diseño capturado a mano va con su «Largo (planos)», que ya es el total del muro, y los ejes ligados desde RAM sólo se revisan. Antes se sumaba el largo de planos más el de cada eje ligado y el volumen salía inflado. Un diseño que salió de RAM sigue sumando sus ejes, cada uno con su largo. La línea de cantidades dice cuál de los dos se usó.' },
+      { tipo: 'arreglo', texto: '«Desde RAM» ya no se cierra al elegir apoyos: un cimiento de la planta se abre con doble clic. Antes un clic sencillo sobre una franja (la que queda sobre los apoyos después de «＋ en este eje») abría el cimiento y cerraba la ventana. La lista de la derecha sigue abriendo con un clic.' },
+      { tipo: 'mejora', texto: 'Las revisiones, el D/C de columnas y trabes y todo lo demás son los de la 3.11.' },
+    ],
+    aviso: 'Aprobada por el Ing. Fernando Burgos para la validación de la 3.11.',
+  },
+  {
     version: '3.11',
     fecha: '2026-11-14',
     lema: 'Cimentaciones: el peralte mínimo es d ≥ 15 cm, y «＋ en este eje» sólo liga y revisa cada apoyo con su reacción.',
