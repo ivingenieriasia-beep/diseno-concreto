@@ -194,7 +194,10 @@ Si el diseño se aplicó a más ejes desde RAM, aparece el bloque **Ejes (n)** [
 - Si la corrida es capturada a mano, otra nota [cim-ejes-w] dice que el eje 1 se revisa con su w capturado y los ligados con la w de sus apoyos; las dos cargas no se suman.
 - "1 · el del diseño · nudos …" [cim-eje-1] y luego cada eje [cim-eje-2…] con sus nudos, su largo y, en corridas, "w de sus apoyos: CM … · CV … t/m", con su ✕ para quitarlo.
 - Cada revisión informa el peor eje y lo agrega a su nota.
-- La memoria empieza con "En sus n ejes", el resumen termina en "· en n ejes" y las cantidades suman todos.
+- La memoria empieza con "En sus n ejes" y el resumen termina en "· en n ejes".
+- Cantidades [cim-cant-nota]:
+  - si el diseño salió de RAM, suman todos los ejes ("suma de sus n ejes");
+  - si es capturado, van con su Largo (planos), que ya es el total, y los ejes ligados sólo se revisan ("con el largo de planos del diseño; los n eje(s) ligado(s) sólo se revisan").
 
 ---
 
@@ -347,7 +350,7 @@ En los muros de piedra y en el cimiento de mampostería no hay varillas que edit
 - En la vista Cimentación:
   - Los cimientos van a escala [cim-plan-{nombre}-{nudo}]; las franjas son [cim-plan-{nombre}] o [cim-plan-{nombre}-e{n}].
   - Cada apoyo trae su % [cim-u-{nudo}]. Si el apoyo no tiene cimiento, el círculo sale punteado y dice "sin cimiento".
-  - Un clic en un cimiento lo abre y cierra la ventana.
+  - Un doble clic en un cimiento lo abre y cierra la ventana; un clic sencillo no hace nada (así no se cierra al elegir apoyos junto a una franja). La lista de la derecha lo abre con un clic.
 - Cada lado de la planta [cim-lado-x-min|x-max|y-min|y-max] dice "lindero?". Al cliquearlo queda marcado como **LINDERO** en rojo.
 
 **Derecha.**

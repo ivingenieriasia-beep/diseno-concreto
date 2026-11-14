@@ -193,6 +193,25 @@ describe('3.11 · «＋ en este eje» sólo liga', () => {
     const Re = tipoCim('corrida').revisar({ ...z2, ejes: [] }, obra)
     expect(sec(Re, 'Cargas del muro').pasos[0].f).toBe('w por metro capturado')
   })
+  it('cantidades: un diseño capturado va con su largo de planos; los ejes ligados no se suman', () => {
+    const solo = revisarCim(zc901, obra)
+    const z2 = { ...zc901, ...ligarEje(zc901, e, obra).cambios }
+    const z3 = { ...z2, ...ligarEje(z2, { ...e, nudos: ['5', '6'] }, obra).cambios }
+    const R = revisarCim(z3, obra)
+    // 0.60 × 0.25 × 12 m = 1.80 m³, con o sin ejes ligados (la 3.11 sumaba 12 + 9 + 9 m)
+    expect(solo.cant.concreto).toBeCloseTo(0.6 * 0.25 * 12, 6)
+    expect(R.cant.concreto).toBeCloseTo(solo.cant.concreto, 6)
+    expect(R.cant.acero).toBeCloseTo(solo.cant.acero, 6)
+    expect(R.cantNota).toMatch(/largo de planos.*2 eje\(s\) ligado\(s\) sólo se revisan/)
+  })
+  it('cantidades: un diseño que salió de RAM suma sus ejes, cada uno con su largo', () => {
+    const z = { ...corridaDesde(A.apoyos, pap, 'y', {}), nombre: 'ZC-902', geo: { ...corridaDesde(A.apoyos, pap, 'y', {}).geo, B: 0.6, h: 25 } }
+    const base = revisarCim(z, obra)
+    const z2 = { ...z, ...ligarEje(z, e, obra).cambios }
+    const R = revisarCim(z2, obra)
+    expect(R.cant.concreto).toBeCloseTo(2 * base.cant.concreto, 6)
+    expect(R.cantNota).toBe('suma de sus 2 ejes')
+  })
   it('en la planta, cada apoyo ligado lleva su propio aprovechamiento', () => {
     const z2 = { ...zc901, uid: 'u1', ...ligarEje(zc901, e, obra).cambios }
     const cargas = A.apoyos.map((a) => ({ CM: { P: a.por.CM.fy, Mx: 0, My: 0, Vx: 0, Vy: 0 }, CV: { P: a.por.CV.fy, Mx: 0, My: 0, Vx: 0, Vy: 0 }, S: { P: 0, Mx: 0, My: 0, Vx: 0, Vy: 0 } }))
@@ -204,5 +223,17 @@ describe('3.11 · «＋ en este eje» sólo liga', () => {
     expect(n3.u).toBeGreaterThan(n1.u)
     // y la franja del eje ligado se dibuja aunque el diseño sea capturado
     expect(P.items.filter((it) => it.franja)).toHaveLength(1)
+  })
+})
+
+describe('3.11 · el cuadro «Desde RAM» no se cierra al elegir apoyos', () => {
+  it('un cimiento de la planta se abre con doble clic, no con un clic sencillo', async () => {
+    const { readFileSync } = await import('fs')
+    const { resolve } = await import('path')
+    const src = readFileSync(resolve(process.cwd(), 'src/components/cim/CimRam.jsx'), 'utf8')
+    const item = src.slice(src.indexOf('className="cim-plan-item"'), src.indexOf('<polygon data-cim'))
+    expect(item).toContain('onDoubleClick={() => abrir(it.z)}')
+    expect(item).not.toMatch(/onClick=\{\(\) => abrir/)
+    expect(src).toContain('doble clic en un cimiento para abrirlo')
   })
 })

@@ -59,6 +59,7 @@ export default function CimRevisiones({ R }) {
           {cant.piedra != null && <span>piedra <b>{fmt(cant.piedra, 'm³')}</b></span>}
           {cant.mortero != null && <span>mortero <b>{fmt(cant.mortero, 'm³')}</b></span>}
           {cant.excavacion != null && <span>excavación <b>{fmt(cant.excavacion, 'm³')}</b></span>}
+          {R.cantNota && <span className="gris" data-testid="cim-cant-nota">{R.cantNota}</span>}
         </div>
       )}
     </div>

@@ -64,7 +64,13 @@ export function revisarEnEjes(revisar, z, obra) {
     ok: checks.every((c) => c.ok),
     checks, secciones,
     avisos: [...new Set(todos.flatMap((t) => t.R.avisos || []))],
-    cant: todos.reduce((a, t) => sumaCant(a, t.R.cant), {}),
+    // cantidades: si el diseño salió de RAM, cada eje es su propio tramo y se
+    // suman; si es capturado, su largo (planos) ya es el total del muro y los
+    // ejes ligados sólo se revisan (antes se sumaban y se contaban dos veces)
+    cant: z.origen?.ram ? todos.reduce((a, t) => sumaCant(a, t.R.cant), {}) : base.cant,
+    cantNota: z.origen?.ram
+      ? `suma de sus ${todos.length} ejes`
+      : `con el largo de planos del diseño; los ${ejes.length} eje(s) ligado(s) sólo se revisan`,
     porEje: todos.map((t) => ({ e: t.e, i: t.i, ok: t.R.ok, u: u(t.R) })),
     resumen: `${base.resumen} · en ${todos.length} ejes`,
   }

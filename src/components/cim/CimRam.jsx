@@ -277,7 +277,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                   }
                   return (
                     <g key={`${it.z.uid}-${it.n || `e${it.eje}`}-${j}`} className="cim-plan-item" data-testid={it.franja ? `cim-plan-${it.z.nombre}${it.eje ? `-e${it.eje + 1}` : ''}` : `cim-plan-${it.z.nombre}-${it.n}`}
-                      onPointerDown={(e) => { e.stopPropagation() }} onClick={() => abrir(it.z)} style={{ cursor: 'pointer' }}>
+                      onPointerDown={(e) => { e.stopPropagation() }} onDoubleClick={() => abrir(it.z)} style={{ cursor: 'pointer' }}>
                       <polygon data-cim={it.z.uid} points={poli(it.poly)} fill={it.liga ? 'rgba(75,70,64,0.55)' : t.f} stroke={it.invade?.length ? '#c62828' : t.c} strokeWidth={it.invade?.length ? 2 : it.liga ? 1.2 : 1.5} strokeDasharray={it.invade?.length ? '4 2' : undefined} />
                       {it.franja && !it.liga && <line x1={geo.P(...it.linea[0])[0]} y1={geo.P(...it.linea[0])[1]} x2={geo.P(...it.linea[1])[0]} y2={geo.P(...it.linea[1])[1]} stroke={t.c} strokeWidth={it.z.tipo === 'contratrabe' ? 3.2 : 1} strokeDasharray={it.z.tipo === 'contratrabe' ? undefined : '5 3'} pointerEvents="none" />}
                       {it.liga && (() => {
@@ -289,7 +289,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                         return <text x={mx} y={my} dy={-6 * esc} transform={`rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})`} textAnchor="middle" fontSize={fs(9.5)} fontWeight={700} fill="#3f3a34" fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre} · {pct(it.u)}</text>
                       })()}
                       {!it.liga && (it.franja || ancho > 26) && <text x={tx} y={ty} textAnchor="middle" fontSize={fs(9.5)} fontWeight={700} fill={t.c} fontFamily="Instrument Sans, sans-serif" pointerEvents="none">{it.z.nombre}{it.franja ? ` · ${pct(it.u)}` : ''}</text>}
-                      <title>{`${it.z.nombre} · ${tipoCim(it.z.tipo).nombre}${it.n ? ` en el nudo ${it.n}` : ` sobre ${it.nudos.length} apoyos${it.z.ejes?.length ? ` (eje ${it.eje + 1} de ${it.z.ejes.length + 1})` : ''}`}: ${pct(it.u)}${it.ok ? '' : ` · no cumple: ${it.rige.join(', ')}`} · clic para abrirlo`}</title>
+                      <title>{`${it.z.nombre} · ${tipoCim(it.z.tipo).nombre}${it.n ? ` en el nudo ${it.n}` : ` sobre ${it.nudos.length} apoyos${it.z.ejes?.length ? ` (eje ${it.eje + 1} de ${it.z.ejes.length + 1})` : ''}`}: ${pct(it.u)}${it.ok ? '' : ` · no cumple: ${it.rige.join(', ')}`} · doble clic para abrirlo`}</title>
                     </g>
                   )
                 })}
@@ -340,7 +340,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                   <span><i style={{ background: '#b45309' }} /> ≤ 100 %</span>
                   <span><i style={{ background: '#c62828' }} /> no cumple</span>
                   <span><i className="vacio" /> sin cimiento</span>
-                  <span className="gris">% con la reacción de cada apoyo · clic en un cimiento para abrirlo</span>
+                  <span className="gris">% con la reacción de cada apoyo · doble clic en un cimiento para abrirlo</span>
                 </div>
               ) : <div className="cim-nota">Círculo: carga de servicio CM + CV del apoyo. Planta orientada como RAM.</div>}
             </div>
