@@ -7,7 +7,7 @@
 import { revisarCim, estadoCim } from './index'
 import { centroColumna } from './aislada'
 import { num } from './comun'
-import { LADOS, lineaLindero, cargasEnEjes } from './reacciones'
+import { LADOS, lineaLindero, cargasEnEjes, apoyosAlDia } from './reacciones'
 import { APLICAR } from './ejes'
 
 /**
@@ -26,7 +26,9 @@ export function cimentacionEnPlanta(A, cimientos, cargas, obra, cont, linderos =
   const anota = (n, it) => { if (!porNudo.has(n)) porNudo.set(n, []); porNudo.get(n).push(it) }
   for (const z of cimientos) {
     const nudos = (z.origen?.ram?.nudos || []).map(String).filter((n) => idx.has(n))
-    if (!nudos.length) continue
+    // un diseño capturado a mano también sale si se le ligaron ejes de RAM
+    const ligados = (z.ejes || []).some((e) => (e.nudos || []).some((n) => idx.has(String(n))))
+    if (!nudos.length && !ligados) continue
     if (z.tipo === 'aislada') {
       const B = num(z.geo.B, 1), L = num(z.geo.cuadrada ? z.geo.B : z.geo.L, 1)
       const { xc, yc } = centroColumna({ ...z.geo, L })
@@ -46,17 +48,23 @@ export function cimentacionEnPlanta(A, cimientos, cargas, obra, cont, linderos =
     } else if (z.tipo === 'corrida' || z.tipo === 'contratrabe' || z.tipo === 'liga') {
       // el eje del diseño y los que se le agregaron, cada uno con su revisión
       const o = z.origen?.ram || {}
-      const ejes = [{ nudos: o.nudos, ini: o.ini, v0: o.v0, v1: o.v1, lindero: o.lindero }, ...(z.ejes || [])]
+      const ejes = [{ nudos: o.nudos, ini: o.ini, v0: o.v0, v1: o.v1, lindero: o.lindero, apoyos: o.apoyos }, ...(z.ejes || [])]
       ejes.forEach((e, k) => {
         const ns = (e.nudos || []).map(String).filter((n) => idx.has(n))
         if (!ns.length) return
-        const zE = k === 0 ? { ...z, ejes: [] } : APLICAR[z.tipo](z, e)
+        let zE = k === 0 ? { ...z, ejes: [] } : APLICAR[z.tipo](z, e)
+        // la corrida: cada apoyo con la reacción de hoy en su largo tributario
+        if (z.tipo === 'corrida' && e.apoyos?.length) zE = { ...zE, apoyosRam: apoyosAlDia(e.apoyos, A, cargas) }
         const it = franja(zE, e, ns, A, idx, obra)
         if (!it) return
         it.z = z; it.eje = k; it.invade = z.tipo === 'liga' ? [] : invade(it.poly)
         items.push(it)
         // la liga no apoya en el suelo: no es el cimiento de nadie
-        if (z.tipo !== 'liga') for (const n of ns) anota(n, it)
+        if (z.tipo === 'liga') return
+        for (const n of ns) {
+          const pa = it.porApoyo?.find((x) => x.nudo === n)
+          anota(n, pa ? { ...it, u: pa.u, ok: pa.ok, rige: pa.rige, apoyo: pa } : it)
+        }
       })
     }
   }
@@ -125,6 +133,7 @@ function franja(z, e, nudos, A, idx, obra) {
   const { u: ut } = estadoCim(R)
   return {
     nudos, u: ut, ok: R.ok, rige: R.checks.filter((c) => !c.ok).map((c) => c.titulo.toLowerCase()),
+    porApoyo: R.datos?.porApoyo || null,
     franja: true, liga: z.tipo === 'liga', poly, linea: [ini, fin],
   }
 }

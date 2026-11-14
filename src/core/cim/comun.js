@@ -30,7 +30,7 @@ export const CRITERIOS = {
   sMin: 10, sMax: 30, paso: 2.5,   // separaciones de parrilla, cm
   calibres: [4, 5, 6, 8],    // los que se prueban al proponer
   plantilla: 5,              // cm de plantilla de concreto pobre bajo el cimiento
-  hMin: 15,                  // cm, peralte mínimo de una zapata
+  dMin: 15,                  // cm, peralte efectivo mínimo de una zapata: d ≥ 150 mm (NTC-C 9.4.6.1)
   Bmin: 0.6,                 // m, ancho mínimo de una zapata
   DfMin: 0.6,                // m, desplante mínimo
   ligaAci: false,            // liga con lado ≥ claro libre/20 (ACI 18.13.3.3, alta sismicidad); si no, la CT-1
@@ -49,6 +49,25 @@ export function minimos(C, { B = null, Df = null, que = 'ancho' } = {}) {
   }
   return out
 }
+
+/**
+ * Peralte mínimo de una zapata (NTC-C 9.4.6.1): d ≥ 150 mm, con el mismo d
+ * con el que se revisan la flexión y el cortante (h − recubrimiento − ½ db,
+ * o la capa de arriba en las parrillas de dos capas). Hasta la 3.10 se
+ * revisaba h ≥ 15 cm, que con 5 cm de recubrimiento deja d ≈ 9.5 cm.
+ * @param sust  la sustitución que se lee en la memoria: «= 25 − 5 − 0.48»
+ */
+export function peralteMinimo(C, d, { titulo = 'Peralte mínimo', sust = '' } = {}) {
+  const dMin = num(C.dMin, 15)
+  const ok = d >= dMin - 1e-9
+  return {
+    check: check('peralte', titulo, dMin, d, 'cm', { grupo: 'Detallado', ok, nota: `d ≥ ${f0(dMin)} cm` }),
+    paso: paso(`${titulo} (NTC-C 9.4.6.1)`, `d ≥ ${f0(dMin)} cm`, `d = ${f1(d)}${sust ? ` ${sust}` : ''}`, ok ? 'cumple' : 'no cumple', '', { ok }),
+  }
+}
+
+/** El peralte (en pasos de 5 cm) que ya da d ≥ dMin con la varilla `n` en una capa */
+export const hParaD = (C, r, n = 3) => arriba(num(C.dMin, 15) + r + varilla(n).diam / 2, 5)
 
 /** Suelo de la obra (del estudio de mecánica de suelos) */
 export const SUELO = {

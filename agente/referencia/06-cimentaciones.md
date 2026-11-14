@@ -93,7 +93,7 @@ Valores de fábrica, antes de que Proponer los ajuste: B = L = 1.20 m, h = 30 cm
   - Suelo: Presión en el suelo.
   - Cortante: Penetración, Cortante en x, Cortante en y.
   - Flexión: Flexión en x, Flexión en y.
-  - Detallado: Anclaje en x, Anclaje en y, Aplastamiento, Peralte mínimo, Ancho mínimo, Desplante mínimo.
+  - Detallado: Anclaje en x, Anclaje en y, Aplastamiento, Peralte mínimo (d ≥ 15 cm con la capa de arriba, NTC-C 9.4.6.1), Ancho mínimo, Desplante mínimo.
   - Contratrabe de liga CT-x: ver §3.
 
 ### Zapata corrida bajo muro (ZC)
@@ -107,11 +107,14 @@ Valores de fábrica: B = 0.80 m, h = 20 cm, muro t = 15 cm de mampostería, al c
 - **Armado**: "Transversal (por metro)" [cim-arm-t] y "Longitudinal (repartidas en B)" [cim-arm-l].
 - Lleva bloque CT **sólo si el muro es de mampostería**.
 - **Revisiones**:
-  - Suelo: Presión en el suelo.
+  - Suelo: Presión en el suelo y, si la corrida salió de apoyos de RAM, "Cada apoyo con su reacción" (nota "rige el nudo …").
   - Cortante: Cortante.
   - Flexión: Flexión transversal, Longitudinal (temperatura).
-  - Detallado: Anclaje transversal, Peralte mínimo, Ancho mínimo, Desplante mínimo.
+  - Detallado: Anclaje transversal, Peralte mínimo (d ≥ 15 cm, d = h − r − ½ db, NTC-C 9.4.6.1), Ancho mínimo, Desplante mínimo.
   - Con muro de mampostería, además el grupo "Contratrabe de liga CT-x".
+- **La memoria empieza con "Cargas del muro"**, que dice de dónde salen: "w por metro capturado" (no se revisa contra reacciones de apoyos) o "w = Σ P de los apoyos / Lz".
+  - Con cargas de RAM, el aviso dice que la carga de los muros que baja por la malla de placas no viene en el modelo sincronizado.
+  - Con apoyos de RAM, la sección "Cada apoyo con su reacción" tiene un renglón por nudo: w = (P CM + P CV) / Lt, con Lt la mitad del claro a cada vecino o el volado, y lo que aprovecha la franja con esa w (suelo, cortante, flexión y anclaje).
 
 ### Zapata corrida con contratrabe (ZT)
 Valores de fábrica: L = 8.60 m, B = 1.20 m, Losa h = 20 cm, Alma bw = 25 cm, Peralte H = 70 cm. Tres columnas en x = 0.3, 4.3 y 8.3 m, con CM P = 18, 26 y 16 t y CV al 35 %. Armado 3#5 abajo y 3#5 arriba, estribos #3 de 2 ramas @ 20, aleros #4 @ 25 y losa longitudinal #3 @ 30.
@@ -187,7 +190,9 @@ Valores de fábrica: de lindero, B = 0.60, H = 0.75, c = 0.30, t = 0.15, B y H a
 
 ### Varios ejes (corrida, contratrabe y liga)
 Si el diseño se aplicó a más ejes desde RAM, aparece el bloque **Ejes (n)** [cim-ejes]:
-- "1 · el del diseño · nudos …" y luego cada eje [cim-eje-2…] con su ✕ para quitarlo.
+- La nota dice que ligar un eje no cambia la sección ni el armado.
+- Si la corrida es capturada a mano, otra nota [cim-ejes-w] dice que el eje 1 se revisa con su w capturado y los ligados con la w de sus apoyos; las dos cargas no se suman.
+- "1 · el del diseño · nudos …" [cim-eje-1] y luego cada eje [cim-eje-2…] con sus nudos, su largo y, en corridas, "w de sus apoyos: CM … · CV … t/m", con su ✕ para quitarlo.
 - Cada revisión informa el peor eje y lo agrega a su nota.
 - La memoria empieza con "En sus n ejes", el resumen termina en "· en n ejes" y las cantidades suman todos.
 
@@ -263,7 +268,7 @@ Es un modal titulado "Suelo y criterios de la obra", con el botón **cerrar ✕*
 | Factor del empuje | 1.5 |
 | FS volteo | 2.0 |
 | FS deslizamiento | 1.5 |
-| Peralte mínimo | 15 cm |
+| Peralte efectivo mínimo (d ≥, NTC-C 9.4.6.1) | 15 cm |
 | Ancho mínimo | 0.60 m |
 | Desplante mínimo | 0.60 m |
 | Separación mínima | 10 cm |
@@ -358,7 +363,11 @@ En los muros de piedra y en el cimiento de mampostería no hay varillas que edit
   - **Zapata corrida (muro sobre estos apoyos)** [cim-ram-corrida].
   - **Corrida con contratrabe (columnas del eje)** [cim-ram-contratrabe].
   - **Contratrabe de liga (une las zapatas)** [cim-ram-liga].
-  - Si ya hay una corrida, contratrabe o liga, sale "o el mismo diseño de" con el select [cim-ram-destino] ("elige…") y **＋ en este eje** [cim-ram-aplicar]. Ese botón agrega los apoyos elegidos como otro eje y vuelve a proponer. Si esos nudos ya están en el diseño, avisa "… ya está en esos apoyos".
+  - Si ya hay una corrida, contratrabe o liga, sale "o el mismo diseño de" con el select [cim-ram-destino] ("elige…") y **＋ en este eje** [cim-ram-aplicar]. Ese botón liga los apoyos elegidos como otro eje y **no cambia la sección ni el armado** (desde la 3.11). Revisa el diseño en todos sus ejes.
+    - Si cumple, el aviso dice "ZC-1: N apoyos ligados como eje k (nudos …); la sección y el armado no cambiaron y cumple en sus k ejes".
+    - Si no cumple, dice en qué eje y "ábrelo y usa ⚡ Proponer si quieres que la app lo redimensione".
+    - Si esos nudos ya están en el diseño, avisa "… ya está en esos apoyos".
+  - En la vista Cimentación, cada apoyo de una corrida lleva su propio % con su reacción en su largo tributario; el globo dice "… con su reacción (CM … + CV … t en … m)".
 
 **Después de crear.** El aviso dice "Zapatas aisladas: Z-1, Z-2 desde las reacciones de RAM, ya dimensionados y armados". Si había apoyos con cimiento, agrega "· ojo: N apoyo(s) ya tenían cimiento". La selección se limpia y la vista pasa a Cimentación.
 
@@ -414,7 +423,7 @@ Si hay una carpeta de proyecto activa, las salidas se guardan ahí; si no, se de
 1. Elige los apoyos de **una fila** (2 o más).
 2. Pulsa Zapata corrida (muro sobre estos apoyos) o Corrida con contratrabe (columnas del eje).
    - Terminan a 0.5 m de la última columna, o al ras si ese extremo cae en un lindero marcado.
-3. Para repetir el diseño en otro eje: elige los apoyos del otro eje, escoge el diseño en "o el mismo diseño de" y pulsa ＋ en este eje.
+3. Para repetir el diseño en otro eje: elige los apoyos del otro eje, escoge el diseño en "o el mismo diseño de" y pulsa ＋ en este eje. El diseño no cambia; si no cumple en el eje nuevo, abre el cimiento y pulsa ⚡ Proponer.
 
 ### D. Contratrabe de liga (TL)
 1. **Crea primero las aisladas** del eje. La liga busca la zapata de cada nudo para tomar su N·e; si la creas antes, el N·e queda en 0.

@@ -5,7 +5,7 @@ import { modeloGuardado, hace, EVENTO_MODELO } from '../../core/ramSync'
 import { gira, GIRO_RAM } from '../../core/agrupacion'
 import { PAPELES, papelesPorDefecto, apoyosDe, cargasDeApoyo, aisladasDesde, corridaDesde, contratrabeDesde, ligaDesde, ejeDesde, tiposDeZapata, contorno, lineaLindero, condicionApoyo, LADOS } from '../../core/cim/reacciones'
 import { conEjes } from '../../core/cim/ejes'
-import { tipoCim, nombreLibre } from '../../core/cim'
+import { tipoCim, nombreLibre, ligarEje } from '../../core/cim'
 import { cimentacionEnPlanta } from '../../core/cim/planta'
 
 // Cimientos a partir de las reacciones de los apoyos del modelo de RAM: se
@@ -179,11 +179,10 @@ export default function CimRam({ obra, onClose, onToast }) {
     if (!e) return
     const yaEn = new Set([...(z.origen?.ram?.nudos || []), ...(z.ejes || []).flatMap((x) => x.nudos || [])].map(String))
     if (e.nudos.every((n) => yaEn.has(String(n)))) { onToast?.(`${z.nombre} ya está en esos apoyos`, 'warn'); return }
-    const z2 = { ...z, ejes: [...(z.ejes || []), e] }
-    let p = {}
-    try { p = tipoCim(z.tipo).proponer(z2, obra) } catch { /* se queda con su diseño */ }
-    actualizar(z.uid, { ejes: z2.ejes, ...(p.geo ? { geo: p.geo } : {}), ...(p.arm ? { arm: p.arm } : {}) })
-    onToast?.(`${z.nombre} ahora en ${z2.ejes.length + 1} ejes; se volvió a proponer para que cumpla en todos`)
+    // sólo se liga: la sección y el armado no cambian (3.11)
+    const L = ligarEje(z, e, obra)
+    actualizar(z.uid, L.cambios)
+    onToast?.(L.mensaje, L.ok ? undefined : 'warn')
     setSel(new Set()); setVista('cim')
   }
 
@@ -308,10 +307,10 @@ export default function CimRam({ obra, onClose, onToast }) {
                         <circle data-nudo={a.nudo} data-testid={`cim-apoyo-${a.nudo}`} cx={x} cy={y} r={(on ? 6 : 4.5) * esc}
                           fill={on ? '#e8830a' : suyo ? t.c : '#fff'} stroke={on ? '#b45309' : suyo ? t.c : '#8a837a'} strokeWidth={1.3} strokeDasharray={suyo || on ? undefined : '2.5 2'}
                           style={{ cursor: 'pointer' }} onPointerDown={(e) => { e.stopPropagation(); tocar(a.nudo, e) }}>
-                          <title>{`Nudo ${a.nudo}: ${suyos.length ? suyos.map((it) => `${it.z.nombre} ${pct(it.u)}`).join(' · ') : 'sin cimiento'}${doble ? ' · ¡está en dos cimientos!' : ''}`}</title>
+                          <title>{`Nudo ${a.nudo}: ${suyos.length ? suyos.map((it) => `${it.z.nombre} ${pct(it.u)}${it.apoyo ? ` con su reacción (CM ${f2(it.apoyo.CM)} + CV ${f2(it.apoyo.CV)} t en ${f2(it.apoyo.Lt)} m)` : it.franja ? ' (la franja)' : ''}`).join(' · ') : 'sin cimiento'}${doble ? ' · ¡está en dos cimientos!' : ''}`}</title>
                         </circle>
                         <text x={x + 7 * esc} y={y - 3 * esc} fontSize={fs(8.5)} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">{a.nudo}</text>
-                        {suyo && !suyo.franja && <text data-testid={`cim-u-${a.nudo}`} x={x + 7 * esc} y={y + 8 * esc} fontSize={fs(9.5)} fontWeight={700} fill={t.c} fontFamily="DM Mono, monospace" pointerEvents="none">{pct(suyo.u)}</text>}
+                        {suyo && (!suyo.franja || suyo.apoyo) && <text data-testid={`cim-u-${a.nudo}`} x={x + 7 * esc} y={y + 8 * esc} fontSize={fs(9.5)} fontWeight={700} fill={t.c} fontFamily="DM Mono, monospace" pointerEvents="none">{pct(suyo.u)}</text>}
                         {!suyos.length && <text x={x + 7 * esc} y={y + 8 * esc} fontSize={fs(8.5)} fill="#8a837a" fontFamily="DM Mono, monospace" pointerEvents="none">sin cimiento</text>}
                       </g>
                     )
@@ -417,7 +416,7 @@ export default function CimRam({ obra, onClose, onToast }) {
                     <option value="">elige…</option>
                     {multis.map((z) => <option key={z.uid} value={z.uid}>{z.nombre} · {CORTO[z.tipo]}{z.ejes?.length ? ` (${z.ejes.length + 1} ejes)` : ''}</option>)}
                   </select>
-                  <button className="btn btn-secondary" data-testid="cim-ram-aplicar" disabled={sel.size < 2 || !destino} onClick={aplicarEje} title="Agrega estos apoyos como otro eje del mismo diseño y lo vuelve a proponer para que cumpla en todos">＋ en este eje</button>
+                  <button className="btn btn-secondary" data-testid="cim-ram-aplicar" disabled={sel.size < 2 || !destino} onClick={aplicarEje} title="Liga estos apoyos como otro eje del mismo diseño y lo revisa en todos sus ejes; no cambia la sección ni el armado">＋ en este eje</button>
                 </div>
               )}
               <p className="cim-nota">Cada cimiento guarda de qué nudos salió y se revisa con la reacción de cada uno. Con un modelo nuevo, la planta dice cuáles ya no alcanzan.</p>

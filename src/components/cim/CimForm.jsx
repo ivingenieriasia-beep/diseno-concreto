@@ -98,6 +98,8 @@ function BloqueCT({ z, set }) {
   )
 }
 
+const wF = (v) => (Number.isFinite(Number(v)) ? Number(v).toFixed(2) : '—')
+
 export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar }) {
   const g = z.geo
   const G = (patch) => set({ geo: { ...g, ...patch } })
@@ -127,12 +129,15 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
 
       {conEjes(z.tipo) && z.ejes?.length > 0 && (
         <Bloque titulo={`Ejes (${z.ejes.length + 1})`} testid="cim-ejes">
-          <div className="cim-nota">El mismo diseño en {z.ejes.length + 1} ejes: se revisa con lo de cada uno y cada revisión informa el peor.</div>
+          <div className="cim-nota">El mismo diseño en {z.ejes.length + 1} ejes: se revisa con lo de cada uno y cada revisión informa el peor. Ligar un eje no cambia la sección ni el armado.</div>
+          {z.tipo === 'corrida' && !z.origen?.ram && (
+            <div className="cim-nota" data-testid="cim-ejes-w">El eje 1 se revisa con el w por metro capturado (CM {wF(z.cargas?.CM?.w)} · CV {wF(z.cargas?.CV?.w)} t/m), sin reacciones de apoyos. Los ejes ligados se revisan con la w de sus apoyos de RAM y cada apoyo con su reacción; las dos cargas no se suman.</div>
+          )}
           <div className="cim-ejes-lista">
-            <div><b>1</b><span>el del diseño{z.origen?.ram?.nudos ? ` · nudos ${z.origen.ram.nudos.join(', ')}` : ''}</span></div>
+            <div data-testid="cim-eje-1"><b>1</b><span>el del diseño{z.origen?.ram?.nudos ? ` · nudos ${z.origen.ram.nudos.join(', ')}` : ''}{z.tipo === 'corrida' ? (z.origen?.ram ? ` · w de sus apoyos: CM ${wF(z.cargas?.CM?.w)} · CV ${wF(z.cargas?.CV?.w)} t/m` : ` · w capturado: CM ${wF(z.cargas?.CM?.w)} · CV ${wF(z.cargas?.CV?.w)} t/m`) : ''}</span></div>
             {z.ejes.map((e, i) => (
               <div key={i} data-testid={`cim-eje-${i + 2}`}>
-                <b>{i + 2}</b><span>{etiquetaEje(e, i)}{e.L ? ` · L = ${Number(e.L).toFixed(2)} m` : e.Lz ? ` · ${Number(e.Lz).toFixed(2)} m` : ''}{e.pos === 'lindero' ? ' · de lindero' : ''}</span>
+                <b>{i + 2}</b><span>{e.nudos?.length ? `nudos ${e.nudos.join(', ')}` : etiquetaEje(e, i)}{e.L ? ` · L = ${Number(e.L).toFixed(2)} m` : e.Lz ? ` · ${Number(e.Lz).toFixed(2)} m` : ''}{e.pos === 'lindero' ? ' · de lindero' : ''}{z.tipo === 'corrida' && e.cargas ? ` · w de sus apoyos: CM ${wF(e.cargas.CM?.w)} · CV ${wF(e.cargas.CV?.w)} t/m${e.apoyos?.length ? ', y cada apoyo con su reacción' : ''}` : ''}</span>
                 <button className="cim-mini" title="Quitar este eje" onClick={() => set({ ejes: z.ejes.filter((_, j) => j !== i) })}>✕</button>
               </div>
             ))}
@@ -235,6 +240,11 @@ export default function CimForm({ z, set, obra, onProponer, onDuplicar, onBorrar
         </Bloque>
         <Bloque titulo="Cargas del muro (servicio, por metro)">
           <Cargas z={z} set={set} campos={[{ k: 'w', t: 'w (t/m)' }, { k: 'M', t: 'M (t·m/m)' }]} />
+          <div className="cim-nota" data-testid="cim-cargas-origen">
+            {z.origen?.ram
+              ? `w = Σ de las reacciones de ${z.origen.ram.apoyos?.length || z.origen.ram.nudos?.length || 'sus'} apoyos de RAM / ${wF(g.Lz)} m. ${z.origen.ram.apoyos?.length ? 'Cada apoyo se revisa además con su reacción (ver «Cada apoyo con su reacción»).' : 'Sin el detalle por apoyo: vuelve a crearla desde RAM para revisarlos uno por uno.'} La carga de los muros que baja por la malla de placas no viene del modelo.`
+              : `Se revisa con este w por metro capturado; no se revisa contra reacciones de apoyos.${z.ejes?.length ? ' Los ejes ligados desde RAM se revisan con lo suyo (ver «Ejes»).' : ''}`}
+          </div>
         </Bloque>
       </>}
 

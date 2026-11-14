@@ -16,7 +16,7 @@ const CRIT = [
   { k: 'fcEmpuje', t: 'Factor del empuje', paso: 0.1 },
   { k: 'fsVolteo', t: 'FS volteo', paso: 0.1 },
   { k: 'fsDesl', t: 'FS deslizamiento', paso: 0.1 },
-  { k: 'hMin', t: 'Peralte mínimo', u: 'cm', paso: 5 },
+  { k: 'dMin', t: 'Peralte efectivo mínimo', u: 'cm', paso: 1, titulo: 'd ≥ 15 cm (NTC-C 9.4.6.1): d = h − recubrimiento − ½ db' },
   { k: 'Bmin', t: 'Ancho mínimo', u: 'm', paso: 0.05 },
   { k: 'DfMin', t: 'Desplante mínimo', u: 'm', paso: 0.05, titulo: 'Df de los cimientos y enterrado de los muros' },
   { k: 'sMin', t: 'Separación mínima', u: 'cm', paso: 2.5 },

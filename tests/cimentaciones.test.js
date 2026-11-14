@@ -96,13 +96,20 @@ describe('núcleo de concreto', () => {
 describe('zapata aislada', () => {
   const obra = { suelo: { qadm: 11.3, gs: 1.5, Df: 0.8 } }
   const excel = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, B: 0.7, L: 0.7, h: 20, c1: 20, c2: 20 }, cargas: { CM: { P: 3.29, Mx: 0, My: 0 }, CV: { P: 0.91, Mx: 0, My: 0 } }, arm: { x: { num: 3, s: 23 }, y: { num: 3, s: 23 } } }
-  it('la céntrica de la hoja cumple con su armado (0.70 × 0.70, #3 @ 23)', () => {
+  it('la céntrica de la hoja cumple con su armado (0.70 × 0.70, #3 @ 23), salvo el peralte: d < 15 cm', () => {
     const R = revisarAislada(excel, obra)
     // centrada: N/A ≤ qe = 9.92 t/m² (9 920 kg/m²), como la hoja
     expect(chk(R, 'suelo').act).toBeCloseTo(4.2 / 0.49, 6)
     expect(chk(R, 'suelo').res).toBeCloseTo(9.92, 6)
     expect(valor(R, 'Capacidad efectiva')).toBeCloseTo(9.92, 6)
-    expect(R.ok).toBe(true)
+    // 3.11: h 20 con 5 cm y #3 en dos capas deja d = 20 − 5 − 0.95 − 0.48 = 13.6 cm < 15 (NTC-C 9.4.6.1)
+    expect(chk(R, 'peralte').res).toBeCloseTo(20 - 5 - 0.95 - 0.95 / 2, 2)
+    expect(chk(R, 'peralte').ok).toBe(false)
+    expect(R.checks.filter((c) => !c.ok).map((c) => c.id)).toEqual(['peralte'])
+    // con 5 cm más el peralte cumple (d = 18.6); el acero mínimo crece con h y #3 @ 23 ya no alcanza
+    const R25 = revisarAislada({ ...excel, geo: { ...excel.geo, h: 25 } }, obra)
+    expect(chk(R25, 'peralte').ok).toBe(true)
+    expect(R25.checks.filter((c) => !c.ok).map((c) => c.id)).toEqual(['flexionX', 'flexionY'])
   })
   it('lindero: con trabe de liga el suelo trabaja parejo; sin liga el área efectiva se desploma', () => {
     const z = { ...nuevaAislada(), geo: { ...nuevaAislada().geo, px: 'min', B: 1.5, L: 1.5 }, cargas: { CM: { P: 20 }, CV: { P: 8 } } }

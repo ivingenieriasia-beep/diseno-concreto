@@ -15,7 +15,7 @@
 import {
   CRITERIOS, SUELO, MAT, paso, check, f1, f2, f3, arriba, num,
   capacidadEfectiva, presiones, flexion, revisaParrilla, proponerParrilla,
-  cortante1D, anclaje, varilla, txtArm, parrilla, kgm, fmtS, GC, minimos, armEfectivo,
+  cortante1D, anclaje, varilla, txtArm, parrilla, kgm, fmtS, GC, minimos, armEfectivo, peralteMinimo, hParaD,
 } from './comun'
 import { nuevaCT, revisarCT, proponerCT } from './ct'
 
@@ -66,6 +66,22 @@ export function revisarCorrida(z, obra = {}, op = {}) {
   const off = lindero && !g.liga ? xm : 0
   const cmb = combinacionesCorrida(z.cargas, C)
   const checks = [], secciones = [], avisos = []
+
+  // ── de dónde salen las cargas ──
+  // capturadas por metro, o Σ de las reacciones de los apoyos de RAM entre el
+  // largo; en ese caso cada apoyo se revisa además con su reacción (abajo)
+  const apo = z.apoyosRam ?? z.origen?.ram?.apoyos ?? null
+  const deRam = z.fuenteW ? z.fuenteW === 'ram' : !!z.origen?.ram
+  const wTxt = `CM ${f2(num(z.cargas?.CM?.w))} · CV ${f2(num(z.cargas?.CV?.w))}${num(z.cargas?.S?.w) ? ` · S ${f2(num(z.cargas?.S?.w))}` : ''} t/m`
+  if (!op.sinApoyos) {
+    secciones.push({
+      titulo: 'Cargas del muro',
+      pasos: [deRam
+        ? paso('Origen de las cargas', 'w = Σ P de los apoyos / Lz', `${apo?.length ? `${apo.length} apoyos de RAM` : 'apoyos de RAM'} en ${f2(num(g.Lz))} m: ${wTxt}`, apo?.length ? 'cada apoyo se revisa también con su reacción' : 'sin el detalle por apoyo: vuelve a ligar los apoyos para revisarlos uno por uno', '')
+        : paso('Origen de las cargas', 'w por metro capturado', wTxt, 'no se revisa contra reacciones de apoyos', '')],
+    })
+    if (deRam) avisos.push('Las reacciones de RAM son solo las de los nudos con apoyo: la carga de los muros que baja por la malla de placas no viene en el modelo sincronizado. Revisa que la w de esta corrida incluya la del muro.')
+  }
 
   // ── suelo ──
   // con el peso de la zapata y el relleno por metro, W; con carga centrada es
@@ -181,10 +197,35 @@ export function revisarCorrida(z, obra = {}, op = {}) {
   // anclaje de la transversal
   const A = anclaje({ num: arm.t.num, s: arm.t.s, disponible: vuelo * 100 - r, fc, fy, r, AsReq: F.AsReq, AsProv: pT.As })
   checks.push(check('anclaje', 'Anclaje transversal', A.recto ? A.Ld : A.Ldh, A.disponible, 'cm', { grupo: 'Detallado', ok: A.ok, nota: A.recto ? 'recta' : A.gancho ? 'con gancho' : 'no se desarrolla' }))
-  checks.push(check('peralte', 'Peralte mínimo', C.hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${C.hMin} cm` }))
+  const pm = peralteMinimo(C, d, { sust: `= h − r − ½ db = ${f1(h)} − ${f1(r)} − ${f2(v.diam / 2)}` })
+  checks.push(pm.check)
   const mn = minimos(C, { B, Df: op.soloZapata ? null : Df, que: 'B' })
   checks.push(...mn.checks)
-  secciones.push({ titulo: 'Anclaje y mínimos', pasos: [...A.pasos, paso('Peralte mínimo', `h ≥ ${C.hMin} cm`, `h = ${f1(h)}`, h >= (C.hMin) ? 'cumple' : 'no cumple', '', { ok: h >= (C.hMin) }), ...mn.pasos] })
+  secciones.push({ titulo: 'Anclaje y mínimos', pasos: [...A.pasos, pm.paso, ...mn.pasos] })
+
+  // ── cada apoyo con su reacción ──
+  // la franja con w = P / Lt de cada apoyo: suelo, cortante, flexión y anclaje
+  let porApoyo = null
+  if (apo?.length && !op.sinApoyos) {
+    porApoyo = apo.map((p) => {
+      const Lt = Math.max(num(p.Lt), 0.1)
+      const w = cargasDeApoyoEnFranja(p)
+      const Ri = revisarCorrida({ ...z, cargas: w, apoyosRam: [], fuenteW: 'ram' }, obra, { soloZapata: true, sinApoyos: true })
+      const ks = Ri.checks.filter((c) => POR_APOYO.includes(c.id))
+      const u = Math.max(0, ...ks.map((c) => c.u).filter(Number.isFinite))
+      return { nudo: String(p.nudo), Lt, CM: num(p.CM), CV: num(p.CV), S: num(p.S), w: w.CM.w + w.CV.w, u, ok: ks.every((c) => c.ok), rige: ks.filter((c) => !c.ok).map((c) => c.titulo.toLowerCase()) }
+    })
+    // el que no cumple, el que más aprovecha y, si empatan (el acero mínimo), el más cargado
+    const peor = porApoyo.reduce((a, b) => ((a.ok && !b.ok) || (a.ok === b.ok && (b.u > a.u + 1e-9 || (Math.abs(b.u - a.u) <= 1e-9 && b.w > a.w))) ? b : a))
+    checks.push(check('apoyos', 'Cada apoyo con su reacción', Math.round(peor.u * 1000) / 10, 100, '%', { grupo: 'Suelo', ok: porApoyo.every((f) => f.ok), nota: `rige el nudo ${peor.nudo}` }))
+    secciones.push({
+      titulo: 'Cada apoyo con su reacción',
+      pasos: [
+        paso('Criterio', 'w = (P CM + P CV) / Lt', 'P: la reacción del apoyo en RAM · Lt: la mitad del claro a cada vecino, o el volado en la orilla', 'la franja se revisa con esa w: suelo, cortante, flexión y anclaje', ''),
+        ...porApoyo.map((f) => paso(`Nudo ${f.nudo}`, `(${f2(f.CM)} + ${f2(f.CV)}) / ${f2(f.Lt)}`, `CM ${f2(f.CM)} t · CV ${f2(f.CV)} t en ${f2(f.Lt)} m`, f.w, 't/m', { ok: f.ok, lim: `aprovecha ${f0c(f.u * 100)} %${f.rige.length ? ` · no cumple: ${f.rige.join(', ')}` : ''}` })),
+      ],
+    })
+  }
 
   // su contratrabe de liga (la dala de desplante), si el muro es de mampostería
   const CT = op.soloZapata ? null : revisarCT(z, obra, { t })
@@ -201,15 +242,40 @@ export function revisarCorrida(z, obra = {}, op = {}) {
   const ok = checks.every((c) => c.ok)
   return {
     tipo: 'corrida', ok, checks, secciones, avisos, cant,
-    datos: { B, h, t, d, xm, lindero, gancho: A.gancho, nL: pL.n, qu: uM.qu - uM.qd, q: sG.q, qe: sG.qe, W, As: F.As, AsReq: F.AsReq, AsL, arm, vuelo, ct: CT?.datos || null, Bmin: num(C.Bmin, 0.6) },
+    datos: { B, h, t, d, xm, lindero, gancho: A.gancho, nL: pL.n, qu: uM.qu - uM.qd, q: sG.q, qe: sG.qe, W, As: F.As, AsReq: F.AsReq, AsL, arm, vuelo, ct: CT?.datos || null, Bmin: num(C.Bmin, 0.6), porApoyo, deRam },
     resumen: `Zapata corrida ${lindero ? 'de lindero' : 'central'} de ${f2(B)} m × ${f1(h)} cm bajo muro de ${f1(t)} cm, `
       + `transversal ${txtArm(arm.t)}${A.gancho ? ' con gancho' : ''} y ${pL.n}#${arm.l.num} longitudinales, f′c = ${fc} kg/cm²`,
   }
 }
 const f0c = (v) => v.toFixed(0)
 
-export function proponerCorrida(z, obra = {}) {
+/** Lo que se revisa en cada apoyo: lo que depende de la carga */
+const POR_APOYO = ['suelo', 'cortante', 'flexion', 'anclaje']
+
+/** La w de un apoyo: su reacción repartida en su largo tributario */
+export function cargasDeApoyoEnFranja(p) {
+  const Lt = Math.max(num(p.Lt), 0.1)
+  return { CM: { w: num(p.CM) / Lt, M: 0 }, CV: { w: num(p.CV) / Lt, M: 0 }, S: { w: num(p.S) / Lt, M: 0 } }
+}
+
+/**
+ * Las cargas con las que se propone: las del eje y, si trae apoyos de RAM, la
+ * del apoyo que más pide en cada caso. Así lo propuesto cumple también apoyo
+ * por apoyo.
+ */
+export function cargasParaProponer(z) {
+  const apo = z.apoyosRam ?? z.origen?.ram?.apoyos ?? []
+  const out = { CM: { w: 0, M: 0, ...(z.cargas?.CM || {}) }, CV: { w: 0, M: 0, ...(z.cargas?.CV || {}) }, S: { w: 0, M: 0, ...(z.cargas?.S || {}) } }
+  for (const p of apo) {
+    const w = cargasDeApoyoEnFranja(p)
+    for (const k of ['CM', 'CV', 'S']) if (w[k].w > num(out[k].w)) out[k] = { ...out[k], w: w[k].w }
+  }
+  return out
+}
+
+export function proponerCorrida(z0, obra = {}) {
   const C = { ...CRITERIOS, ...(obra.criterios || {}) }
+  const z = { ...z0, cargas: cargasParaProponer(z0) }
   const t = num(z.geo.t, 15)
   let geo = { ...z.geo }
   let minB = Math.max(C.Bmin, arriba(t / 100 + 0.2, 0.05))
@@ -221,8 +287,9 @@ export function proponerCorrida(z, obra = {}) {
   const concOk = (R) => pasa(R, ['cortante', 'peralte']) && !R.secciones.some((s) => s.pasos.some((p) => p.v === 'no alcanza'))
   const sube = (v) => Math.round((v + 0.05) * 100) / 100
   const cal = [3, ...C.calibres.filter((n) => n !== 3)]
-  let h = Math.max(C.hMin, arriba(num(geo.h, 15), 5))
-  let hPiso = C.hMin                  // sólo sube: cuando el acero pide más peralte
+  const h0 = hParaD(C, r, cal[0])     // el primero que da d ≥ dMin con la varilla más chica
+  let h = Math.max(h0, arriba(num(geo.h, 15), 5))
+  let hPiso = h0                      // sólo sube: cuando el acero pide más peralte
   // mismo cierre que la aislada: suelo → peralte → varillas → se revisa todo
   // con las varillas elegidas, y lo que falle mueve B o h
   for (let v = 0; v < 40; v++) {

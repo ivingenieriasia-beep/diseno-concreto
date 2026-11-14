@@ -19,7 +19,7 @@
 import {
   CRITERIOS, SUELO, MAT, paso, check, f0, f1, f2, f3, arriba, num,
   capacidadEfectiva, presiones, flexion, revisaParrilla, proponerParrilla,
-  cortante1D, penetracion, aplastamiento, anclaje, peraltes, varilla, txtArm, parrilla, kgm, GC, minimos, armEfectivo,
+  cortante1D, penetracion, aplastamiento, anclaje, peraltes, varilla, txtArm, parrilla, kgm, GC, minimos, armEfectivo, peralteMinimo,
 } from './comun'
 import { nuevaCT, revisarCTAislada, proponerCT } from './ct'
 
@@ -336,11 +336,13 @@ export function revisarAislada(z, obra = {}, op = {}) {
   }
 
   // peralte, ancho y desplante mínimos
-  const hMin = C.hMin
-  checks.push(check('peralte', 'Peralte mínimo', hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${hMin} cm` }))
+  // d ≥ 15 cm con la capa de arriba, la de menos peralte
+  const vAb = varilla(abajoX ? arm.x.num : arm.y.num), vAr = varilla(abajoX ? arm.y.num : arm.x.num)
+  const pm = peralteMinimo(C, Math.min(dX, dY), { sust: `= h − r − db (abajo) − ½ db (arriba) = ${f1(h)} − ${f1(r)} − ${f2(vAb.diam)} − ${f2(vAr.diam / 2)}` })
+  checks.push(pm.check)
   const mn = minimos(C, { B: Math.min(B, L), Df: op.soloZapata ? null : Df, que: 'B, L' })
   checks.push(...mn.checks)
-  secciones.push({ titulo: 'Aplastamiento y mínimos', pasos: [...ap.pasos, paso('Peralte mínimo', `h ≥ ${hMin} cm`, `h = ${f1(h)}`, h >= hMin ? 'cumple' : 'no cumple', '', { ok: h >= hMin }), ...mn.pasos] })
+  secciones.push({ titulo: 'Aplastamiento y mínimos', pasos: [...ap.pasos, pm.paso, ...mn.pasos] })
 
   // su contratrabe de liga
   const CT = op.soloZapata ? null : revisarCTAislada(z, obra, ctSolic)

@@ -17,7 +17,7 @@ import { corridasMax } from '../propuesta'
 import {
   CRITERIOS, SUELO, MAT, paso, check, f1, f2, f3, arriba, abajo, num,
   capacidadEfectiva, flexion, revisaParrilla, proponerParrilla, parrilla,
-  cortante1D, anclaje, varilla, txtArm, kgm, GC, minimos, armEfectivo,
+  cortante1D, anclaje, varilla, txtArm, kgm, GC, minimos, armEfectivo, peralteMinimo, hParaD,
 } from './comun'
 
 export function nuevaContratrabe(nombre = 'ZT-1') {
@@ -294,10 +294,11 @@ export function revisarContratrabe(z, obra = {}) {
       paso('Longitudinales', `#${arm.long.num} @ ${arm.long.s}`, `${pL.n} varillas`, pL.As, 'cm²', { ok: okL, lim: `≥ ${f2(AsL)}` }),
     ],
   })
-  checks.push(check('peralte', 'Peralte de la losa', C.hMin, h, 'cm', { grupo: 'Detallado', nota: `h ≥ ${C.hMin} cm` }))
+  const pm = peralteMinimo(C, dA, { titulo: 'Peralte de la losa', sust: `= h − r − ½ db = ${f1(h)} − ${f1(r)} − ${f2(va.diam / 2)}` })
+  checks.push(pm.check)
   const mn = minimos(C, { B, Df, que: 'B' })
   checks.push(...mn.checks)
-  secciones.push({ titulo: 'Mínimos', pasos: mn.pasos })
+  secciones.push({ titulo: 'Mínimos', pasos: [pm.paso, ...mn.pasos] })
 
   const nE = Math.ceil(L * 100 / arm.est.s) + 1
   const perE = 2 * (bw - 2 * r) / 100 + 2 * (H - 2 * r) / 100 + 0.2
@@ -357,7 +358,7 @@ export function proponerContratrabe(z, obra = {}) {
   for (let v = 0; v < 8; v++) {
     let B = minB
     for (; B <= 6; B = Math.round((B + 0.05) * 100) / 100) if (ok(R0({ ...geo, B }), ['suelo'])) break
-    let h = C.hMin
+    let h = hParaD(C, r, z.arm?.alero?.num || 3)
     for (; h <= 80; h += 5) {
       const R = R0({ ...geo, B, h })
       if (ok(R, ['cortanteAlero']) && !R.secciones.some((s) => s.pasos.some((p) => p.v === 'no alcanza'))) break

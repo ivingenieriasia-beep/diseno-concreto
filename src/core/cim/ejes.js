@@ -9,7 +9,7 @@
 
 /** El cimiento con lo de un eje: sus cargas o columnas, su largo, su condición */
 export const APLICAR = {
-  corrida: (z, e) => ({ ...z, ejes: [], cargas: e.cargas || z.cargas, geo: { ...z.geo, Lz: e.Lz ?? z.geo.Lz, pos: e.pos ?? z.geo.pos } }),
+  corrida: (z, e) => ({ ...z, ejes: [], cargas: e.cargas || z.cargas, apoyosRam: e.apoyos || [], fuenteW: e.nudos?.length ? 'ram' : 'capturado', geo: { ...z.geo, Lz: e.Lz ?? z.geo.Lz, pos: e.pos ?? z.geo.pos } }),
   contratrabe: (z, e) => ({ ...z, ejes: [], columnas: e.columnas || z.columnas, geo: { ...z.geo, L: e.L ?? z.geo.L } }),
   liga: (z, e) => ({ ...z, ejes: [], columnas: e.columnas || z.columnas }),
 }
@@ -43,6 +43,16 @@ export function revisarEnEjes(revisar, z, obra) {
     }
     return peor.e ? { ...peor.c, nota: `${peor.c.nota ? `${peor.c.nota} · ` : ''}${etiquetaEje(peor.e, peor.i)}` } : c
   })
+  // las revisiones que sólo tienen los otros ejes (p. ej. «Cada apoyo con su
+  // reacción» de un eje ligado desde RAM a un diseño capturado): la del peor
+  const ids = new Set(base.checks.map((c) => c.id))
+  const extra = new Map()
+  for (const o of otros) for (const k of o.R.checks) {
+    if (ids.has(k.id)) continue
+    const p = extra.get(k.id)
+    if (!p || (p.c.ok && !k.ok) || (p.c.ok === k.ok && k.u > p.c.u + 1e-12)) extra.set(k.id, { c: k, e: o.e, i: o.i })
+  }
+  for (const { c, e, i } of extra.values()) checks.push({ ...c, nota: `${c.nota ? `${c.nota} · ` : ''}${etiquetaEje(e, i)}` })
   const gov = todos.reduce((a, b) => ((a.R.ok && !b.R.ok) || (a.R.ok === b.R.ok && u(b.R) > u(a.R)) ? b : a))
   const tabla = {
     titulo: `En sus ${todos.length} ejes`,

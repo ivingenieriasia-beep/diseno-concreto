@@ -9,7 +9,7 @@ import { nuevaContencion, revisarContencion, proponerContencion } from './conten
 import { nuevaGravedad, revisarGravedad, proponerGravedad } from './gravedad'
 import { nuevaMamposteria, revisarMamposteria, proponerMamposteria } from './mamposteria'
 import { nuevaLiga, revisarLiga, proponerLiga } from './liga'
-import { revisarEnEjes, proponerEnEjes } from './ejes'
+import { revisarEnEjes, proponerEnEjes, etiquetaEje } from './ejes'
 
 // los que se pueden repetir en varios ejes: se revisan y se proponen en todos
 const multi = (revisar, proponer) => ({
@@ -36,6 +36,25 @@ export function revisarCim(z, obra) {
   } catch (e) {
     console.error(e)
     return { tipo: z.tipo, ok: false, checks: [], secciones: [], avisos: [`No se pudo revisar: ${e.message}`], cant: {}, datos: null, resumen: '', error: true }
+  }
+}
+
+/**
+ * «＋ en este eje» (3.11): liga los apoyos de un eje a un diseño que ya existe
+ * SIN cambiar su sección ni su armado, y lo revisa en todos sus ejes. Si
+ * alguno no cumple lo dice; redimensionar queda para ⚡ Proponer.
+ * @returns { cambios, R, ok, mensaje } — `cambios` sólo trae `ejes`
+ */
+export function ligarEje(z, e, obra) {
+  const ejes = [...(z.ejes || []), e]
+  const R = revisarCim({ ...z, ejes }, obra)
+  const k = ejes.length + 1
+  const malos = (R.porEje || []).filter((x) => !x.ok).map((x) => (x.e ? etiquetaEje(x.e, x.i) : 'el eje del diseño'))
+  const base = `${z.nombre}: ${e.nudos.length} apoyos ligados como eje ${k} (nudos ${e.nudos.join(', ')}); la sección y el armado no cambiaron`
+  return {
+    cambios: { ejes }, R, ok: R.ok,
+    mensaje: R.ok ? `${base} y cumple en sus ${k} ejes`
+      : `${base}. No cumple en ${malos.join(', ') || 'algún eje'}: ábrelo y usa ⚡ Proponer si quieres que la app lo redimensione`,
   }
 }
 
