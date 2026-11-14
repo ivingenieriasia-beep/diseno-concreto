@@ -32,6 +32,22 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.11',
+    fecha: '2026-11-14',
+    lema: 'Cimentaciones: el peralte mínimo es d ≥ 15 cm, y «＋ en este eje» sólo liga y revisa cada apoyo con su reacción.',
+    destacados: [],
+    cambios: [
+      { tipo: 'arreglo', texto: 'Peralte mínimo de zapatas (NTC-C 9.4.6.1): se revisa d ≥ 15 cm, con d = h − recubrimiento − ½ db (en la aislada, la capa de arriba), en corridas, aisladas y la losa de las corridas con contratrabe. Antes se revisaba h ≥ 15 cm, que con 5 cm de recubrimiento deja d ≈ 9.5 cm. En pantalla y en la memoria sale «d ≥ 15 cm». En «Suelo y criterios», «Peralte mínimo» pasa a «Peralte efectivo mínimo» (15 cm). Hallazgo del Diseñador de concreto; pedido del Ing. Fernando Burgos.' },
+      { tipo: 'arreglo', texto: '⚡ Proponer ya no deja un peralte que no cumpla: arranca en el h que da d ≥ 15 cm (con 5 cm de recubrimiento y #3, 20.5 cm, que en pasos de 5 cm queda en 25).' },
+      { tipo: 'arreglo', texto: '«＋ en este eje» (Desde RAM) sólo liga los apoyos como otro eje: no cambia la sección ni el armado. Revisa el diseño en todos sus ejes y, si alguno no cumple, lo dice; redimensionar queda para ⚡ Proponer. Antes lo volvía a proponer desde el mínimo y podía bajar un diseño aprobado. Hallazgo del Diseñador de concreto; pedido del Ing. Fernando Burgos.' },
+      { tipo: 'nuevo', texto: 'Corridas desde RAM: cada apoyo se revisa con su reacción repartida en su largo tributario (la mitad del claro a cada vecino, o el volado en la orilla): suelo, cortante, flexión y anclaje. Sale en la memoria («Cada apoyo con su reacción»), en las revisiones («rige el nudo …») y en la planta de «Desde RAM», con el % de cada apoyo.' },
+      { tipo: 'mejora', texto: 'La corrida dice de dónde salen sus cargas: «w por metro capturado» (no se revisa contra reacciones) o «Σ P de los apoyos / Lz». En el bloque «Ejes» se ven los nudos de cada eje y su w. Con cargas de RAM avisa que la carga de los muros que baja por la malla de placas no viene en el modelo sincronizado.' },
+      { tipo: 'mejora', texto: 'Una corrida capturada a mano con ejes ligados desde RAM ya se dibuja en la planta de «Desde RAM».' },
+      { tipo: 'mejora', texto: 'Columnas y trabes no cambian: el D/C es el de la 3.10.' },
+    ],
+    aviso: 'Es una propuesta: no se usa en un proyecto hasta que un ingeniero la valide. Los cimientos guardados con h 15 o 20 cm ahora salen «no cumple» en el peralte; vuelve a revisarlos. Los ejes ligados en la 3.10 no traen el detalle por apoyo: vuelve a ligarlos.',
+  },
+  {
     version: '3.10',
     fecha: '2026-11-13',
     lema: 'Columnas: la superficie 3D completa del eje inclinado y el desglose del método general.',
