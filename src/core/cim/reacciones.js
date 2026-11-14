@@ -28,8 +28,12 @@ export const PAPELES = [
   { id: 'CM', t: 'muerta (CM)' },
   { id: 'CV', t: 'viva (CV)' },
   { id: 'S', t: 'sismo (S)' },
+  { id: 'CVmed', t: 'viva media (asentamientos)' },
   { id: 'no', t: 'no usar' },
 ]
+
+/** Papeles que entran al diseño (CM, CV, S); la viva media sólo a los asentamientos */
+const DE_DISENO = new Set(['CM', 'CV', 'S'])
 
 const LATERAL = /SISM|SEISM|QUAKE|EARTH|VIENTO|WIND|^S[XYZ]\b|^CS[XYZ]|^S[XYZ]\d|^E[XYZ]\b/i
 
@@ -40,7 +44,7 @@ export function papelesPorDefecto(casos) {
     const t = `${c.categoria || ''} ${c.id || ''} ${c.descripcion || ''}`.toUpperCase()
     if (LATERAL.test(t) || LATERAL.test(String(c.id))) out[c.id] = /VIENTO|WIND/.test(t) ? 'no' : 'S'
     else if (/DEAD|MUERT|PERMAN|PESO PROPIO|SELF|SOBREIMP/.test(t) || /^(CM|PP|D|DL|SD|SDL|CMA|CMS)\d*$/i.test(c.id)) out[c.id] = 'CM'
-    else if (/LIVE|VIVA/.test(t) || /^(CV|L|LL|CVM)\d*$/i.test(c.id)) out[c.id] = /MEDIA|INSTANT|ACCID|^CVA/i.test(t) ? 'no' : 'CV'
+    else if (/LIVE|VIVA/.test(t) || /^(CV|L|LL|CVM)\d*$/i.test(c.id)) out[c.id] = /MEDIA|\bCVMED\b/i.test(t) ? 'CVmed' : /INSTANT|ACCID|^CVA/i.test(t) ? 'no' : 'CV'
     else out[c.id] = 'no'
   }
   return out
@@ -103,7 +107,7 @@ export function cargasDeApoyo(a, papeles, up = 'y') {
   const out = { CM: VACIA(), CV: VACIA(), S: VACIA() }
   for (const [caso, r] of Object.entries(a.por || {})) {
     const p = papeles[caso]
-    if (!p || p === 'no') continue
+    if (!DE_DISENO.has(p)) continue
     const c = aZapata(r, up, planoDe(up))
     if (p === 'S') {
       // varios sismos (x, z): el que más pesa en cada componente; su sentido
@@ -114,6 +118,19 @@ export function cargasDeApoyo(a, papeles, up = 'y') {
     for (const k of COMP) out[p][k] += c[k]
   }
   return out
+}
+
+/**
+ * La carga viva media de un apoyo (los casos con el papel «viva media»), sólo
+ * para los asentamientos; null si ningún caso tiene ese papel.
+ */
+export function vivaMediaDeApoyo(a, papeles, up = 'y') {
+  let P = null
+  for (const [caso, r] of Object.entries(a.por || {})) {
+    if (papeles[caso] !== 'CVmed') continue
+    P = (P ?? 0) + aZapata(r, up, planoDe(up)).P
+  }
+  return P
 }
 
 /** El sismo de un apoyo caso por caso, con su signo: { caso: { P, Mx, My, Vx, Vy } } */

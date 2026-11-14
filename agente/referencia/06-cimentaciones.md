@@ -14,6 +14,7 @@ Lo básico del estado:
 - Título **Cimentaciones** con el contador: "N cimiento(s) · M no cumplen" o "· todos cumplen".
 - **🪨 Suelo y criterios** con la etiqueta `qadm 15.0` (el qadm vigente) [cim-obra-btn]: abre el modal de la obra.
 - **⚡ Desde RAM** [cim-ram-btn]: abre la ventana de reacciones.
+- **📉 Asentamientos** [cim-asent-btn]: abre el apartado de asentamientos (§6 bis, desde la 3.12).
 - **📄 Memoria PDF** [cim-pdf]: PDF del cimiento seleccionado. Se desactiva si no hay ninguno.
 - **todos** [cim-pdf-todos]: PDF de todos los cimientos. Necesita al menos 2.
 - **DXF** [cim-dxf]: el seleccionado. **DXF todos** [cim-dxf-todos] necesita al menos 2.
@@ -283,6 +284,8 @@ Además del cuadro:
 - **Calibres que se prueban al proponer**: botones #3, #4, #5, #6 y #8. De fábrica están encendidos #4, #5, #6 y #8, y al menos uno queda encendido siempre.
 - **valores de fábrica**: regresa los criterios que cambiaste.
 
+**Asentamientos** [obra-asent], cerrado al abrir: los mismos datos del apartado 📉 Asentamientos (§6 bis). Ninguno tiene valor de fábrica.
+
 **Mínimos de 0.60 m:**
 - Los campos B y Df no aceptan menos de Ancho mínimo y Desplante mínimo.
 - ⚡ Proponer no baja de ahí.
@@ -338,8 +341,8 @@ En los muros de piedra y en el cimiento de mampostería no hay varillas que edit
 - Un clic en el fondo la cierra.
 
 **Columna izquierda: Papel de cada caso.**
-- Hay un select por caso [cim-papel-{caso}] con las opciones muerta (CM), viva (CV), sismo (S) y no usar.
-- El papel sale del nombre del caso: sismo para SISM/SX/EX…; viento queda en no usar; muerta para DEAD/CM/PP/SD…; viva para LIVE/CV/L, salvo la viva media o instantánea, que queda en no usar.
+- Hay un select por caso [cim-papel-{caso}] con las opciones muerta (CM), viva (CV), sismo (S), viva media (asentamientos) y no usar.
+- El papel sale del nombre del caso: sismo para SISM/SX/EX…; viento queda en no usar; muerta para DEAD/CM/PP/SD…; viva para LIVE/CV/L. La viva media (MEDIA o CVmed) queda en «viva media (asentamientos)», que sólo usan los asentamientos: no entra al diseño. La instantánea o accidental queda en no usar.
 - Lo que elijas se recuerda en el navegador (`auxiv.cim.ram.papeles`).
 - Si sale [cim-ram-sincasos], el modelo sólo trae combinaciones: hay que volver a generar sincronizar.py.
 
@@ -373,6 +376,67 @@ En los muros de piedra y en el cimiento de mampostería no hay varillas que edit
   - En la vista Cimentación, cada apoyo de una corrida lleva su propio % con su reacción en su largo tributario; el globo dice "… con su reacción (CM … + CV … t en … m)".
 
 **Después de crear.** El aviso dice "Zapatas aisladas: Z-1, Z-2 desde las reacciones de RAM, ya dimensionados y armados". Si había apoyos con cimiento, agrega "· ojo: N apoyo(s) ya tenían cimiento". La selección se limpia y la vista pasa a Cimentación.
+
+---
+
+## 6 bis. Apartado 📉 Asentamientos [cim-asent] (desde la 3.12)
+
+Pedido por FB: ver en una malla cómo se va a asentar la cimentación, evaluar el efecto en las trabes de liga y ver qué está calculando la app.
+
+**Qué entra.** Las corridas que salieron de RAM y sus ejes ligados (necesitan posición en planta). Las corridas capturadas sin ejes de RAM no entran y se dice [asent-sinpos]. Las aisladas no entran.
+
+**Columna izquierda: datos** [asent-datos], los mismos de Suelo y criterios:
+- **Modelo del suelo** [asent-modelo]: elástico, semiespacio con E y ν; o Winkler, con ks.
+- **Estratos** [asent-estrato-{id}], con nombre, E (t/m²), ν y ks (t/m³); **＋ estrato** [asent-mas-estrato]. **Toda la obra sobre** [asent-base].
+- **Zonas o tramos sobre otro estrato:**
+  - ＋ zona: un rectángulo en planta, con las coordenadas del modelo de RAM en m [asent-mas-zona];
+  - ＋ tramo de eje: una corrida y su eje [asent-mas-tramo].
+- **Asentamiento medio permisible** [asent-limMedio], en mm, y la zona y el caso para la memoria [asent-limMedioNota]. Los botones dan los de zona I: aislada 50 mm y colindante 25 mm. En otra zona se captura su valor.
+- **Distorsión permisible** [asent-dist-{valor}]: 0.001, 0.0015, 0.002, 0.0025 o 0.003.
+- **Carga de cada franja** [asent-carga], de servicio, CM + CV media:
+  - la w del diseño;
+  - las reacciones de los apoyos, cada una en su tributario;
+  - las dos sumadas.
+  - Con la w, se pide la w CV media de cada corrida [asent-wCVmed-{nombre}].
+- **Usar la CV máxima donde falte la media** [asent-cvMax], del lado seguro.
+- **Inercia agrietada Ie/Ig** [asent-fInercia] y **Factor de carga del hundimiento** [asent-fcAsent].
+- Debajo, el papel de cada caso de RAM [asent-papel-{caso}], el mismo de Desde RAM.
+
+**Sin datos no calcula.** El centro dice "Sin estos datos no se calcula:" y la lista de lo que falta [asent-faltan].
+
+**Centro:**
+- **Planta** [asent-vista-planta]:
+  - cada panel de ≈ 0.25 m de la franja con su color (azul poco, rojo mucho) y la escala en mm;
+  - la deformada exagerada sobre el eje;
+  - cada tramo entre apoyos en verde o rojo con su distorsión;
+  - cada apoyo con su δ en mm.
+- **3D** [asent-vista-3d]: la misma malla hundida, en isométrica, con la de referencia punteada.
+- **Memoria paso a paso** [asent-vista-memoria].
+- **Escenario:** «todo sobre un estrato» [asent-esc-base] o «con zonas» [asent-esc-zonas].
+- **deformada** [asent-exag]: multiplica la exageración automática; el máximo se ve como el 12 % de la planta.
+- Al pasar el cursor por un panel o un tramo salen sus números.
+
+**Derecha:**
+- **Revisiones:**
+  - Asentamiento medio contra el permisible;
+  - Distorsión entre apoyos contra el límite;
+  - Momento inducido y Cortante inducido contra MR y VR, en la CT de cada corrida y en las ligas.
+- **Salidas:** 📄 Memoria PDF [asent-pdf], Imagen (SVG) de la vista [asent-svg] y DXF de la planta deformada a escala real [asent-dxf].
+
+**Cómo calcula** (sale igual en la memoria):
+- **Presión:** q = (wCM + wCV media) / B.
+  - Con apoyos: w = (P CM + P CV media) / Lt, en su tributario: la mitad del claro a cada vecino, o el volado en la orilla.
+- **Elástico:** δ = (1 − ν²)/E · Σ q·I. I es el rectángulo flexible con la fórmula de la esquina, (1/π)[a ln((b + r)/a) + b ln((a + r)/b)]. Todos los paneles se influyen entre sí.
+- **Winkler:** δ = q / ks.
+- **Asentamiento medio:** Σ δ ds / Σ ds. **Distorsión:** |δb − δa| / L entre apoyos consecutivos.
+- **CT y ligas:** M = FC · 6 EI Δ / L² y V = FC · 12 EI Δ / L³ (empotrada-empotrada), con EI = Ec · (Ie/Ig) · Ig.
+  - Ec es la de Deflexiones.
+  - MR y VR, igual que en la liga.
+  - Es sólo el efecto del diferencial: no se suma a la gravedad.
+- **Simplificaciones:**
+  - la corrida es flexible;
+  - el semiespacio no tiene capas: con zonas, cada punto usa el E y ν de su estrato;
+  - el asentamiento va sobre el eje.
 
 ---
 

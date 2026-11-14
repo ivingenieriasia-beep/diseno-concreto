@@ -60,6 +60,7 @@ export default function App() {
   const sueloObra = useCimStore((s) => s.suelo)
   const criteriosObra = useCimStore((s) => s.criterios)
   const linderosObra = useCimStore((s) => s.linderos)
+  const asentObra = useCimStore((s) => s.asent)
   const cargarCim = useCimStore((s) => s.cargar)
   const empacarCim = useCimStore((s) => s.empacar)
   const [dxfScale, setDxfScale] = useState(1)
@@ -114,7 +115,7 @@ export default function App() {
   useEffect(() => {
     if (!restored.current) return
     autosave(packProject({ projectName, dxfScale, sections, columns, cargas: packCargas(), model, rutaRam, cimentacion: empacarCim() }))
-  }, [projectName, dxfScale, sections, columns, model, rutaRam, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas, cimientos, sueloObra, criteriosObra, linderosObra, empacarCim])
+  }, [projectName, dxfScale, sections, columns, model, rutaRam, losasCarga, murosCarga, tablerosCarga, unidadCarga, packCargas, cimientos, sueloObra, criteriosObra, linderosObra, asentObra, empacarCim])
 
   // Las pestañas de módulos abiertas se recuerdan entre sesiones
   useEffect(() => { guardarAbiertos(modulos) }, [modulos])

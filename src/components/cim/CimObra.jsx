@@ -3,6 +3,7 @@ import { Num, Bloque, Check } from './campos'
 import { SUELO, CRITERIOS, f2 } from '../../core/cim/comun'
 import { meyerhof } from '../../core/cim/suelo'
 import { CAMPO_SUELO } from './CimForm'
+import AsentDatos from './AsentDatos'
 
 // El suelo de la obra (del estudio de mecánica de suelos) y los criterios de
 // diseño, compartidos por todos los cimientos. Con la hoja «Capacidad Suelo»
@@ -95,6 +96,9 @@ export default function CimObra({ suelo, criterios, setSuelo, setCriterios, onCl
               </span>
             </label>
             <button className="cim-mini" style={{ marginTop: 8 }} onClick={() => setCriterios(Object.fromEntries(Object.keys(criterios).map((k) => [k, CRITERIOS[k]])))}>valores de fábrica</button>
+          </Bloque>
+          <Bloque titulo="Asentamientos (estratos, límites y criterio)" abierto={false} testid="obra-asent">
+            <AsentDatos />
           </Bloque>
         </div>
       </div>

@@ -7,6 +7,7 @@ import CimDetallador from './cim/CimDetallador'
 import CimRevisiones, { CimMemoria } from './cim/CimRevisiones'
 import CimObra from './cim/CimObra'
 import CimRam from './cim/CimRam'
+import CimAsent from './cim/CimAsent'
 import { exportarPlanos, exportarMemoriaPdf } from '../core/cim/salidas'
 
 // Cimentaciones: aisladas, corridas (bajo muro y con contratrabe), muros de
@@ -44,6 +45,7 @@ export default function CimentacionesView({ onToast, dxfScale = 1, projectName =
   const [menu, setMenu] = useState(false)
   const [obraAbierta, setObraAbierta] = useState(false)
   const [ram, setRam] = useState(false)
+  const [asentAbierto, setAsentAbierto] = useState(false)
   const raiz = useRef(null)
 
   const obra = useMemo(() => ({ suelo, criterios }), [suelo, criterios])
@@ -113,6 +115,7 @@ export default function CimentacionesView({ onToast, dxfScale = 1, projectName =
             🪨 Suelo y criterios <span className="cim-q">qadm {Number(suelo.qadm ?? SUELO.qadm).toFixed(1)}</span>
           </button>
           <button className="btn btn-secondary" data-testid="cim-ram-btn" onClick={() => setRam(true)} title="Crear cimientos con las reacciones de los apoyos del modelo de RAM">⚡ Desde RAM</button>
+          <button className="btn btn-secondary" data-testid="cim-asent-btn" onClick={() => setAsentAbierto(true)} title="Cómo se asienta la cimentación: malla, deformada, distorsión y efecto en la CT y las ligas">📉 Asentamientos</button>
           <span className="cim-sep" />
           <button className="btn btn-secondary" data-testid="cim-pdf" disabled={!z} onClick={() => memoria(false)} title="Memoria paso a paso del cimiento seleccionado">📄 Memoria PDF</button>
           <button className="btn btn-secondary" data-testid="cim-pdf-todos" disabled={cimientos.length < 2} onClick={() => memoria(true)} title="Memoria de todos los cimientos, con su tabla resumen">todos</button>
@@ -187,6 +190,7 @@ export default function CimentacionesView({ onToast, dxfScale = 1, projectName =
 
       {obraAbierta && <CimObra suelo={suelo} criterios={criterios} setSuelo={setSuelo} setCriterios={setCriterios} onClose={() => setObraAbierta(false)} />}
       {ram && <CimRam obra={obra} onClose={() => setRam(false)} onToast={onToast} />}
+      {asentAbierto && <CimAsent dxfScale={dxfScale} projectName={projectName} onClose={() => setAsentAbierto(false)} onToast={onToast} />}
     </div>
   )
 }

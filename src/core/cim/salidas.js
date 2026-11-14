@@ -13,6 +13,7 @@ import { revisarCim, tipoCim } from './index'
 import { planosSvg, dibujoParaExportar, dibujoParaDocumento, baseNombre, sello } from './planos'
 import { svgParaDxf } from './lienzo'
 import { SUELO, f2 } from './comun'
+import { dibujoAsent, svgAsent } from './asentDibujo'
 export { dibujoParaExportar, dibujoParaDocumento, planosSvg } from './planos'
 import { svgToDxf } from '../svgToDxf'
 import { svgToPng } from '../generateMemoria'
@@ -206,4 +207,56 @@ export async function exportarMemoriaPdf(lista, obra, { projectName = '' } = {})
   const nombre = `${baseNombre(projectName, una ? lista[0].nombre : 'todos')}-memoria-${sello()}.pdf`
   const r = await guardarSalida(nombre, doc.output('blob'), { sub: 'memoria', mime: 'application/pdf' })
   return `Memoria de ${una ? lista[0].nombre : `${lista.length} cimientos`} (${doc.getNumberOfPages()} págs.) ${r.donde === 'carpeta' ? dondeQuedo(r) : 'descargada'}`
+}
+
+// ── Asentamientos (3.12) ─────────────────────────────────────
+
+/** La memoria PDF de los asentamientos: datos, planta, 3D, revisiones y cada paso */
+export async function memoriaAsentPdf(res, { projectName = '', zonas = [] } = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter', compress: true })
+  prepararFuentes(doc)
+  const ctx = { m: 16, ancho: doc.internal.pageSize.getWidth(), alto: doc.internal.pageSize.getHeight(), y: 0, pag: 1, proyecto: projectName, fecha: new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) }
+  ctx.y = ctx.m + 8
+  encabezado(doc, ctx)
+  parrafo(doc, ctx, 'Asentamientos de la cimentación', { tam: 16, negrita: true, despues: 1 })
+  parrafo(doc, ctx, `${projectName || 'Proyecto sin nombre'} · ${res.escenario === 'zonas' ? 'con las zonas sobre otro estrato' : 'todo sobre el estrato de la obra'}`, { tam: 10, color: [107, 103, 96], despues: 3 })
+  parrafo(doc, ctx, res.ok ? '✓ Cumple las revisiones de asentamientos' : `✗ No cumple: ${res.checks.filter((c) => !c.ok).map((c) => c.titulo.toLowerCase()).join(', ')}`, { tam: 9.5, negrita: true, color: res.ok ? [21, 128, 61] : [198, 40, 40], despues: 2 })
+  for (const vista of ['planta', '3d']) {
+    const d = dibujoAsent(res, { vista, W: 1000, H: 640, zonas })
+    if (d) await imagen(doc, ctx, svgAsent(d, { fuente: 'DejaVu Sans Mono, monospace' }), d.W, d.H, 112)
+  }
+  parrafo(doc, ctx, 'Revisiones', { tam: 10.5, negrita: true, antes: 1 })
+  tabla(doc, ctx, [{ t: 'Revisión', w: 72 }, { t: 'Actuante', w: 40, align: 'right' }, { t: 'Resistente / límite', w: 50, align: 'right' }, { t: 'Aprov.', w: 21.9, align: 'right' }], filasRevision(res))
+  for (const s of res.secciones) {
+    parrafo(doc, ctx, s.titulo, { tam: 9.8, negrita: true, antes: 3, despues: 1 })
+    tabla(doc, ctx, [
+      { t: 'Concepto', w: 44 }, { t: 'Fórmula', w: 56, font: 'DejaVuMono' }, { t: 'Sustitución', w: 50, font: 'DejaVuMono' }, { t: 'Resultado', w: 33.9, align: 'right' },
+    ], s.pasos.map((p) => [[p.t, p.f, p.n, `${fmtV(p.v, p.u)}${p.ok != null ? (p.ok ? ' ✓' : ' ✗') : ''}${p.lim ? `\n${p.lim}` : ''}${p.nota ? `\n${p.nota}` : ''}`],
+      { colores: [null, [74, 70, 64], [107, 103, 96], p.ok === false ? [198, 40, 40] : p.ok ? [21, 128, 61] : [26, 24, 20]] }]), { tam: 7.2 })
+  }
+  const n = doc.getNumberOfPages()
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i); doc.setFont('DejaVu', 'normal'); doc.setFontSize(7.5); doc.setTextColor(135, 145, 139)
+    doc.text(`${i} / ${n}`, ctx.ancho - ctx.m, ctx.alto - 8, { align: 'right' })
+  }
+  return doc
+}
+
+/** Salidas del apartado: 'pdf' (memoria), 'svg' (imagen de la vista) o 'dxf' (planta a escala real) */
+export async function exportarAsent(res, { formato = 'pdf', vista = 'planta', exag = 1, dxfScale = 1, projectName = '', zonas = [] } = {}) {
+  const base = baseNombre(projectName, 'asentamientos')
+  if (formato === 'pdf') {
+    const doc = await memoriaAsentPdf(res, { projectName, zonas })
+    const r = await guardarSalida(`${base}-${sello()}.pdf`, doc.output('blob'), { sub: 'memoria', mime: 'application/pdf' })
+    return `Memoria de asentamientos (${doc.getNumberOfPages()} págs.) ${r.donde === 'carpeta' ? dondeQuedo(r) : 'descargada'}`
+  }
+  if (formato === 'svg') {
+    const d = dibujoAsent(res, { vista, exag, W: 1400, H: 900, zonas })
+    const r = await guardarSalida(`${base}-${vista}.svg`, svgAsent(d), { sub: 'planos', mime: 'image/svg+xml' })
+    return `Imagen de los asentamientos (${vista === '3d' ? '3D' : 'planta'}) ${r.donde === 'carpeta' ? dondeQuedo(r) : 'descargada'}`
+  }
+  const d = dibujoAsent(res, { vista: 'planta', exag, dxf: true, zonas })
+  const dxf = svgToDxf(svgParaDxf(d), { scaleFactor: dxfScale })
+  const r = await guardarSalida(`${base}.dxf`, dxf, { sub: 'planos', mime: 'application/dxf' })
+  return `DXF de la planta deformada a escala real${dxfScale !== 1 ? ` × ${dxfScale}` : ''} (la deformada, exagerada) · ${r.donde === 'carpeta' ? dondeQuedo(r) : 'descargado'}`
 }

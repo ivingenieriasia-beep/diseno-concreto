@@ -31,6 +31,7 @@ const useCimStore = create((set, get) => ({
   suelo: {},          // lo capturado de la obra; lo que falte sale de SUELO
   criterios: {},      // lo cambiado de CRITERIOS
   linderos: {},       // lados de la planta que son colindancia: { 'x-min': true, … } (ejes de la zapata)
+  asent: {},          // datos de los asentamientos (3.12): el ingeniero los captura; nada de fábrica
   hist: [],
 
   obra: () => ({ suelo: get().suelo, criterios: get().criterios }),
@@ -110,17 +111,18 @@ const useCimStore = create((set, get) => ({
   setSuelo: (patch) => set((s) => ({ suelo: { ...s.suelo, ...patch } })),
   setCriterios: (patch) => set((s) => ({ criterios: { ...s.criterios, ...patch } })),
   setLinderos: (patch) => set((s) => ({ linderos: { ...s.linderos, ...patch } })),
+  setAsent: (patch) => set((s) => ({ asent: { ...s.asent, ...patch } })),
 
   /** Del .json del proyecto (o del autoguardado) */
   cargar: (data) => {
     const d = data || {}
     const cimientos = Array.isArray(d.cimientos) ? d.cimientos.map((z) => conUid(alDia(z))) : []
-    set({ cimientos, suelo: d.suelo || {}, criterios: d.criterios || {}, linderos: d.linderos || {}, selUid: cimientos[0]?.uid ?? null, hist: [] })
+    set({ cimientos, suelo: d.suelo || {}, criterios: d.criterios || {}, linderos: d.linderos || {}, asent: d.asent || {}, selUid: cimientos[0]?.uid ?? null, hist: [] })
   },
 
   empacar: () => {
-    const { cimientos, suelo, criterios, linderos } = get()
-    return { cimientos, suelo, criterios, linderos }
+    const { cimientos, suelo, criterios, linderos, asent } = get()
+    return { cimientos, suelo, criterios, linderos, ...(Object.keys(asent || {}).length ? { asent } : {}) }
   },
 }))
 
