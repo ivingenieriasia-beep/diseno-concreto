@@ -37,7 +37,7 @@ import sys
 
 # qué instalador es: sale en el encabezado de la salida (si dice otra cosa,
 # se corrió un archivo viejo)
-VERSION = u'3.11.1 · igual a la 3.06 rev. 2 (lee las tablas de fábrica sin «//infotable»)'
+VERSION = u'3.12 · igual a la 3.06 rev. 2 (lee las tablas de fábrica sin «//infotable»)'
 
 # ── El catálogo (lo escribe la app desde catalogoRam.js; no hace falta tocarlo)
 CATALOGO = {

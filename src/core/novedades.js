@@ -32,6 +32,23 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.12',
+    fecha: '2026-11-14',
+    lema: 'Cimentaciones: el apartado «Asentamientos», con la malla de las corridas, cómo se asienta y lo que el diferencial le hace a la CT y a las ligas.',
+    destacados: [],
+    cambios: [
+      { tipo: 'nuevo', texto: 'Botón «📉 Asentamientos» en Cimentaciones. Las corridas que salieron de RAM y sus ejes ligados se parten en paneles de ≈ 0.25 m. Se ven en planta, con el mapa de color en mm, la deformada exagerada (con control) y la distorsión de cada tramo en verde o rojo, o en 3D (isométrica) hundidas. Pedido del Ing. Fernando Burgos.' },
+      { tipo: 'nuevo', texto: 'El cálculo, paso a paso como en la memoria: q de servicio CM + CV media (NTC-Cimentaciones 2023, 3.2.1.1.1); modelo elástico (semiespacio con E y ν, rectángulos flexibles con la fórmula de la esquina) o Winkler (ks); todo sobre un estrato, o zonas y tramos de eje sobre otro.' },
+      { tipo: 'nuevo', texto: 'Revisiones: el asentamiento medio contra la tabla 3.1.1.2.2.3 de la NTC-Cimentaciones 2023 y la distorsión entre apoyos contra el límite que elige el ingeniero (tabla 6.2.2.1 de la NTC-Criterios y Acciones 2023, de 0.001 a 0.003).' },
+      { tipo: 'nuevo', texto: 'Efecto en la CT de cada corrida y en las contratrabes de liga: M = 6 EI Δ / L² y V = 12 EI Δ / L³ (empotrada-empotrada, EI agrietado), por el factor de carga, contra MR y VR, tramo por tramo.' },
+      { tipo: 'nuevo', texto: 'Salidas: memoria PDF de los asentamientos (planta, 3D, revisiones y cada paso), imagen SVG de la vista y DXF de la planta deformada a escala real.' },
+      { tipo: 'mejora', texto: 'Los datos se capturan en «Suelo y criterios» (bloque «Asentamientos») o en el mismo apartado, y viajan en el proyecto. Ninguno tiene valor de fábrica: sin datos no se calcula y la app dice qué falta.' },
+      { tipo: 'mejora', texto: 'Papel nuevo de los casos de RAM: «viva media (asentamientos)». Sólo lo usan los asentamientos; el diseño no cambia.' },
+      { tipo: 'mejora', texto: 'Columnas, trabes y cimientos dan los mismos D/C que la 3.11.1.' },
+    ],
+    aviso: 'Es una propuesta: no se usa en un proyecto hasta que un ingeniero la valide. Las simplificaciones (corrida flexible, semiespacio sin capas, asentamiento sobre el eje) y que el efecto del diferencial no se suma a la gravedad se dicen en la memoria.',
+  },
+  {
     version: '3.11.1',
     fecha: '2026-11-14',
     lema: 'Cimentaciones: dos correcciones que encontró el Diseñador de concreto al validar la 3.11. El diseño no cambia.',
