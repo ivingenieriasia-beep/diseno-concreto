@@ -32,6 +32,19 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.13',
+    fecha: '2026-11-14',
+    lema: 'Asentamientos: la cimentación como viga sobre resortes de Winkler, con trabes de liga, para ver si una liga o una CT más peraltada arregla un tramo sobre suelo blando.',
+    destacados: [],
+    cambios: [
+      { tipo: 'nuevo', texto: 'En «📉 Asentamientos», «Cómo trabaja la cimentación»: viga sobre resortes. Cada corrida (con su CT), contratrabe o eje ligado es una viga con EI = Ec · (Ie/Ig) · Ig sobre resortes ks · B, con el ks del estrato o la zona de cada punto, y reparte la carga. La corrida flexible de la 3.12 se queda como opción. Pedido del Ing. Fernando Burgos.' },
+      { tipo: 'nuevo', texto: 'Trabes de liga en la viga: las TL del proyecto entre nudos de RAM entran solas, y se agregan otras de un nudo a otro nudo o al eje de otra viga, con la sección de una TL. Cada extremo, empotrado o articulado (12 EI/L³ o 3 EI/L³). Transmiten cortante y momento.' },
+      { tipo: 'nuevo', texto: 'Servicio (CM + CV media, o la máxima donde falte) para los asentamientos y la distorsión; U1 (los fcm y fcv de la obra) para el M y el V de cada viga y liga, contra MR y VR de su sección con su armado.' },
+      { tipo: 'nuevo', texto: 'Vista «Vigas y ligas: M y V»: de cada viga, la deformada con la distorsión por tramo y los diagramas de M y V con MR y VR; de cada liga, su M, su V y la fuerza que toma. En la planta, cada liga con su fuerza. Todo va también a la memoria PDF.' },
+      { tipo: 'mejora', texto: 'Datos del ingeniero, sin valores de fábrica: si la viga lleva el peso de la zapata y el relleno, si los cruces (un nudo en dos vigas) van unidos o separados, y cómo llega cada extremo de cada liga. Sin ellos no se calcula y la app dice qué falta.' },
+    ],
+  },
+  {
     version: '3.12',
     fecha: '2026-11-14',
     lema: 'Cimentaciones: el apartado «Asentamientos», con la malla de las corridas, cómo se asienta y lo que el diferencial le hace a la CT y a las ligas.',
