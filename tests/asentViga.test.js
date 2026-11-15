@@ -10,7 +10,7 @@ import { asentamientos, nuevoAsent } from '../src/core/cim/asentamientos'
 import { ligasDelModelo, seccionViga } from '../src/core/cim/asentViga'
 import { dibujoAsent, diagramaViga, diagramaLiga } from '../src/core/cim/asentDibujo'
 import { memoriaAsentPdf } from '../src/core/cim/salidas'
-import { corridaDesde, contratrabeDesde, ligaDesde, cargasDeApoyo, vivaMediaDeApoyo } from '../src/core/cim/reacciones'
+import { corridaDesde, contratrabeDesde, ligaDesde, ejeDesde, cargasDeApoyo, vivaMediaDeApoyo } from '../src/core/cim/reacciones'
 import { EcNTC } from '../src/core/deflexiones'
 
 // ── el solver ─────────────────────────────────────────────────
@@ -273,5 +273,60 @@ describe('3.13 · lo que se ve y la memoria', () => {
   it('la memoria PDF se arma con los diagramas', async () => {
     const doc = await memoriaAsentPdf(r, { projectName: 'CH-26-901 (ficticio)' })
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(3)
+  })
+})
+
+// ── 3.13.1: una TL ligada en dos ejes con «＋ en este eje» ─────
+describe('3.13.1 · una trabe de liga con dos ejes', () => {
+  // TL-901: eje 1 del nudo 4 al 7 (el de su diseño) y eje 2 del nudo 1 al 5
+  const e2 = ejeDesde('liga', [ap[1], ap[5]], pap, 'y', {})
+  const tl2 = { ...tl, ejes: [e2] }
+  const ext = { 'tl1:0': { a: 'articulada', b: 'empotrada' }, 'tl1:e1:0': { a: 'empotrada', b: 'empotrada' } }
+
+  it('cada eje ligado entra como liga, con su clave y sus extremos', () => {
+    const ls = ligasDelModelo([zA, zB, tl2], { ...base, extLigas: ext })
+    expect(ls).toHaveLength(2)
+    expect(ls[0]).toMatchObject({ key: 'tl1:0', eje: 0, nombre: 'TL-901, eje 1', de: '4', hasta: { tipo: 'nudo', nudo: '7' }, extA: 'articulada', extB: 'empotrada' })
+    expect(ls[1]).toMatchObject({ key: 'tl1:e1:0', eje: 1, nombre: 'TL-901, eje 2', de: '1', hasta: { tipo: 'nudo', nudo: '5' }, extA: 'empotrada', extB: 'empotrada' })
+  })
+  it('pide los extremos del eje 2 aunque el eje 1 ya los tenga', () => {
+    const r = calc([zA, zB, tl2], { ...base, extLigas: { 'tl1:0': ext['tl1:0'] } })
+    const t = r.faltan.join(' | ')
+    expect(t).toMatch(/TL-901, eje 2: elige cómo llega cada extremo/)
+    expect(t).not.toMatch(/TL-901, eje 1:/)
+  })
+  it('calcula las dos ligas: cada una con su fuerza, en el conteo y en la memoria', () => {
+    const r = calc([zA, zB, tl2], { ...base, extLigas: ext })
+    expect(r.faltan).toEqual([])
+    expect(r.ligas).toHaveLength(2)
+    const l2 = r.ligas.find((x) => x.key === 'tl1:e1:0')
+    expect(l2.L).toBeCloseTo(4, 9)
+    const EI = EcNTC(250) * (25 * 60 ** 3) / 12 / 1e7
+    expect(l2.RL.k).toBeCloseTo((12 * EI) / 4 ** 3, 6)
+    // F = k (w1 − w5)
+    const d = (uid, n) => r.franjas.find((f) => f.z.uid === uid).apoyos.find((p) => p.nudo === n).d
+    expect(Math.abs(l2.S.F)).toBeGreaterThan(0)
+    expect(l2.S.F).toBeCloseTo(l2.RL.k * (d('zcA', '1') - d('zcB', '5')), 9)
+    // la segunda liga cambia la solución respecto a sólo el eje 1
+    const solo1 = calc([zA, zB, tl], { ...base, extLigas: ext })
+    expect(solo1.ligas).toHaveLength(1)
+    expect(d('zcA', '1')).not.toBeCloseTo(solo1.franjas.find((f) => f.z.uid === 'zcA').apoyos.find((p) => p.nudo === '1').d, 9)
+    // el equilibrio de todo: suelo = cargas
+    const P = r.vigas.reduce((s, v) => s + v.nodos.reduce((t, n) => t + n.P[0], 0), 0)
+    const Rs = r.vigas.reduce((s, v) => s + v.nodos.reduce((t, n, j) => t + n.k * v.w[j], 0), 0)
+    expect(Rs).toBeCloseTo(P, 6)
+    // la memoria lista las dos
+    const sec = r.secciones.find((x) => x.titulo === 'Trabes de liga (fuerza que toma cada una)')
+    const txt = JSON.stringify(sec)
+    expect(txt).toContain('TL-901, eje 1')
+    expect(txt).toContain('TL-901, eje 2')
+  })
+  it('la corrida flexible de la 3.12 también revisa el eje 2', () => {
+    const r = calc([zA, zB, tl2], { ...base, metodo: '', fcAsent: 1 })
+    const ques = r.efectos.map((e) => e.que)
+    expect(ques).toContain('TL-901, eje 1, tramo 1')
+    expect(ques).toContain('TL-901, eje 2, tramo 1')
+    // con un solo eje, el mismo texto de la 3.12
+    expect(calc([zA, zB, tl], { ...base, metodo: '', fcAsent: 1 }).efectos.map((e) => e.que)).toContain('TL-901, tramo 1')
   })
 })

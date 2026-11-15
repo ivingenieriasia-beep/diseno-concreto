@@ -255,14 +255,14 @@ export function asentamientos({ A, cimientos, cargas, asent, escenario = 'zonas'
   for (const f of franjas) for (const p of f.apoyos) if (!dNudo.has(p.nudo)) dNudo.set(p.nudo, p.d)
   const ligasSin = []
   for (const z of cimientos.filter((x) => x.tipo === 'liga')) {
-    const cs = [...(z.columnas || [])].filter((c) => c.nudo != null).sort((p, q) => num(p.x) - num(q.x))
     const rec = recLiga(z.mat)
-    for (let i = 0; i < cs.length - 1; i++) {
-      const c0 = cs[i], c1 = cs[i + 1]
+    for (const { c0, c1, eje, nEjes, i } of tramosLiga(z)) {
+      // con un solo eje, los mismos textos de la 3.12
+      const zE = nEjes > 1 ? `${z.nombre}, eje ${eje + 1}` : z.nombre
       const d0 = dNudo.get(String(c0.nudo)), d1 = dNudo.get(String(c1.nudo))
-      if (d0 == null || d1 == null) { ligasSin.push(`${z.nombre} (nudos ${c0.nudo} y ${c1.nudo})`); continue }
+      if (d0 == null || d1 == null) { ligasSin.push(`${zE} (nudos ${c0.nudo} y ${c1.nudo})`); continue }
       const L = num(c1.x) - num(c0.x)
-      efectos.push(efectoViga({ que: `${z.nombre}, tramo ${i + 1}`, tramo: { p: { nudo: String(c0.nudo), d: d0 }, q: { nudo: String(c1.nudo), d: d1 } }, L, D: Math.abs(d1 - d0), sec: { b: num(z.geo?.b, 15), h: num(z.geo?.h, 30), sup: z.arm?.sup || { num: 4, n: 2 }, inf: z.arm?.inf || { num: 4, n: 2 }, est: z.arm?.est || { num: 2.5, ramas: 2, s: 15 }, r: rec.r, rInf: rec.rInf, fc: num(z.mat?.fc, 250), fy: num(z.mat?.fy, 4200) }, fI, FC }))
+      efectos.push(efectoViga({ que: `${zE}, tramo ${i + 1}`, tramo: { p: { nudo: String(c0.nudo), d: d0 }, q: { nudo: String(c1.nudo), d: d1 } }, L, D: Math.abs(d1 - d0), sec: { b: num(z.geo?.b, 15), h: num(z.geo?.h, 30), sup: z.arm?.sup || { num: 4, n: 2 }, inf: z.arm?.inf || { num: 4, n: 2 }, est: z.arm?.est || { num: 2.5, ramas: 2, s: 15 }, r: rec.r, rInf: rec.rInf, fc: num(z.mat?.fc, 250), fy: num(z.mat?.fy, 4200) }, fI, FC }))
     }
   }
 
@@ -278,6 +278,25 @@ export function asentamientos({ A, cimientos, cargas, asent, escenario = 'zonas'
   ]
   const secciones = memoria({ a, escenario, franjas, paneles, medio, dMax, dMin, limM, tramos, limD, efectos, sinPos, ligasSin, fI, FC })
   return { ok: checks.every((c) => c.ok), faltan: [], franjas, sinPos, ligasSin, paneles, tramos, efectos, medio, dMax, dMin, checks, secciones, escenario }
+}
+
+/**
+ * Los tramos de una trabe de liga entre nudos de RAM: los del eje del diseño
+ * y los de cada eje ligado con «＋ en este eje» (3.13.1: antes sólo entraba
+ * el primer eje). El eje 1 conserva la clave de la 3.13 (`uid:i`); los demás,
+ * `uid:e<k>:i`.
+ */
+export function tramosLiga(z) {
+  const ejes = [z.columnas || [], ...(z.ejes || []).map((e) => e.columnas || [])]
+  const out = []
+  ejes.forEach((cols, k) => {
+    const cs = [...cols].filter((c) => c.nudo != null && c.nudo !== '').sort((p, q) => num(p.x) - num(q.x))
+    for (let i = 0; i < cs.length - 1; i++) {
+      const nombre = [z.nombre, ejes.length > 1 ? `eje ${k + 1}` : '', cs.length > 2 ? `tramo ${i + 1}` : ''].filter(Boolean).join(', ')
+      out.push({ key: k === 0 ? `${z.uid}:${i}` : `${z.uid}:e${k}:${i}`, eje: k, nEjes: ejes.length, i, c0: cs[i], c1: cs[i + 1], nombre })
+    }
+  })
+  return out
 }
 
 const segIni = (f, p) => p.s - (p === f.apoyos[0] ? p.s : (p.s - f.apoyos[f.apoyos.indexOf(p) - 1].s) / 2)

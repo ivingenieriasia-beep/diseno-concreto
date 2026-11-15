@@ -450,7 +450,7 @@ Pedido por FB, aprobado el 2026-11-14: la corrida flexible no sirve para saber s
 - **Peso de la zapata y el relleno** [asent-peso]: no se suma; el W del diseño de cada cimiento; o capturado en t/m [asent-wPeso-{nombre}].
 - **Cruces** [asent-cruces], sólo si un nudo está en dos vigas: unidos (bajan lo mismo y la reacción entra una vez) o separados (cada viga por su cuenta, con la reacción completa).
 - **Trabes de liga** [asent-liga-{clave}]:
-  - las TL del proyecto que van entre nudos de RAM entran solas; de cada una se elige cómo llega cada extremo;
+  - las TL del proyecto que van entre nudos de RAM entran solas, en el eje de su diseño y en cada eje ligado con «＋ en este eje» (desde la 3.13.1; se llaman «TL-1, eje 2», etc.); de cada tramo se elige cómo llega cada extremo;
   - **＋ liga** [asent-mas-liga]: sección (una TL del proyecto) [asent-liga-tl-{id}], de qué nudo sale [asent-liga-de-{id}], a dónde llega: otro nudo o el eje de otra viga [asent-liga-tipo-{id}], y cómo llega cada extremo [asent-liga-extA-{id}] y [asent-liga-extB-{id}]: empotrada o articulada.
 - **Ie/Ig** [asent-fInercia], de las vigas y de las ligas. El factor de carga del hundimiento no se usa: el M y el V salen de U1.
 

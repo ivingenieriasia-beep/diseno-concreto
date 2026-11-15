@@ -15,7 +15,7 @@ import { paso, check, f1, f2, f3, num, GC, CRITERIOS, SUELO } from './comun'
 import { ctDe, llevaCT } from './ct'
 import { recLiga } from './liga'
 import { EcNTC } from '../deflexiones'
-import { MALLA, nuevoAsent, faltantes, franjasDe, estratoEn, wLinea, cvMedia, resistencias } from './asentamientos'
+import { MALLA, nuevoAsent, faltantes, franjasDe, estratoEn, wLinea, cvMedia, resistencias, tramosLiga } from './asentamientos'
 import { DS_VIGA, resolverVigas, rigidezLiga, mallaViga } from './vigaResortes'
 
 const mm = (m) => m * 1000
@@ -55,16 +55,17 @@ const EIde = (sec, fI) => (EcNTC(sec.fc) * fI * (sec.b * sec.h ** 3) / 12) / 1e7
 
 /**
  * Las trabes de liga del modelo: cada tramo de las TL del proyecto que van
- * entre nudos de RAM, más las que el ingeniero agrega (de un nudo a otro nudo
- * o al eje de otra viga, con la sección de una TL del proyecto).
+ * entre nudos de RAM, en el eje del diseño y en cada eje ligado, más las que
+ * el ingeniero agrega (de un nudo a otro nudo o al eje de otra viga, con la
+ * sección de una TL del proyecto).
  */
 export function ligasDelModelo(cimientos, a) {
   const out = []
   for (const z of cimientos.filter((x) => x.tipo === 'liga')) {
-    const cs = [...(z.columnas || [])].filter((c) => c.nudo != null && c.nudo !== '').sort((p, q) => num(p.x) - num(q.x))
-    for (let i = 0; i < cs.length - 1; i++) {
-      const key = `${z.uid}:${i}`, e = a.extLigas?.[key] || {}
-      out.push({ key, auto: true, nombre: cs.length > 2 ? `${z.nombre}, tramo ${i + 1}` : z.nombre, z, de: String(cs[i].nudo), hasta: { tipo: 'nudo', nudo: String(cs[i + 1].nudo) }, extA: e.a || '', extB: e.b || '' })
+    // el eje del diseño y cada eje ligado (3.13.1)
+    for (const t of tramosLiga(z)) {
+      const e = a.extLigas?.[t.key] || {}
+      out.push({ key: t.key, auto: true, eje: t.eje, nombre: t.nombre, z, de: String(t.c0.nudo), hasta: { tipo: 'nudo', nudo: String(t.c1.nudo) }, extA: e.a || '', extB: e.b || '' })
     }
   }
   for (const l of a.ligas || []) {
