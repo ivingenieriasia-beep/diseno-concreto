@@ -32,6 +32,18 @@ export const TIPOS = {
  */
 export const NOVEDADES = [
   {
+    version: '3.13.1',
+    fecha: '2026-11-14',
+    lema: 'Asentamientos: una trabe de liga ligada en varios ejes entra completa a la viga sobre resortes. El diseño no cambia.',
+    destacados: [],
+    cambios: [
+      { tipo: 'arreglo', texto: 'Cada eje ligado de una trabe de liga con «＋ en este eje» entra como liga en «📉 Asentamientos»: con su nombre («TL-1, eje 2»), su elección de extremos, su fuerza, su M y su V, en el conteo, la planta, los diagramas y la memoria. Antes sólo entraba el eje del diseño: «Desde RAM» mostraba el eje 2, pero la viga sobre resortes decía «1 liga» y no lo tomaba. Hallazgo del Ing. Fernando Burgos al validar la 3.13.' },
+      { tipo: 'arreglo', texto: 'La corrida flexible de la 3.12 tenía la misma omisión: también revisa el efecto del asentamiento en cada eje ligado de una TL. Con un solo eje sus textos no cambian.' },
+      { tipo: 'mejora', texto: 'El eje del diseño conserva lo que ya se eligió en la 3.13 (cómo llega cada extremo); los ejes ligados piden sus extremos. Las revisiones, el D/C de columnas y trabes y todo lo demás son los de la 3.13.' },
+    ],
+    aviso: 'Corrección pedida por el Ing. Fernando Burgos para la validación de la 3.13.',
+  },
+  {
     version: '3.13',
     fecha: '2026-11-14',
     lema: 'Asentamientos: la cimentación como viga sobre resortes de Winkler, con trabes de liga, para ver si una liga o una CT más peraltada arregla un tramo sobre suelo blando.',
