@@ -33,6 +33,7 @@ import { ctDe, llevaCT } from './ct'
 import { recLiga } from './liga'
 import { calcFlexion, calcCortante } from '../sectionCalculator'
 import { EcNTC } from '../deflexiones'
+import { asentViga } from './asentViga'
 
 /** Largo de cada panel de la malla, m (se ajusta para que el eje se parta parejo) */
 export const MALLA = 0.25
@@ -44,6 +45,8 @@ export const DISTORSIONES = [0.001, 0.0015, 0.002, 0.0025, 0.003]
 export const nuevoAsent = () => ({
   modelo: '', estratos: [{ id: 'E1', nombre: 'Estrato 1', E: '', nu: '', ks: '' }], base: 'E1', zonas: [],
   limMedio: '', limMedioNota: '', limDist: '', carga: '', cvMaxSiFalta: false, wCVmed: {}, fInercia: '', fcAsent: '',
+  // 3.13: cómo trabaja la cimentación ('' o 'flexible': la de la 3.12; 'viga': sobre resortes)
+  metodo: '', pesoViga: '', wPeso: {}, cruces: '', ligas: [], extLigas: {},
 })
 
 const finito = (v) => v !== '' && v != null && Number.isFinite(Number(v))
@@ -103,12 +106,14 @@ export function influencia(x1, x2, y1, y2) {
  * apoyos de RAM), cada apoyo con su reacción de hoy y su largo tributario.
  * @param cargas  por apoyo de A: { CM, CV, CVmed } (P en t; CVmed null si ningún caso tiene ese papel)
  */
-export function franjasDe(A, cimientos, cargas) {
+export function franjasDe(A, cimientos, cargas, { conContratrabes = false } = {}) {
   const idx = new Map(A.apoyos.map((a, i) => [a.nudo, i]))
   const out = [], sinPos = []
-  for (const z of cimientos.filter((x) => x.tipo === 'corrida')) {
+  for (const z of cimientos.filter((x) => x.tipo === 'corrida' || (conContratrabes && x.tipo === 'contratrabe'))) {
     const o = z.origen?.ram || {}
-    const ejes = [{ nudos: o.nudos, v0: o.v0, v1: o.v1, k: 0 }, ...(z.ejes || []).map((e, i) => ({ ...e, k: i + 1 }))]
+    const ejes = z.tipo === 'contratrabe'
+      ? [{ nudos: o.nudos, ...volados(z.columnas, z.geo?.L), k: 0 }, ...(z.ejes || []).map((e, i) => ({ nudos: e.nudos, ...volados(e.columnas || z.columnas, e.L ?? z.geo?.L), k: i + 1 }))]
+      : [{ nudos: o.nudos, v0: o.v0, v1: o.v1, k: 0 }, ...(z.ejes || []).map((e, i) => ({ ...e, k: i + 1 }))]
     let alguno = false
     for (const e of ejes) {
       const ns = (e.nudos || []).map(String).filter((n) => idx.has(n))
@@ -136,8 +141,15 @@ export function franjasDe(A, cimientos, cargas) {
   return { franjas: out, sinPos }
 }
 
+/** Los volados de una contratrabe: de su orilla a la primera y a la última columna con nudo */
+function volados(columnas, L) {
+  const xs = (columnas || []).filter((c) => c.nudo != null).map((c) => num(c.x))
+  if (!xs.length) return {}
+  return { v0: Math.max(0, Math.min(...xs)), v1: Math.max(0, num(L) - Math.max(...xs)) }
+}
+
 /** La w CV media de la línea de una corrida: capturada o, si el ingeniero lo pidió, la CV máxima */
-function wLinea(z, a) {
+export function wLinea(z, a) {
   const med = a.wCVmed?.[z.uid]
   const cm = num(z.cargas?.CM?.w)
   if (finito(med)) return { CM: cm, CV: Number(med), cvMax: false }
@@ -161,8 +173,9 @@ export function estratoEn(a, x, y, f, escenario = 'zonas') {
  * efectos, medio, checks, secciones } — si falta algo, `faltan` lo dice y no
  * hay números.
  */
-export function asentamientos({ A, cimientos, cargas, asent, escenario = 'zonas', conCasoMedio = true }) {
+export function asentamientos({ A, cimientos, cargas, asent, escenario = 'zonas', conCasoMedio = true, criterios = {}, suelo = {} }) {
   const a = { ...nuevoAsent(), ...(asent || {}) }
+  if (a.metodo === 'viga') return asentViga({ A, cimientos, cargas, asent: a, escenario, conCasoMedio, criterios, suelo })
   const corridas = cimientos.filter((z) => z.tipo === 'corrida')
   const { franjas, sinPos } = A ? franjasDe(A, cimientos, cargas) : { franjas: [], sinPos: corridas }
   const faltan = faltantes(a, { conCasoMedio, corridas })
@@ -270,7 +283,7 @@ export function asentamientos({ A, cimientos, cargas, asent, escenario = 'zonas'
 const segIni = (f, p) => p.s - (p === f.apoyos[0] ? p.s : (p.s - f.apoyos[f.apoyos.indexOf(p) - 1].s) / 2)
 const segFin = (f, p) => { const i = f.apoyos.indexOf(p); return i === f.apoyos.length - 1 ? f.L : p.s + (f.apoyos[i + 1].s - p.s) / 2 }
 /** La CV media de un apoyo: el caso «viva media» o, si el ingeniero lo pidió, la máxima */
-const cvMedia = (p, a) => (p.CVmed != null ? p.CVmed : a.cvMaxSiFalta ? p.CV : 0)
+export const cvMedia = (p, a) => (p.CVmed != null ? p.CVmed : a.cvMaxSiFalta ? p.CV : 0)
 
 /** MR y VR de una sección rectangular con sus dos lechos y estribos (igual que la liga) */
 export function resistencias({ b, h, sup, inf, est, r, rInf, fc, fy }) {

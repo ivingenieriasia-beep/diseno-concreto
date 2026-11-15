@@ -94,6 +94,13 @@ export function dibujoAsent(res, { vista = 'planta', exag = 1, W = 960, H = 640,
     const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
     out.push(`<text x="${n2(mx)}" y="${n2(my - 6)}" font-size="${fs(9.5)}" text-anchor="middle" fill="${c}" font-weight="700">${t.dist.toFixed(4)}</text>`)
   }
+  // trabes de liga (3.13): de un extremo al otro, con la fuerza que toman en servicio
+  for (const l of res.ligas || []) {
+    const a = P2(l.A.x, l.A.y, iso ? dEnViga(res, l.A) : 0), b = P2(l.B.x, l.B.y, iso ? dEnViga(res, l.B) : 0)
+    const c = l.inactiva ? TENUE : l.okM && l.okV ? OK : MAL
+    out.push(`<line data-liga="${esc(l.nombre)}" x1="${n2(a[0])}" y1="${n2(a[1])}" x2="${n2(b[0])}" y2="${n2(b[1])}" stroke="${c}" stroke-width="${dxf ? 10 : 5}" stroke-dasharray="${dxf ? '24 10' : '9 4'}" opacity="0.9"><title>${esc(`${l.nombre}: ${l.inactiva ? 'no transmite nada' : `F = ${Math.abs(l.S.F).toFixed(2)} t en servicio, ${Math.abs(l.U.F).toFixed(2)} t en U1 · M ${l.Mmax.toFixed(2)} t·m`}`)}</title></line>`)
+    if (!l.inactiva) out.push(`<text x="${n2((a[0] + b[0]) / 2)}" y="${n2((a[1] + b[1]) / 2 + (dxf ? 30 : 14))}" font-size="${fs(9.5)}" text-anchor="middle" fill="${c}" font-weight="700">${esc(`${l.nombre} · ${Math.abs(l.S.F).toFixed(2)} t`)}</text>`)
+  }
   // apoyos con su asentamiento
   for (const f of res.franjas) for (const p of f.apoyos) {
     const [x, y] = P2(p.x, p.y, iso ? p.d : 0)
@@ -101,12 +108,108 @@ export function dibujoAsent(res, { vista = 'planta', exag = 1, W = 960, H = 640,
     out.push(`<text x="${n2(x + 6)}" y="${n2(y + 13)}" font-size="${fs(9.5)}" fill="${TINTA}">${esc(`${p.nudo} · ${fmm(p.d)} mm`)}</text>`)
   }
   // título y escala de color
-  out.push(`<text x="${M}" y="${n2(dxf ? 60 : 20)}" font-size="${fs(13)}" font-weight="700" fill="${TINTA}" font-family="Instrument Sans, sans-serif">${esc(`Asentamientos ${iso ? 'en 3D (isométrica)' : 'en planta'} · deformada × ${Math.round(E)}`)}</text>`)
+  out.push(`<text x="${M}" y="${n2(dxf ? 60 : 20)}" font-size="${fs(13)}" font-weight="700" fill="${TINTA}" font-family="Instrument Sans, sans-serif">${esc(`Asentamientos ${iso ? 'en 3D (isométrica)' : 'en planta'}${res.metodo === 'viga' ? ' · viga sobre resortes' : ''} · deformada × ${Math.round(E)}`)}</text>`)
   const lx = W - M - (dxf ? 600 : 220), ly = dxf ? 40 : 12, lw = dxf ? 520 : 170
   for (let i = 0; i < 20; i++) out.push(`<rect x="${n2(lx + (i * lw) / 20)}" y="${ly}" width="${n2(lw / 20 + 0.5)}" height="${dxf ? 22 : 9}" fill="${colorDe(res.dMin + ((res.dMax - res.dMin) * (i + 0.5)) / 20, res.dMin, res.dMax)}"/>`)
   out.push(`<text x="${n2(lx)}" y="${n2(ly + (dxf ? 50 : 21))}" font-size="${fs(9)}" fill="${TENUE}">${fmm(res.dMin)} mm</text>`)
   out.push(`<text x="${n2(lx + lw)}" y="${n2(ly + (dxf ? 50 : 21))}" font-size="${fs(9)}" fill="${TENUE}" text-anchor="end">${fmm(res.dMax)} mm</text>`)
   return { inner: out.join(''), W, H, k: dxf ? 1 : null, E }
+}
+
+/** El asentamiento de un punto de una viga (extremo de liga) */
+function dEnViga(res, e) {
+  const v = (res.vigas || []).find((x) => x.f === e.f)
+  if (!v) return 0
+  let j = 0
+  for (let i = 1; i < v.nodos.length; i++) if (Math.abs(v.nodos[i].s - e.s) < Math.abs(v.nodos[j].s - e.s)) j = i
+  return v.nodos[j].w
+}
+
+// ── diagramas de la viga sobre resortes (3.13) ─────────────────
+/**
+ * Una gráfica de una variable a lo largo de s.
+ * @param ys       valores en cada s (o, con `escalon`, uno por elemento entre s[i] y s[i+1])
+ * @param lims     líneas de límite [{ y, t }]
+ * @param abajo    el valor positivo se dibuja hacia abajo (la deformada)
+ */
+function grafica({ x0, y0, w, h, s, ys, titulo, unidad, lims = [], escalon = false, abajo = false, marcas = [], color = '#2b5f9e', dec = 2 }) {
+  const out = []
+  const L = s[s.length - 1] - s[0] || 1
+  const vals = [...ys, ...lims.map((l) => l.y), 0]
+  let lo = Math.min(...vals), hi = Math.max(...vals)
+  if (hi - lo < 1e-12) { hi += 1; lo -= 1 }
+  const pad = (hi - lo) * 0.08
+  lo -= pad; hi += pad
+  const X = (v) => x0 + ((v - s[0]) / L) * w
+  const Y = (v) => (abajo ? y0 + ((v - lo) / (hi - lo)) * h : y0 + h - ((v - lo) / (hi - lo)) * h)
+  out.push(`<rect x="${n2(x0)}" y="${n2(y0)}" width="${n2(w)}" height="${n2(h)}" fill="#fbfaf7" stroke="#e2ddd3"/>`)
+  out.push(`<line x1="${n2(x0)}" y1="${n2(Y(0))}" x2="${n2(x0 + w)}" y2="${n2(Y(0))}" stroke="${TENUE}" stroke-width="0.8"/>`)
+  for (const l of lims) {
+    out.push(`<line x1="${n2(x0)}" y1="${n2(Y(l.y))}" x2="${n2(x0 + w)}" y2="${n2(Y(l.y))}" stroke="${MAL}" stroke-width="0.8" stroke-dasharray="5 3"/>`)
+    out.push(`<text x="${n2(x0 + w - 4)}" y="${n2(Y(l.y) - 3)}" font-size="8.5" fill="${MAL}" text-anchor="end">${esc(l.t)}</text>`)
+  }
+  let pts
+  if (escalon) {
+    pts = []
+    ys.forEach((v, i) => { pts.push([X(s[i]), Y(v)], [X(s[i + 1]), Y(v)]) })
+  } else pts = ys.map((v, i) => [X(s[i]), Y(v)])
+  const poly = pts.map((p) => p.map(n2).join(',')).join(' ')
+  out.push(`<polygon points="${n2(pts[0][0])},${n2(Y(0))} ${poly} ${n2(pts[pts.length - 1][0])},${n2(Y(0))}" fill="${color}" opacity="0.13"/>`)
+  out.push(`<polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.5"/>`)
+  for (const m of marcas) {
+    out.push(`<line x1="${n2(X(m.s))}" y1="${n2(y0)}" x2="${n2(X(m.s))}" y2="${n2(y0 + h)}" stroke="#c9c3b8" stroke-width="0.6" stroke-dasharray="2 3"/>`)
+    if (m.t) out.push(`<text x="${n2(X(m.s) + 3)}" y="${n2(y0 + h - 4)}" font-size="8.5" fill="${TENUE}">${esc(m.t)}</text>`)
+  }
+  // el máximo y el mínimo
+  const iMax = ys.reduce((b, v, i) => (v > ys[b] ? i : b), 0), iMin = ys.reduce((b, v, i) => (v < ys[b] ? i : b), 0)
+  for (const i of new Set([iMax, iMin])) {
+    const sx = escalon ? (s[i] + s[i + 1]) / 2 : s[i]
+    out.push(`<text x="${n2(Math.min(x0 + w - 30, Math.max(x0 + 30, X(sx))))}" y="${n2(Y(ys[i]) + ((ys[i] >= 0) !== abajo ? -4 : 11))}" font-size="9" text-anchor="middle" fill="${TINTA}" font-weight="700">${ys[i].toFixed(dec)}</text>`)
+  }
+  out.push(`<text x="${n2(x0)}" y="${n2(y0 - 5)}" font-size="10.5" font-weight="700" fill="${TINTA}">${esc(titulo)} <tspan font-weight="400" fill="${TENUE}">(${esc(unidad)})</tspan></text>`)
+  return out.join('')
+}
+
+/** Deformada (servicio), M y V (U1) de una viga sobre resortes, con sus límites */
+export function diagramaViga(v, { W = 900, limD = null } = {}) {
+  const s = v.nodos.map((n) => n.s), M = 50, gw = W - 2 * M, gh = 120, sep = 34
+  const marcas = v.f.apoyos.map((p) => ({ s: p.s, t: p.nudo }))
+  const out = []
+  out.push(`<text x="${M}" y="20" font-size="13" font-weight="700" fill="${TINTA}" font-family="Instrument Sans, sans-serif">${esc(`${v.f.z.nombre}, eje ${v.f.k + 1} · ${v.flexible ? 'sin sección rígida (flexible)' : v.sec.nombre} · L = ${v.f.L.toFixed(2)} m`)}</text>`)
+  let y = 46
+  out.push(`<g data-diag="deformada">${grafica({ x0: M, y0: y, w: gw, h: gh, s, ys: v.w.map((w) => w * 1000), titulo: 'Deformada en servicio, CM + CV media', unidad: 'mm, hacia abajo', abajo: true, marcas, color: '#3f3a34' })}</g>`)
+  // la distorsión de cada tramo, arriba de la deformada
+  const L = s[s.length - 1] || 1
+  for (let i = 0; i < v.f.apoyos.length - 1; i++) {
+    const p = v.f.apoyos[i], q = v.f.apoyos[i + 1], d = Math.abs(q.d - p.d) / (q.s - p.s)
+    const ok = limD == null || d <= limD + 1e-12
+    out.push(`<text x="${n2(M + ((p.s + q.s) / 2 / L) * gw)}" y="${n2(y + 12)}" font-size="9" text-anchor="middle" fill="${ok ? OK : MAL}" font-weight="700">${d.toFixed(4)}</text>`)
+  }
+  y += gh + sep
+  if (!v.flexible) {
+    out.push(`<g data-diag="M">${grafica({ x0: M, y0: y, w: gw, h: gh, s, ys: v.M, titulo: 'Momento U1 (+ tensión abajo)', unidad: 't·m', lims: [{ y: v.R.MRinf, t: `MR abajo ${v.R.MRinf.toFixed(2)}` }, { y: -v.R.MRsup, t: `MR arriba −${v.R.MRsup.toFixed(2)}` }], marcas, color: '#9a3412' })}</g>`)
+    y += gh + sep
+    out.push(`<g data-diag="V">${grafica({ x0: M, y0: y, w: gw, h: gh, s, ys: v.V, escalon: true, titulo: 'Cortante U1', unidad: 't', lims: [{ y: v.R.VR, t: `VR ${v.R.VR.toFixed(2)}` }, { y: -v.R.VR, t: '−VR' }], marcas, color: '#1a7a5e' })}</g>`)
+    y += gh + 14
+  }
+  return { inner: out.join(''), W, H: y + 10 }
+}
+
+/** El diagrama de una trabe de liga: su M (lineal) y su V (constante) en U1 */
+export function diagramaLiga(l, { W = 900 } = {}) {
+  const M = 50, gw = W - 2 * M, gh = 90, sep = 34
+  const out = []
+  const ext = (e, n) => `${n} (${e === 'empotrada' ? 'empotrada' : 'articulada'})`
+  out.push(`<text x="${M}" y="20" font-size="13" font-weight="700" fill="${TINTA}" font-family="Instrument Sans, sans-serif">${esc(`${l.nombre} · ${l.sec.nombre} · L = ${l.L.toFixed(2)} m · toma ${Math.abs(l.S.F).toFixed(2)} t en servicio, ${Math.abs(l.U.F).toFixed(2)} t en U1`)}</text>`)
+  const s = [0, l.L]
+  const marcas = [{ s: 0, t: ext(l.extA, l.A.nudo ? `nudo ${l.A.nudo}` : 'eje') }]
+  let y = 46
+  out.push(`<text x="${n2(W - M - 4)}" y="${n2(y + gh - 4)}" font-size="8.5" fill="${TENUE}" text-anchor="end">${esc(ext(l.extB, l.B.nudo ? `nudo ${l.B.nudo}` : `eje de ${l.B.f.z.nombre}`))}</text>`)
+  out.push(`<g data-diag="M">${grafica({ x0: M, y0: y, w: gw, h: gh, s, ys: [l.U.Ma, l.U.Mb], titulo: 'Momento U1 (+ tensión abajo)', unidad: 't·m', lims: [{ y: l.R.MRinf, t: `MR abajo ${l.R.MRinf.toFixed(2)}` }, { y: -l.R.MRsup, t: `MR arriba −${l.R.MRsup.toFixed(2)}` }], marcas, color: '#9a3412' })}</g>`)
+  y += gh + sep
+  out.push(`<g data-diag="V">${grafica({ x0: M, y0: y, w: gw, h: gh, s, ys: [l.U.F], escalon: true, titulo: 'Cortante U1 (la fuerza de la liga)', unidad: 't', lims: [{ y: l.R.VR, t: `VR ${l.R.VR.toFixed(2)}` }, { y: -l.R.VR, t: '−VR' }], marcas, color: '#1a7a5e' })}</g>`)
+  y += gh + 14
+  return { inner: out.join(''), W, H: y + 10 }
 }
 
 /** El punto de la deformada de un panel en planta: corrido hacia un lado de su eje δ·E */

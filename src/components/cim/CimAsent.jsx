@@ -4,7 +4,7 @@ import { parseModeloRam } from '../../core/ramModel'
 import { modeloGuardado, hace, EVENTO_MODELO } from '../../core/ramSync'
 import { apoyosDe, cargasDeApoyo, vivaMediaDeApoyo, papelesPorDefecto, PAPELES } from '../../core/cim/reacciones'
 import { asentamientos, nuevoAsent } from '../../core/cim/asentamientos'
-import { dibujoAsent } from '../../core/cim/asentDibujo'
+import { dibujoAsent, diagramaViga, diagramaLiga } from '../../core/cim/asentDibujo'
 import { exportarAsent } from '../../core/cim/salidas'
 import CimRevisiones, { CimMemoria } from './CimRevisiones'
 import AsentDatos from './AsentDatos'
@@ -64,10 +64,16 @@ export default function CimAsent({ dxfScale = 1, projectName = '', onClose, onTo
     return { CM: c.CM.P, CV: c.CV.P, CVmed: vivaMediaDeApoyo(a, pap, A.up) }
   }) : []), [A, pap])
   const asent = useMemo(() => ({ ...nuevoAsent(), ...(guardado || {}) }), [guardado])
-  const res = useMemo(() => asentamientos({ A, cimientos, cargas, asent, escenario, conCasoMedio }), [A, cimientos, cargas, asent, escenario, conCasoMedio])
+  const criterios = useCimStore((s) => s.criterios)
+  const suelo = useCimStore((s) => s.suelo)
+  const res = useMemo(() => asentamientos({ A, cimientos, cargas, asent, escenario, conCasoMedio, criterios, suelo }), [A, cimientos, cargas, asent, escenario, conCasoMedio, criterios, suelo])
+  const esViga = res.metodo === 'viga'
   const vistaDib = vista === '3d' ? '3d' : 'planta'
   const dib = useMemo(() => (res.paneles.length ? dibujoAsent(res, { vista: vistaDib, exag, W: tam.w, H: tam.h, zonas: asent.zonas }) : null), [res, vistaDib, exag, tam, asent.zonas])
-  const Rrev = { ok: res.ok, checks: res.checks, secciones: res.secciones, avisos: [], cant: {}, resumen: res.paneles.length ? `medio ${(res.medio * 1000).toFixed(2)} mm · máximo ${(res.dMax * 1000).toFixed(2)} mm · ${res.tramos.length} tramos` : '' }
+  const diags = useMemo(() => (esViga && vista === 'diagramas' && res.paneles.length
+    ? [...res.vigas.map((v) => ({ id: `v-${v.f.z.uid}-${v.f.k}`, d: diagramaViga(v, { W: Math.max(600, tam.w - 24), limD: res.limD }) })), ...res.ligas.filter((l) => !l.inactiva).map((l) => ({ id: `l-${l.key}`, d: diagramaLiga(l, { W: Math.max(600, tam.w - 24) }) }))]
+    : []), [res, esViga, vista, tam.w])
+  const Rrev = { ok: res.ok, checks: res.checks, secciones: res.secciones, avisos: res.avisos || [], cant: {}, resumen: res.paneles.length ? `medio ${(res.medio * 1000).toFixed(2)} mm · máximo ${(res.dMax * 1000).toFixed(2)} mm · ${res.tramos.length} tramos${esViga ? ` · ${res.vigas.length} viga${res.vigas.length === 1 ? "" : "s"} · ${res.ligas.length} liga${res.ligas.length === 1 ? "" : "s"}` : ''}` : '' }
 
   const salida = async (formato) => {
     setOcupado(true)
@@ -108,6 +114,7 @@ export default function CimAsent({ dxfScale = 1, projectName = '', onClose, onTo
               <div className="cim-seg" role="tablist">
                 <button role="tab" aria-selected={vista === 'planta'} className={vista === 'planta' ? 'on' : ''} data-testid="asent-vista-planta" onClick={() => setVista('planta')}>Planta</button>
                 <button role="tab" aria-selected={vista === '3d'} className={vista === '3d' ? 'on' : ''} data-testid="asent-vista-3d" onClick={() => setVista('3d')}>3D</button>
+                {esViga && <button role="tab" aria-selected={vista === 'diagramas'} className={vista === 'diagramas' ? 'on' : ''} data-testid="asent-vista-diagramas" onClick={() => setVista('diagramas')}>Vigas y ligas: M y V</button>}
                 <button role="tab" aria-selected={vista === 'memoria'} className={vista === 'memoria' ? 'on' : ''} data-testid="asent-vista-memoria" onClick={() => setVista('memoria')}>Memoria paso a paso</button>
               </div>
               <div className="cim-seg" role="tablist" title="Escenario del suelo">
@@ -127,6 +134,10 @@ export default function CimAsent({ dxfScale = 1, projectName = '', onClose, onTo
                 </div>
               ) : vista === 'memoria' ? (
                 <div style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}><CimMemoria R={Rrev} /></div>
+              ) : vista === 'diagramas' && esViga ? (
+                <div style={{ position: 'absolute', inset: 0, overflowY: 'auto' }} data-testid="asent-diagramas">
+                  {diags.map(({ id, d }) => <div key={id} dangerouslySetInnerHTML={{ __html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${d.W} ${d.H}" width="${d.W}" height="${d.H}" font-family="DM Mono, monospace">${d.inner}</svg>` }} />)}
+                </div>
               ) : dib && (
                 <div data-testid="asent-dibujo" dangerouslySetInnerHTML={{ __html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dib.W} ${dib.H}" width="${dib.W}" height="${dib.H}" font-family="DM Mono, monospace">${dib.inner}</svg>` }} />
               )}
@@ -136,7 +147,7 @@ export default function CimAsent({ dxfScale = 1, projectName = '', onClose, onTo
           <div className="cim-ram-der">
             {res.paneles.length > 0 && <CimRevisiones R={Rrev} />}
             {res.sinPos?.length > 0 && <p className="cim-aviso-mini" data-testid="asent-sinpos">Sin posición en planta (no salieron de RAM ni tienen ejes ligados): {res.sinPos.map((z) => z.nombre).join(', ')}. No entran.</p>}
-            {res.ligasSin?.length > 0 && <p className="cim-aviso-mini">Ligas con un apoyo fuera de las corridas: {res.ligasSin.join(', ')}. Su efecto no se calcula.</p>}
+            {res.ligasSin?.length > 0 && <p className="cim-aviso-mini" data-testid="asent-ligassin">{esViga ? `Ligas que no entran: ${res.ligasSin.join(', ')}.` : `Ligas con un apoyo fuera de las corridas: ${res.ligasSin.join(', ')}. Su efecto no se calcula.`}</p>}
             <div className="cim-grupo-t" style={{ marginTop: 8 }}>Salidas</div>
             <button className="btn btn-secondary" data-testid="asent-pdf" disabled={!res.paneles.length || ocupado} onClick={() => salida('pdf')}>📄 Memoria PDF</button>
             <button className="btn btn-secondary" data-testid="asent-svg" disabled={!res.paneles.length || ocupado} onClick={() => salida('svg')}>Imagen (SVG) de la vista</button>

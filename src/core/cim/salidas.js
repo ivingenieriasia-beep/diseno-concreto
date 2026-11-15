@@ -13,7 +13,7 @@ import { revisarCim, tipoCim } from './index'
 import { planosSvg, dibujoParaExportar, dibujoParaDocumento, baseNombre, sello } from './planos'
 import { svgParaDxf } from './lienzo'
 import { SUELO, f2 } from './comun'
-import { dibujoAsent, svgAsent } from './asentDibujo'
+import { dibujoAsent, svgAsent, diagramaViga, diagramaLiga } from './asentDibujo'
 export { dibujoParaExportar, dibujoParaDocumento, planosSvg } from './planos'
 import { svgToDxf } from '../svgToDxf'
 import { svgToPng } from '../generateMemoria'
@@ -227,6 +227,12 @@ export async function memoriaAsentPdf(res, { projectName = '', zonas = [] } = {}
   }
   parrafo(doc, ctx, 'Revisiones', { tam: 10.5, negrita: true, antes: 1 })
   tabla(doc, ctx, [{ t: 'Revisión', w: 72 }, { t: 'Actuante', w: 40, align: 'right' }, { t: 'Resistente / límite', w: 50, align: 'right' }, { t: 'Aprov.', w: 21.9, align: 'right' }], filasRevision(res))
+  if (res.metodo === 'viga') {
+    parrafo(doc, ctx, 'Deformada, momento y cortante de cada viga y liga', { tam: 10.5, negrita: true, antes: 3, despues: 1 })
+    const fu = { fuente: 'DejaVu Sans Mono, monospace' }
+    for (const v of res.vigas) { const d = diagramaViga(v, { W: 1000, limD: res.limD }); await imagen(doc, ctx, svgAsent(d, fu), d.W, d.H, 150) }
+    for (const l of res.ligas.filter((x) => !x.inactiva)) { const d = diagramaLiga(l, { W: 1000 }); await imagen(doc, ctx, svgAsent(d, fu), d.W, d.H, 90) }
+  }
   for (const s of res.secciones) {
     parrafo(doc, ctx, s.titulo, { tam: 9.8, negrita: true, antes: 3, despues: 1 })
     tabla(doc, ctx, [

@@ -14,7 +14,7 @@ Lo básico del estado:
 - Título **Cimentaciones** con el contador: "N cimiento(s) · M no cumplen" o "· todos cumplen".
 - **🪨 Suelo y criterios** con la etiqueta `qadm 15.0` (el qadm vigente) [cim-obra-btn]: abre el modal de la obra.
 - **⚡ Desde RAM** [cim-ram-btn]: abre la ventana de reacciones.
-- **📉 Asentamientos** [cim-asent-btn]: abre el apartado de asentamientos (§6 bis, desde la 3.12).
+- **📉 Asentamientos** [cim-asent-btn]: abre el apartado de asentamientos (§6 bis, desde la 3.12; la viga sobre resortes, desde la 3.13).
 - **📄 Memoria PDF** [cim-pdf]: PDF del cimiento seleccionado. Se desactiva si no hay ninguno.
 - **todos** [cim-pdf-todos]: PDF de todos los cimientos. Necesita al menos 2.
 - **DXF** [cim-dxf]: el seleccionado. **DXF todos** [cim-dxf-todos] necesita al menos 2.
@@ -437,6 +437,42 @@ Pedido por FB: ver en una malla cómo se va a asentar la cimentación, evaluar e
   - la corrida es flexible;
   - el semiespacio no tiene capas: con zonas, cada punto usa el E y ν de su estrato;
   - el asentamiento va sobre el eje.
+
+### Viga sobre resortes (desde la 3.13)
+
+Pedido por FB, aprobado el 2026-11-14: la corrida flexible no sirve para saber si una trabe de liga arregla un tramo sobre suelo blando, porque cada panel asienta solo. En la viga sobre resortes, la cimentación reparte la carga.
+
+**Cómo trabaja la cimentación** [asent-metodo]:
+- **corrida flexible** (vacío): la de la 3.12, sin cambios. Los proyectos de la 3.12 se abren así;
+- **viga sobre resortes**: usa Winkler (ks).
+
+**Datos que se piden en la viga** (ninguno de fábrica):
+- **Peso de la zapata y el relleno** [asent-peso]: no se suma; el W del diseño de cada cimiento; o capturado en t/m [asent-wPeso-{nombre}].
+- **Cruces** [asent-cruces], sólo si un nudo está en dos vigas: unidos (bajan lo mismo y la reacción entra una vez) o separados (cada viga por su cuenta, con la reacción completa).
+- **Trabes de liga** [asent-liga-{clave}]:
+  - las TL del proyecto que van entre nudos de RAM entran solas; de cada una se elige cómo llega cada extremo;
+  - **＋ liga** [asent-mas-liga]: sección (una TL del proyecto) [asent-liga-tl-{id}], de qué nudo sale [asent-liga-de-{id}], a dónde llega: otro nudo o el eje de otra viga [asent-liga-tipo-{id}], y cómo llega cada extremo [asent-liga-extA-{id}] y [asent-liga-extB-{id}]: empotrada o articulada.
+- **Ie/Ig** [asent-fInercia], de las vigas y de las ligas. El factor de carga del hundimiento no se usa: el M y el V salen de U1.
+
+**Qué entra:** las corridas con CT y las contratrabes que salieron de RAM, y sus ejes ligados. Una corrida con muro de concreto (sin CT) se toma flexible y se avisa.
+
+**Cómo calcula** (sale igual en la memoria):
+- Cada viga es de Euler-Bernoulli con elementos de 2.5 cm o menos y un nudo en cada apoyo y en cada extremo de liga.
+  - En cada nudo, un resorte k = ks · B · (largo tributario), con el ks del estrato o la zona bajo ese punto.
+- **Rigidez:** EI = Ec · (Ie/Ig) · Ig, sólo la CT de la corrida o la contratrabe bw × H. La zapata y el muro no suman.
+- **Cargas:**
+  - servicio, CM + CV media (o la máxima donde falte, si se marcó), para los asentamientos y la distorsión;
+  - U1, fcm CM + fcv CV máxima con los factores de Suelo y criterios, para el M y el V.
+  - Las corridas llevan la w de la línea, las reacciones en su nudo o las dos, según «Carga de cada franja». Las contratrabes llevan siempre las reacciones de sus columnas. El peso entra con fcm en U1.
+- **Liga:** un resorte vertical entre sus dos extremos, sin apoyo en el suelo ni peso propio:
+  - empotrada-empotrada, k = 12 EI/L³ y M = 6 EI Δ/L² en cada extremo;
+  - empotrada-articulada, k = 3 EI/L³ y M = 3 EI Δ/L² = F L en el empotrado;
+  - articulada en los dos extremos no transmite nada y se avisa.
+  - Si llega al eje de otra viga, llega al pie de la perpendicular desde su nudo.
+- **Revisiones:** asentamiento medio y distorsión entre apoyos (servicio); flexión de la viga (M⁺ contra el MR de abajo y M⁻ contra el de arriba) y cortante de la viga (V máximo en cualquier punto); flexión y cortante de la liga, con la fuerza que toma en servicio.
+- **Vigas y ligas: M y V** [asent-vista-diagramas]: de cada viga, la deformada de servicio con la distorsión de cada tramo, el M y el V de U1 con MR y VR; de cada liga, su M y su V. Van también a la memoria PDF.
+- En la planta, cada liga sale punteada, verde o roja, con la fuerza que toma en servicio [data-liga].
+- **Nota en la memoria:** es el M y el V con las cargas U1 sobre los resortes; el ingeniero decide cómo se combina con el diseño de la CT o la contratrabe (presión rígida).
 
 ---
 
